@@ -1,0 +1,88 @@
+// Placeholder login only (real auth module is N Danushika's)
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const { pool } = require('../../config/db');
+const config = require('../../config/env');
+const { SESSION_COOKIE_NAME } = require('../../config/roles');
+const asyncHandler = require('../../utils/asyncHandler');
+const ApiError = require('../../utils/ApiError');
+const { authLimiter } = require('../../middleware/rateLimiters');
+const bcrypt = require('bcryptjs');
+
+const router = express.Router();
+
+function issueSessionCookie(res, user) {
+  const token = jwt.sign({ sub: user.id, role: user.role }, config.auth.jwtSecret, {
+    expiresIn: config.auth.jwtExpiresIn,
+  });
+  res.cookie(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'strict',
+    maxAge: config.auth.sessionTimeoutMinutes * 60 * 1000,
+  });
+}
+
+// POST /api/session/login - placeholder sign-in for standalone testing only.
+router.post(
+  '/login',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    const [rows] = await pool.execute(
+      'SELECT id, full_name, email, password_hash, role, status FROM users WHERE email = ?',
+      [email]
+    );
+    const user = rows[0];
+    if (!user || user.status !== 'ACTIVE') {
+      throw new ApiError(401, 'Invalid email or password.');
+    }
+    const passwordMatches = await bcrypt.compare(password || '', user.password_hash);
+    if (!passwordMatches) {
+      throw new ApiError(401, 'Invalid email or password.');
+    }
+
+    issueSessionCookie(res, user);
+    res.status(200).json({
+      success: true,
+      data: { id: user.id, fullName: user.full_name, email: user.email, role: user.role },
+    });
+  })
+);
+
+// POST /api/session/logout
+router.post('/logout', (req, res) => {
+  res.clearCookie(SESSION_COOKIE_NAME);
+  res.status(200).json({ success: true, message: 'Logged out.' });
+});
+
+// GET /api/session/me - lets the frontend know who is currently logged in.
+router.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    const token = req.cookies[SESSION_COOKIE_NAME];
+    if (!token) throw new ApiError(401, 'Not logged in.');
+
+    let payload;
+    try {
+      payload = jwt.verify(token, config.auth.jwtSecret);
+    } catch (error) {
+      throw new ApiError(401, 'Session expired.');
+    }
+
+    const [rows] = await pool.execute(
+      'SELECT id, full_name, email, role, status FROM users WHERE id = ?',
+      [payload.sub]
+    );
+    const user = rows[0];
+    if (!user || user.status !== 'ACTIVE') {
+      throw new ApiError(401, 'Session expired.');
+    }
+    res.status(200).json({
+      success: true,
+      data: { id: user.id, fullName: user.full_name, email: user.email, role: user.role },
+    });
+  })
+);
+
+module.exports = router;

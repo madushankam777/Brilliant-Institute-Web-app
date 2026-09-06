@@ -41,25 +41,27 @@ owner: N Danushika) is authored separately.
 
 ```
 Brilliant-Institute-Web-app/
-├── server/                        Node.js + Express REST API
-│   ├── scripts/seed.js            Demo tutor + student + class
-│   ├── .env.example
-│   └── src/
-│       ├── config/                env.js, db.js, roles.js
-│       ├── middleware/            auth, RBAC, rate limiting, CSRF, error handling
-│       ├── utils/                 ApiError, safe DTO mappers, audit log
-│       ├── modules/
-│       │   ├── session/           Placeholder login only (real login is a separate module)
-│       │   ├── attendance/        Attendance marking
-│       │   └── payment/           Fee payments
-│       ├── app.js
-│       └── server.js
-└── client/                        React (Vite) frontend
-    └── src/
-        ├── api/                   httpClient, sessionApi (placeholder), attendanceApi, paymentApi
-        ├── pages/attendance/      Class sessions, Mark Attendance, Attendance History
-        ├── pages/payment/         Fee Balance (pay), Payment History
-        └── pages/PlaceholderLoginPage.jsx
+├── sql/schema.sql                 Shared MySQL schema (not part of this module, kept once for the team)
+└── M T Madushanka/
+    ├── server/                    Node.js + Express REST API
+    │   ├── scripts/seed.js        Demo tutor + student + class
+    │   ├── .env.example
+    │   └── src/
+    │       ├── config/            env.js, db.js, roles.js
+    │       ├── middleware/        auth, RBAC, rate limiting, CSRF, error handling
+    │       ├── utils/             ApiError, safe DTO mappers, audit log
+    │       ├── modules/
+    │       │   ├── session/       Placeholder login only (real login is a separate module)
+    │       │   ├── attendance/    Attendance marking
+    │       │   └── payment/       Fee payments
+    │       ├── app.js
+    │       └── server.js
+    └── client/                    React (Vite) frontend
+        └── src/
+            ├── api/               httpClient, sessionApi (placeholder), attendanceApi, paymentApi
+            ├── pages/attendance/  Class sessions, Mark Attendance, Attendance History
+            ├── pages/payment/     Fee Balance (pay), Payment History
+            └── pages/PlaceholderLoginPage.jsx
 ```
 
 > This module does not include the real login - it ships a clearly-labelled
@@ -79,7 +81,7 @@ Create the schema above in MySQL (see your project's shared schema file).
 ### 2. Backend API
 
 ```bash
-cd server
+cd "M T Madushanka/server"
 cp .env.example .env      # fill in your DB password + a generated JWT_SECRET
 npm install
 npm run db:seed           # optional: creates a demo tutor + student + class
@@ -89,7 +91,7 @@ npm run dev                # http://localhost:5000
 ### 3. Frontend
 
 ```bash
-cd client
+cd "M T Madushanka/client"
 cp .env.example .env
 npm install
 npm run dev                # http://localhost:5173
