@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Alert from '../components/common/Alert';
-import FormField from '../components/common/FormField';
+import Alert from '../../../../shared/client/src/components/common/Alert';
+import FormField from '../../../../shared/client/src/components/common/FormField';
 
 function PlaceholderLoginPage() {
   const { login } = useAuth();

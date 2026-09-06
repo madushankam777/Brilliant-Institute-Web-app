@@ -1,6 +1,6 @@
 // Mock payment gateway (no card data ever stored)
 const { randomUUID } = require('crypto');
-const config = require('../../config/env');
+const config = require('../../../../../shared/server/src/config/env');
 
 // A real integration would call the gateway's HTTPS API here using
 // config.paymentGateway.apiKey. Decline/timeout below are deterministic

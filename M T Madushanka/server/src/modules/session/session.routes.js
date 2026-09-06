@@ -1,12 +1,12 @@
 // Placeholder login only (real auth module is N Danushika's)
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../../config/db');
-const config = require('../../config/env');
-const { SESSION_COOKIE_NAME } = require('../../config/roles');
-const asyncHandler = require('../../utils/asyncHandler');
-const ApiError = require('../../utils/ApiError');
-const { authLimiter } = require('../../middleware/rateLimiters');
+const { pool } = require('../../../../../shared/server/src/config/db');
+const config = require('../../../../../shared/server/src/config/env');
+const { SESSION_COOKIE_NAME } = require('../../../../../shared/server/src/config/roles');
+const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
+const ApiError = require('../../../../../shared/server/src/utils/ApiError');
+const { authLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
 const bcrypt = require('bcryptjs');
 
 const router = express.Router();

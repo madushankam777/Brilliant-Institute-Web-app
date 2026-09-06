@@ -1,5 +1,5 @@
 // Placeholder login client (real auth module is N Danushika's)
-import httpClient from './httpClient';
+import httpClient from '../../../../shared/client/src/api/httpClient';
 
 export async function login({ email, password }) {
   const response = await httpClient.post('/session/login', { email, password });

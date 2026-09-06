@@ -1,5 +1,5 @@
 // HTTP layer for attendance routes
-const asyncHandler = require('../../utils/asyncHandler');
+const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
 const service = require('./attendance.service');
 
 const listClassSessions = asyncHandler(async (req, res) => {

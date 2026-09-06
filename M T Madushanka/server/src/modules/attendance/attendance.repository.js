@@ -1,5 +1,5 @@
 // SQL for class_sessions / attendance_records
-const { pool } = require('../../config/db');
+const { pool } = require('../../../../../shared/server/src/config/db');
 
 async function findClassById(classId) {
   const [rows] = await pool.execute(`SELECT * FROM classes WHERE id = ? LIMIT 1`, [classId]);

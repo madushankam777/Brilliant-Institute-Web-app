@@ -1,7 +1,7 @@
 // Seeds a demo tutor, student, class and enrollment
 const bcrypt = require('bcryptjs');
-const config = require('../src/config/env');
-const { pool } = require('../src/config/db');
+const config = require('../../../shared/server/src/config/env');
+const { pool } = require('../../../shared/server/src/config/db');
 
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Demo@1234';
 

@@ -1,5 +1,5 @@
 // Frontend API client for the payment endpoints
-import httpClient from './httpClient';
+import httpClient from '../../../../shared/client/src/api/httpClient';
 
 export async function fetchMyBalances() {
   const response = await httpClient.get('/payments/balance');

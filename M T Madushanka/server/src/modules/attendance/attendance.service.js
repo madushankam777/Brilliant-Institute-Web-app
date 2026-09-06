@@ -1,8 +1,8 @@
 // Attendance business logic
-const config = require('../../config/env');
-const ApiError = require('../../utils/ApiError');
-const { recordAuditEvent } = require('../../utils/auditLogger');
-const { ROLES } = require('../../config/roles');
+const config = require('../../../../../shared/server/src/config/env');
+const ApiError = require('../../../../../shared/server/src/utils/ApiError');
+const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
+const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const repository = require('./attendance.repository');
 
 async function assertTutorOwnsClass(tutorUser, classRow) {

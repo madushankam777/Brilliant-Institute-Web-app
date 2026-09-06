@@ -1,5 +1,5 @@
 // HTTP layer for payment routes
-const asyncHandler = require('../../utils/asyncHandler');
+const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
 const service = require('./payment.service');
 
 const getMyBalances = asyncHandler(async (req, res) => {

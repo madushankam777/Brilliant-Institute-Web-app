@@ -5,7 +5,7 @@ import Navbar from './components/layout/Navbar';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
 import HomePage from './pages/HomePage';
-import NotFoundPage from './pages/NotFoundPage';
+import NotFoundPage from '../../../shared/client/src/pages/NotFoundPage';
 import PlaceholderLoginPage from './pages/PlaceholderLoginPage';
 
 import ClassSessionsPage from './pages/attendance/ClassSessionsPage';

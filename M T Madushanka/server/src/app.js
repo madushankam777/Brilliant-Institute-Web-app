@@ -5,10 +5,10 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 
-const config = require('./config/env');
-const { apiLimiter } = require('./middleware/rateLimiters');
-const csrfGuard = require('./middleware/csrfGuard');
-const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
+const config = require('../../../shared/server/src/config/env');
+const { apiLimiter } = require('../../../shared/server/src/middleware/rateLimiters');
+const csrfGuard = require('../../../shared/server/src/middleware/csrfGuard');
+const { notFoundHandler, errorHandler } = require('../../../shared/server/src/middleware/errorHandler');
 
 const sessionRoutes = require('./modules/session/session.routes'); // placeholder login only
 const attendanceRoutes = require('./modules/attendance/attendance.routes');

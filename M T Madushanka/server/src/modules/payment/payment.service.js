@@ -1,8 +1,8 @@
 // Payment business logic (transactions, receipts)
-const { pool } = require('../../config/db');
-const ApiError = require('../../utils/ApiError');
-const { recordAuditEvent } = require('../../utils/auditLogger');
-const { toSafePayment } = require('../../utils/sanitize');
+const { pool } = require('../../../../../shared/server/src/config/db');
+const ApiError = require('../../../../../shared/server/src/utils/ApiError');
+const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
+const { toSafePayment } = require('../../../../../shared/server/src/utils/sanitize');
 const { PAYMENT_STATUS } = require('./payment.constants');
 const gateway = require('./paymentGateway');
 const repository = require('./payment.repository');

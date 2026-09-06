@@ -1,6 +1,6 @@
 // Entry point: checks DB, then starts listening
-const config = require('./config/env');
-const { verifyDatabaseConnection } = require('./config/db');
+const config = require('../../../shared/server/src/config/env');
+const { verifyDatabaseConnection } = require('../../../shared/server/src/config/db');
 const app = require('./app');
 
 async function start() {

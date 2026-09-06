@@ -1,8 +1,8 @@
 // Student/Parent: view balance, pay online
 import { useCallback, useEffect, useState } from 'react';
 import { fetchMyBalances, makePayment } from '../../api/paymentApi';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Alert from '../../components/common/Alert';
+import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
+import Alert from '../../../../../shared/client/src/components/common/Alert';
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);

@@ -1,5 +1,5 @@
 // SQL for enrollments / payments / receipts
-const { pool } = require('../../config/db');
+const { pool } = require('../../../../../shared/server/src/config/db');
 
 async function findEnrollmentById(enrollmentId, executor = pool) {
   const [rows] = await executor.execute(

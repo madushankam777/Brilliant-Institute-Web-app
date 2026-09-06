@@ -1,9 +1,9 @@
 // Route table, mounted at /api/payments
 const express = require('express');
-const authenticate = require('../../middleware/authenticate');
-const authorize = require('../../middleware/authorize');
-const validateRequest = require('../../middleware/validateRequest');
-const { ROLES } = require('../../config/roles');
+const authenticate = require('../../../../../shared/server/src/middleware/authenticate');
+const authorize = require('../../../../../shared/server/src/middleware/authorize');
+const validateRequest = require('../../../../../shared/server/src/middleware/validateRequest');
+const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const controller = require('./payment.controller');
 const { makePaymentRules, paymentIdParamRules } = require('./payment.validation');
 

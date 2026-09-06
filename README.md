@@ -35,70 +35,95 @@ A full-stack web application designed to digitize and centralize the day-to-day 
 
 ## Project Structure
 
-This branch holds the **Attendance & Payment** module (SRS ATP-01..ATP-07,
-owner: M T Madushanka). The **Registration & Login** module (REG-01..REG-08,
-owner: N Danushika) is authored separately.
+This repository is organised **by contributor**, so each person's work can be
+reviewed, run, and submitted independently. Code that's genuinely identical
+across both modules (and would otherwise be duplicated file-for-file) lives
+once, in `shared/`, instead of being copy-pasted into each person's folder:
 
 ```
 Brilliant-Institute-Web-app/
-├── sql/schema.sql                 Shared MySQL schema (not part of this module, kept once for the team)
-└── M T Madushanka/
-    ├── server/                    Node.js + Express REST API
-    │   ├── scripts/seed.js        Demo tutor + student + class
-    │   ├── .env.example
-    │   └── src/
-    │       ├── config/            env.js, db.js, roles.js
-    │       ├── middleware/        auth, RBAC, rate limiting, CSRF, error handling
-    │       ├── utils/             ApiError, safe DTO mappers, audit log
-    │       ├── modules/
-    │       │   ├── session/       Placeholder login only (real login is a separate module)
-    │       │   ├── attendance/    Attendance marking
-    │       │   └── payment/       Fee payments
-    │       ├── app.js
-    │       └── server.js
-    └── client/                    React (Vite) frontend
-        └── src/
-            ├── api/               httpClient, sessionApi (placeholder), attendanceApi, paymentApi
-            ├── pages/attendance/  Class sessions, Mark Attendance, Attendance History
-            ├── pages/payment/     Fee Balance (pay), Payment History
-            └── pages/PlaceholderLoginPage.jsx
+├── sql/schema.sql                  Shared MySQL schema (kept once for the whole team)
+├── shared/                         Code identical across every module - see note below
+│   ├── server/src/
+│   │   ├── config/                 env.js, db.js, roles.js
+│   │   ├── middleware/             auth, RBAC, rate limiting, CSRF, error handling
+│   │   └── utils/                  ApiError, safe DTO mappers, audit log, password policy
+│   └── client/src/
+│       ├── api/httpClient.js
+│       ├── components/common/      Alert, FormField, LoadingSpinner
+│       └── pages/NotFoundPage.jsx
+│
+├── M T Madushanka/                 Attendance & Payment module (SRS ATP-01..ATP-07)
+│   ├── server/
+│   │   ├── scripts/seed.js         Demo tutor + student + class
+│   │   └── src/
+│   │       ├── modules/session/    Placeholder login only (real login is N Danushika's)
+│   │       ├── modules/attendance/
+│   │       ├── modules/payment/
+│   │       ├── app.js
+│   │       └── server.js
+│   └── client/src/
+│       ├── api/                    sessionApi (placeholder), attendanceApi, paymentApi
+│       ├── pages/attendance/, pages/payment/, pages/PlaceholderLoginPage.jsx
+│       ├── context/AuthContext.jsx, components/layout/{Navbar,ProtectedRoute}.jsx
+│       └── App.jsx
+│
+└── N Danushika/                    Registration & Login module (SRS REG-01..REG-08)
+    ├── server/src/modules/auth/
+    └── client/src/
+        ├── api/authApi.js
+        ├── pages/auth/
+        ├── context/AuthContext.jsx, components/layout/{Navbar,ProtectedRoute}.jsx
+        └── App.jsx
 ```
 
-> This module does not include the real login - it ships a clearly-labelled
-> placeholder (`modules/session`, `PlaceholderLoginPage.jsx`) so the
-> Attendance & Payment pages can be reached and tested on their own.
+> **Why `shared/` exists:** `config/`, `middleware/`, `utils/`, `httpClient.js`,
+> the common UI components, and the 404 page were byte-for-byte identical in
+> both folders - env validation, the MySQL pool, JWT/RBAC middleware, rate
+> limiters, the safe-DTO helper. Neither module "owns" them, so they live
+> once here and both apps import them via a relative path into `shared/`.
 >
-> The SQL schema (`users`, `classes`, `class_sessions`, `enrollments`,
-> `attendance_records`, `payments`, `receipts`, `audit_log`) is not part of
-> this repository - set it up separately in your own MySQL database.
+> **What's deliberately NOT in `shared/`**, even though a couple of these
+> files look similar at a glance: `AuthContext.jsx`, `Navbar.jsx`, `App.jsx`,
+> `HomePage.jsx` and each module's `package.json` are genuinely different per
+> module (different routes, different login mechanism) - and `ProtectedRoute.jsx`
+> was textually identical but depends on each module's own `AuthContext`, so
+> it stays duplicated rather than creating a hidden cross-module dependency.
+>
+> Each app's own `.env`, `index.html`, `main.jsx`, `vite.config.js` and
+> `package.json` also stay local - they're that app's own bootstrap/build
+> config, not reusable code, even where their content currently matches.
 
 ## Getting Started
 
+Each contributor's folder is a complete, independently runnable app (its own
+`server/` + `client/`), depending only on `shared/` and the database schema.
+
 ### 1. Database
 
-Create the schema above in MySQL (see your project's shared schema file).
-
-### 2. Backend API
-
 ```bash
-cd "M T Madushanka/server"
-cp .env.example .env      # fill in your DB password + a generated JWT_SECRET
-npm install
-npm run db:seed           # optional: creates a demo tutor + student + class
-npm run dev                # http://localhost:5000
+mysql -u root -p < sql/schema.sql
 ```
 
-### 3. Frontend
+### 2. Run a module (pick one folder)
 
 ```bash
-cd "M T Madushanka/client"
+cd "M T Madushanka/server"   # or: cd "N Danushika/server"
+cp .env.example .env         # fill in your DB password + a generated JWT_SECRET
+npm install
+npm run dev                  # http://localhost:5000
+```
+
+```bash
+cd "M T Madushanka/client"   # or: cd "N Danushika/client"
 cp .env.example .env
 npm install
-npm run dev                # http://localhost:5173
+npm run dev                  # http://localhost:5173
 ```
 
-Demo accounts created by `npm run db:seed` (password `Demo@1234` unless you
-set `SEED_DEMO_PASSWORD`):
+Only M T Madushanka's server has `npm run db:seed` (creates a demo tutor +
+student + class, password `Demo@1234` unless you set `SEED_DEMO_PASSWORD`).
+To test N Danushika's module, register a new account via the Register page.
 
 | Role    | Email                  |
 |---------|------------------------|

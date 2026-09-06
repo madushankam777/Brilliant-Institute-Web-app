@@ -1,5 +1,5 @@
 // Frontend API client for the attendance endpoints
-import httpClient from './httpClient';
+import httpClient from '../../../../shared/client/src/api/httpClient';
 
 export async function fetchClassSessions(classId) {
   const response = await httpClient.get(`/attendance/classes/${classId}/sessions`);

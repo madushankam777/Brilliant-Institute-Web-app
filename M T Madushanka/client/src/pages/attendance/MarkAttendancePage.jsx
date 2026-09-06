@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchAttendanceSheet, saveAttendance } from '../../api/attendanceApi';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Alert from '../../components/common/Alert';
+import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
+import Alert from '../../../../../shared/client/src/components/common/Alert';
 
 const STATUS_OPTIONS = ['PRESENT', 'ABSENT', 'LATE'];
 

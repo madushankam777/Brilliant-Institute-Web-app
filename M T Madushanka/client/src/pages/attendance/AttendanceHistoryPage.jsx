@@ -1,8 +1,8 @@
 // Student/Parent: attendance history + rate
 import { useEffect, useState } from 'react';
 import { fetchMyAttendanceHistory } from '../../api/attendanceApi';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Alert from '../../components/common/Alert';
+import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
+import Alert from '../../../../../shared/client/src/components/common/Alert';
 
 function statusBadgeClass(status) {
   if (status === 'PRESENT') return 'badge badge-success';

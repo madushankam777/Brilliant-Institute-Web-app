@@ -1,7 +1,7 @@
 // Frontend route guard (server still re-checks access)
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import LoadingSpinner from '../common/LoadingSpinner';
+import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 
 function ProtectedRoute({ allowedRoles }) {
   const { isLoggedIn, isCheckingSession, user } = useAuth();

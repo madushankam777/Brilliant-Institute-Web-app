@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchClassSessions } from '../../api/attendanceApi';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Alert from '../../components/common/Alert';
+import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
+import Alert from '../../../../../shared/client/src/components/common/Alert';
 
 function ClassSessionsPage() {
   const { classId: classIdParam } = useParams();
