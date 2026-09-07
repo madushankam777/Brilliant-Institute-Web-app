@@ -11,8 +11,15 @@ const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
+// A bcrypt hash of no real password, used only so a login for a non-existent
+// or inactive account still runs a comparison of the same cost - without
+// this, responses for "no such user" would return measurably faster than
+// "wrong password", letting an attacker detect which emails are registered.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
+
 function issueSessionCookie(res, user) {
   const token = jwt.sign({ sub: user.id, role: user.role }, config.auth.jwtSecret, {
+    algorithm: 'HS256',
     expiresIn: config.auth.jwtExpiresIn,
   });
   res.cookie(SESSION_COOKIE_NAME, token, {
@@ -34,11 +41,16 @@ router.post(
       [email]
     );
     const user = rows[0];
-    if (!user || user.status !== 'ACTIVE') {
-      throw new ApiError(401, 'Invalid email or password.');
-    }
-    const passwordMatches = await bcrypt.compare(password || '', user.password_hash);
-    if (!passwordMatches) {
+    const isAccountUsable = Boolean(user) && user.status === 'ACTIVE';
+
+    // Always compare against a real bcrypt hash - even when there's no such
+    // user - so this takes the same time either way (see DUMMY_PASSWORD_HASH).
+    const passwordMatches = await bcrypt.compare(
+      password || '',
+      isAccountUsable ? user.password_hash : DUMMY_PASSWORD_HASH
+    );
+
+    if (!isAccountUsable || !passwordMatches) {
       throw new ApiError(401, 'Invalid email or password.');
     }
 
@@ -65,7 +77,7 @@ router.get(
 
     let payload;
     try {
-      payload = jwt.verify(token, config.auth.jwtSecret);
+      payload = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] });
     } catch (error) {
       throw new ApiError(401, 'Session expired.');
     }

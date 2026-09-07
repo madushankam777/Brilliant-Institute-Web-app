@@ -12,7 +12,8 @@ function authenticate(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, config.auth.jwtSecret);
+    // Explicitly pin the algorithm - never let the token's own header pick it.
+    const payload = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] });
     req.user = {
       id: payload.sub,
       role: payload.role,

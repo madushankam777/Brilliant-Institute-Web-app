@@ -1,4 +1,3 @@
-// Top navigation bar, scoped to this module's routes
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 

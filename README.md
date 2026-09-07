@@ -93,6 +93,13 @@ Brilliant-Institute-Web-app/
 > Each app's own `.env`, `index.html`, `main.jsx`, `vite.config.js` and
 > `package.json` also stay local - they're that app's own bootstrap/build
 > config, not reusable code, even where their content currently matches.
+>
+> **Node.js can't see a sibling folder's `node_modules`** - it only looks in
+> the requiring file's own folder and upward from there. So `shared/server`
+> has a small `package.json` of its own for the few packages its code needs
+> (see step 2 below), and `shared/client`'s packages are resolved through an
+> alias in each app's `vite.config.js` pointing at that app's own
+> `node_modules` instead.
 
 ## Getting Started
 
@@ -107,7 +114,13 @@ mysql -u root -p < sql/schema.sql
 
 ### 2. Run a module (pick one folder)
 
+`shared/server` has a few packages of its own (`dotenv`, `mysql2`, etc.) that
+its code needs - install those once, then install and run your module as
+usual:
+
 ```bash
+cd shared/server && npm install && cd ../..
+
 cd "M T Madushanka/server"   # or: cd "N Danushika/server"
 cp .env.example .env         # fill in your DB password + a generated JWT_SECRET
 npm install

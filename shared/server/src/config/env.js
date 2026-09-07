@@ -33,6 +33,17 @@ function assertRequiredEnvVars() {
     );
     process.exit(1);
   }
+
+  // A short JWT secret is brute-forceable against the signed tokens it
+  // produces - refuse to start rather than run with a weak one.
+  if (process.env.JWT_SECRET.length < 32) {
+    // eslint-disable-next-line no-console
+    console.error(
+      '\n[FATAL] JWT_SECRET is too short (must be at least 32 characters).\n' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"\n'
+    );
+    process.exit(1);
+  }
 }
 
 assertRequiredEnvVars();

@@ -5,11 +5,19 @@ import { fetchClassSessions } from '../../api/attendanceApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 
+// A class id is always a plain positive integer (see attendance.validation.js
+// on the server). Rejecting anything else here - before it ever reaches
+// navigate() - closes off open-redirect payloads smuggled through the URL's
+// own :classId segment (e.g. a link containing "\\evil.com" as the id).
+function isValidClassId(value) {
+  return /^[1-9][0-9]*$/.test(String(value || ''));
+}
+
 function ClassSessionsPage() {
   const { classId: classIdParam } = useParams();
   const navigate = useNavigate();
 
-  const [classIdInput, setClassIdInput] = useState(classIdParam || '');
+  const [classIdInput, setClassIdInput] = useState(isValidClassId(classIdParam) ? classIdParam : '');
   const [classSubject, setClassSubject] = useState('');
   const [sessions, setSessions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,14 +39,19 @@ function ClassSessionsPage() {
   }, []);
 
   useEffect(() => {
-    if (classIdParam) {
+    if (isValidClassId(classIdParam)) {
       loadSessions(classIdParam);
+    } else if (classIdParam) {
+      setErrorMessage('Invalid class id in the URL.');
     }
   }, [classIdParam, loadSessions]);
 
   function handleFindClass(event) {
     event.preventDefault();
-    if (!classIdInput) return;
+    if (!isValidClassId(classIdInput)) {
+      setErrorMessage('Please enter a valid class id (a positive number).');
+      return;
+    }
     navigate(`/attendance/classes/${classIdInput}/sessions`);
   }
 

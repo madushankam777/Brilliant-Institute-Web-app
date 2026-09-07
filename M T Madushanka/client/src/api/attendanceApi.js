@@ -1,4 +1,3 @@
-// Frontend API client for the attendance endpoints
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
 export async function fetchClassSessions(classId) {
