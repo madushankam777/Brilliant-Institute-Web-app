@@ -29,9 +29,10 @@ async function findEnrollmentByIdForUpdate(enrollmentId, connection) {
 
 async function listBalancesForStudent(studentId, executor = pool) {
   const [rows] = await executor.execute(
-    `SELECT e.id AS enrollment_id, e.class_id, c.subject, e.balance
+    `SELECT e.id AS enrollment_id, e.class_id, c.subject, e.balance, t.full_name AS tutor_name
      FROM enrollments e
      JOIN classes c ON c.id = e.class_id
+     JOIN users t ON t.id = c.tutor_id
      WHERE e.student_id = ? AND e.status = 'ACTIVE'
      ORDER BY c.subject ASC`,
     [studentId]

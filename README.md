@@ -35,23 +35,44 @@ A full-stack web application designed to digitize and centralize the day-to-day 
 
 ## Project Structure
 
-This repository is organised **by contributor**, so each person's work can be
-reviewed, run, and submitted independently. Code that's genuinely identical
-across both modules (and would otherwise be duplicated file-for-file) lives
-once, in `shared/`, instead of being copy-pasted into each person's folder:
+This repository holds three things:
+
+1. **`client/` + `server/` at the root** - the combined site. One login
+   (N Danushika's real Registration & Login), one running app, with
+   Attendance & Payment (M T Madushanka) as protected pages behind that
+   same login. This is what you deploy / demo.
+2. **`M T Madushanka/` and `N Danushika/`** - each contributor's own
+   complete, independently runnable copy of their module, for individual
+   review and submission. The combined app mounts their *actual* server
+   route files directly (not copies), so there is one source of truth for
+   the server-side logic either way.
+3. **`shared/`** - the one place for everything genuinely common to the
+   **whole NexusDev team** (env validation, the MySQL pool, JWT/RBAC
+   middleware, rate limiters, the safe-DTO helper, common UI components,
+   the institute logo and other brand assets) - not just Attendance/Payment
+   and Registration/Login. When C D Kumanan, H A S Hapuarachchi or
+   S Vithushan add Course Management, Feedback & Complaint, or
+   Admin & Notifications, their code should import from here too, instead
+   of copy-pasting a second version of the logo, the auth middleware, etc.
 
 ```
 Brilliant-Institute-Web-app/
 ├── sql/schema.sql                  Shared MySQL schema (kept once for the whole team)
+├── client/ + server/                THE COMBINED SITE - run this one (see Getting Started)
 ├── shared/                         Code identical across every module - see note below
 │   ├── server/src/
 │   │   ├── config/                 env.js, db.js, roles.js
 │   │   ├── middleware/             auth, RBAC, rate limiting, CSRF, error handling
 │   │   └── utils/                  ApiError, safe DTO mappers, audit log, password policy
-│   └── client/src/
-│       ├── api/httpClient.js
-│       ├── components/common/      Alert, FormField, LoadingSpinner
-│       └── pages/NotFoundPage.jsx
+│   └── client/
+│       ├── public/favicon.jpeg     The one favicon file - every app's vite.config.js
+│       │                          points its publicDir here instead of keeping a copy
+│       └── src/
+│           ├── api/httpClient.js
+│           ├── assets/             logo.jpeg (institute crest) - and any future shared images
+│           ├── components/common/  Alert, FormField, Icon, Logo, PasswordStrength, StatCard, LoadingSpinner
+│           ├── components/layout/  AuthLayout, Footer, PortalShell, navItems.js
+│           └── pages/NotFoundPage.jsx
 │
 ├── M T Madushanka/                 Attendance & Payment module (SRS ATP-01..ATP-07)
 │   ├── server/
@@ -78,10 +99,13 @@ Brilliant-Institute-Web-app/
 ```
 
 > **Why `shared/` exists:** `config/`, `middleware/`, `utils/`, `httpClient.js`,
-> the common UI components, and the 404 page were byte-for-byte identical in
-> both folders - env validation, the MySQL pool, JWT/RBAC middleware, rate
-> limiters, the safe-DTO helper. Neither module "owns" them, so they live
-> once here and both apps import them via a relative path into `shared/`.
+> the common UI components, the institute logo, and the 404 page were
+> byte-for-byte identical in both folders - env validation, the MySQL pool,
+> JWT/RBAC middleware, rate limiters, the safe-DTO helper, the brand crest.
+> No single module "owns" them, so they live once here and every app
+> (present and future) imports them via a relative path into `shared/`,
+> instead of each contributor keeping their own copy of the logo or
+> re-implementing the same middleware.
 >
 > **What's deliberately NOT in `shared/`**, even though a couple of these
 > files look similar at a glance: `AuthContext.jsx`, `Navbar.jsx`, `App.jsx`,
@@ -90,9 +114,17 @@ Brilliant-Institute-Web-app/
 > was textually identical but depends on each module's own `AuthContext`, so
 > it stays duplicated rather than creating a hidden cross-module dependency.
 >
-> Each app's own `.env`, `index.html`, `main.jsx`, `vite.config.js` and
-> `package.json` also stay local - they're that app's own bootstrap/build
-> config, not reusable code, even where their content currently matches.
+> **Why `index.html`, `main.jsx`, `vite.config.js`, `package.json`, `.env`
+> and `tsconfig.json` still exist once per app, even though their content
+> currently matches:** these aren't application code Vite bundles together -
+> they're each app's own *project root*. Vite (and npm) require `index.html`
+> and `package.json` to physically exist at the folder you run `npm run dev`
+> from; there's no supported way to point three separate Vite projects at
+> one shared `index.html` without hand-rolling a build step, which would
+> trade a handful of tiny boilerplate files for real fragility. Everything
+> that actually *can* be pointed at one shared copy safely already is -
+> `vite.config.js`'s `publicDir` option makes the favicon one real file
+> (`shared/client/public/favicon.jpeg`), not three.
 >
 > **Node.js can't see a sibling folder's `node_modules`** - it only looks in
 > the requiring file's own folder and upward from there. So `shared/server`
@@ -103,39 +135,68 @@ Brilliant-Institute-Web-app/
 
 ## Getting Started
 
-Each contributor's folder is a complete, independently runnable app (its own
-`server/` + `client/`), depending only on `shared/` and the database schema.
-
 ### 1. Database
 
 ```bash
 mysql -u root -p < sql/schema.sql
 ```
 
-### 2. Run a module (pick one folder)
+### 2. Run the combined site
 
 `shared/server` has a few packages of its own (`dotenv`, `mysql2`, etc.) that
-its code needs - install those once, then install and run your module as
-usual:
+its code needs - install those once, then run the site as usual:
 
 ```bash
 cd shared/server && npm install && cd ../..
 
-cd "M T Madushanka/server"   # or: cd "N Danushika/server"
+cd server
 cp .env.example .env         # fill in your DB password + a generated JWT_SECRET
 npm install
+npm run db:seed              # optional: creates a demo tutor + student + class
 npm run dev                  # http://localhost:5000
+```
+
+```bash
+cd client
+cp .env.example .env
+npm install
+npm run dev                  # http://localhost:5173
+```
+
+Open **http://localhost:5173** - register an account (or log in with a demo
+account below), and every page - profile, mark attendance, fee balance,
+payment history - is reachable from that one login.
+
+Demo accounts created by `npm run db:seed` (password `Demo@1234` unless you
+set `SEED_DEMO_PASSWORD`):
+
+| Role    | Email                  |
+|---------|------------------------|
+| Tutor   | tutor@brilliant.test   |
+| Student | student@brilliant.test |
+
+### 3. Run one person's module standalone instead
+
+Each contributor's folder is also a complete, independently runnable app on
+its own ports (useful for individually reviewing just that person's work):
+
+```bash
+cd "M T Madushanka/server"   # or: cd "N Danushika/server"
+cp .env.example .env
+npm install
+npm run dev                  # M T Madushanka: http://localhost:5000, N Danushika: http://localhost:5001
 ```
 
 ```bash
 cd "M T Madushanka/client"   # or: cd "N Danushika/client"
 cp .env.example .env
 npm install
-npm run dev                  # http://localhost:5173
+npm run dev                  # M T Madushanka: http://localhost:5173, N Danushika: http://localhost:5174
 ```
 
-Only M T Madushanka's server has `npm run db:seed` (creates a demo tutor +
-student + class, password `Demo@1234` unless you set `SEED_DEMO_PASSWORD`).
+M T Madushanka's standalone copy ships a placeholder login (the real one is
+N Danushika's module) so it can be tested without her code. Only her server
+has `npm run db:seed`.
 To test N Danushika's module, register a new account via the Register page.
 
 | Role    | Email                  |

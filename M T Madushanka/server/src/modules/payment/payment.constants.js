@@ -6,6 +6,6 @@ const PAYMENT_STATUS = Object.freeze({
   REFUNDED: 'REFUNDED',
 });
 
-const PAYMENT_METHODS = Object.freeze(['CARD', 'BANK_TRANSFER']);
+const PAYMENT_METHODS = Object.freeze(['CARD', 'EZ_CASH', 'MCASH', 'BANK_TRANSFER']);
 
 module.exports = { PAYMENT_STATUS, PAYMENT_METHODS };

@@ -1,52 +1,99 @@
+/**
+ * Navbar.jsx
+ * -----------------------------------------------------------------------
+ * Top bar for this module (Attendance & Payment). Renders the public
+ * marketing navbar when signed out, and the authenticated "portal topbar"
+ * (search, notification bell, avatar chip, log out) once signed in -
+ * matching the two navbar styles used throughout the design mockups.
+ * Sidebar/bottom-tab navigation for signed-in pages is handled separately
+ * by <PortalShell>.
+ * -----------------------------------------------------------------------
+ */
+
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import Icon from '../../../../../shared/client/src/components/common/Icon';
+import Logo from '../../../../../shared/client/src/components/common/Logo';
+
+function initialsOf(fullName) {
+  return (fullName || '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('');
+}
 
 function Navbar() {
   const { user, isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
   }
 
-  const isTutorOrAdmin = user && (user.role === 'TUTOR' || user.role === 'ADMIN');
-  const isStudentParent = user && user.role === 'STUDENT_PARENT';
+  if (isLoggedIn) {
+    return (
+      <header className="navbar">
+        <div className="navbar-brand">
+          <NavLink to="/">
+            <Logo />
+          </NavLink>
+        </div>
+
+        <div className="topbar-search">
+          <Icon name="search" size={16} />
+          <input type="search" placeholder="Search classes, billing, portal..." aria-label="Search" />
+        </div>
+
+        <div className="navbar-actions">
+          <button type="button" className="topbar-icon-btn" aria-label="Notifications">
+            <Icon name="bell" size={18} />
+          </button>
+          <span className="avatar-chip">
+            <span className="avatar-circle">{initialsOf(user.fullName) || <Icon name="user" size={16} />}</span>
+            <span className="avatar-chip-text">
+              <span className="avatar-chip-name">{user.fullName}</span>
+              <span className="avatar-chip-role">{user.role.replace('_', ' / ')}</span>
+            </span>
+          </span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleLogout}>
+            <Icon name="logout" size={15} /> Log out
+          </button>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="navbar">
       <div className="navbar-brand">
-        <NavLink to="/">Brilliant Institute</NavLink>
+        <NavLink to="/">
+          <Logo />
+        </NavLink>
       </div>
 
-      <nav className="navbar-links">
-        {isLoggedIn && isTutorOrAdmin && (
-          <NavLink to="/attendance/classes">Mark Attendance</NavLink>
-        )}
-        {isLoggedIn && isStudentParent && (
-          <>
-            <NavLink to="/attendance/history">My Attendance</NavLink>
-            <NavLink to="/payments">Fee Balance</NavLink>
-            <NavLink to="/payments/history">Payment History</NavLink>
-          </>
-        )}
+      <nav className={`navbar-links${menuOpen ? ' open' : ''}`}>
+        <NavLink to="/" end onClick={() => setMenuOpen(false)}>
+          Home
+        </NavLink>
       </nav>
 
       <div className="navbar-actions">
-        {isLoggedIn ? (
-          <>
-            <span className="navbar-user">
-              {user.fullName} <span className="badge">{user.role}</span>
-            </span>
-            <button type="button" className="btn btn-secondary" onClick={handleLogout}>
-              Log out
-            </button>
-          </>
-        ) : (
-          <NavLink to="/login" className="btn btn-secondary">
-            Log in
-          </NavLink>
-        )}
+        <NavLink to="/login" className="btn btn-primary btn-sm">
+          Log in
+        </NavLink>
+        <button
+          type="button"
+          className="navbar-menu-toggle"
+          aria-label="Toggle menu"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          <Icon name={menuOpen ? 'x' : 'menu'} size={22} />
+        </button>
       </div>
     </header>
   );

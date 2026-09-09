@@ -17,6 +17,7 @@ async function getMyBalances(studentUser) {
     enrollmentId: row.enrollment_id,
     classId: row.class_id,
     subject: row.subject,
+    tutorName: row.tutor_name,
     balance: Number(row.balance),
   }));
 }

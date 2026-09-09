@@ -1,0 +1,281 @@
+// Landing page (logged out) / role-based dashboard (logged in) for the
+// combined site. The dashboard only ever shows numbers this site can
+// actually back with real data (attendance rate, pending fees).
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { fetchMyAttendanceHistory } from '../api/attendanceApi';
+import { fetchMyBalances } from '../api/paymentApi';
+import Icon from '../../../shared/client/src/components/common/Icon';
+import StatCard from '../../../shared/client/src/components/common/StatCard';
+import Footer from '../../../shared/client/src/components/layout/Footer';
+
+const FEATURES = [
+  {
+    icon: 'user',
+    title: 'One Account, Every Role',
+    description:
+      'Register once as a Student/Parent and sign in from any device - your profile, session and role travel with you across attendance and fees.',
+  },
+  {
+    icon: 'calendar',
+    title: 'Easy Class Management',
+    description:
+      'Tutors mark attendance in seconds; students see their history and rate the moment it is submitted.',
+  },
+  {
+    icon: 'card',
+    title: 'Track Attendance & Fees',
+    description:
+      'Automate billing with digital receipts. Pay outstanding fees online and pick up right where a failed payment left off.',
+  },
+  {
+    icon: 'lock',
+    title: 'Secure by Default',
+    description:
+      'Passwords are hashed, sessions live in httpOnly cookies, and every reset link expires - no plaintext credentials, ever.',
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    quote:
+      'Creating my account took less than a minute, and everything - my classes, attendance and fees - lives in one place now.',
+    name: 'Amit Patel',
+    role: 'Grade 11 Mathematics Student',
+  },
+  {
+    quote:
+      'The real-time notification engine has saved countless frantic calls. When a tutor is sick, parents get notified instantly.',
+    name: 'Evelyn Wong',
+    role: 'Parent',
+  },
+];
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
+}
+
+function StudentDashboard({ user }) {
+  const [summaryByClass, setSummaryByClass] = useState([]);
+  const [balances, setBalances] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([fetchMyAttendanceHistory(), fetchMyBalances()])
+      .then(([attendance, balanceList]) => {
+        if (!isMounted) return;
+        setSummaryByClass(attendance.summaryByClass || []);
+        setBalances(balanceList || []);
+      })
+      .catch(() => {
+        /* Dashboard degrades gracefully - the dedicated pages surface the real error. */
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const totalAttended = summaryByClass.reduce((sum, s) => sum + s.attendedSessions, 0);
+  const totalSessions = summaryByClass.reduce((sum, s) => sum + s.totalSessions, 0);
+  const overallRate = totalSessions > 0 ? Math.round((totalAttended / totalSessions) * 100) : null;
+  const pendingFees = balances.reduce((sum, b) => sum + Number(b.balance), 0);
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h1>Welcome back, {user.fullName.split(' ')[0]}!</h1>
+        <p className="muted">Here&apos;s a snapshot of your classes, attendance and fees.</p>
+      </div>
+
+      {!isLoading && (
+        <div className="stat-grid">
+          <StatCard icon="book" label="Enrolled Classes" value={balances.length || summaryByClass.length} />
+          <StatCard
+            icon="calendar"
+            label="Attendance Rate"
+            value={overallRate === null ? '-' : `${overallRate}%`}
+            sub={overallRate === null ? 'No sessions yet' : overallRate >= 80 ? 'On track' : 'Needs attention'}
+            tone={overallRate !== null && overallRate < 80 ? 'warning' : 'success'}
+          />
+          <StatCard
+            icon="wallet"
+            label="Pending Fees"
+            value={formatCurrency(pendingFees)}
+            tone={pendingFees > 0 ? 'warning' : 'success'}
+          />
+        </div>
+      )}
+
+      <div className="summary-grid">
+        <Link to="/attendance/history" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="calendar" size={22} />
+          </div>
+          <h2>My Attendance</h2>
+          <p className="muted">Check your attendance history and rate by class.</p>
+        </Link>
+        <Link to="/payments" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="wallet" size={22} />
+          </div>
+          <h2>Fee Balance</h2>
+          <p className="muted">View outstanding fees and pay online.</p>
+        </Link>
+        <Link to="/payments/history" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="receipt" size={22} />
+          </div>
+          <h2>Payment History</h2>
+          <p className="muted">Review past payments and download receipts.</p>
+        </Link>
+        <Link to="/profile" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="user" size={22} />
+          </div>
+          <h2>My Profile</h2>
+          <p className="muted">Update your details or change your password.</p>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function TutorDashboard({ user }) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h1>Good day, {user.fullName.split(' ')[0]}!</h1>
+        <p className="muted">Open a class to take attendance for today&apos;s session.</p>
+      </div>
+
+      <div className="summary-grid">
+        <Link to="/attendance/classes" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="calendar" size={22} />
+          </div>
+          <h2>Mark Attendance</h2>
+          <p className="muted">Open a class session and record who attended.</p>
+        </Link>
+        <Link to="/profile" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="user" size={22} />
+          </div>
+          <h2>My Profile</h2>
+          <p className="muted">Update your details or change your password.</p>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function HomePage() {
+  const { user, isLoggedIn } = useAuth();
+
+  if (isLoggedIn) {
+    const isTutorOrAdmin = user.role === 'TUTOR' || user.role === 'ADMIN';
+    return isTutorOrAdmin ? <TutorDashboard user={user} /> : <StudentDashboard user={user} />;
+  }
+
+  return (
+    <>
+      <section className="container hero">
+        <div className="hero-copy">
+          <span className="eyebrow">Revolutionizing EdTech Operations</span>
+          <h1>
+            Empowering Education,
+            <br />
+            One Class at a Time
+          </h1>
+          <p>
+            Create your Brilliant Institute account to track class schedules, attendance and fee
+            payments - all from one secure login shared across the whole platform.
+          </p>
+          <div className="hero-actions">
+            <Link to="/register" className="btn btn-primary">
+              Get Started
+            </Link>
+            <Link to="/login" className="btn btn-secondary">
+              Login to Platform
+            </Link>
+          </div>
+        </div>
+        <div className="hero-media" />
+      </section>
+
+      <section className="section section-bg-soft">
+        <div className="container">
+          <div className="section-heading">
+            <span className="eyebrow">Tailored for Tuitions</span>
+            <h2>Everything you need to scale operations</h2>
+          </div>
+          <div className="feature-grid">
+            {FEATURES.map((feature) => (
+              <div key={feature.title} className="feature-card">
+                <div className="feature-icon-box">
+                  <Icon name={feature.icon} size={22} />
+                </div>
+                <h3>{feature.title}</h3>
+                <p>{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="section-heading">
+            <span className="eyebrow">Endorsed by Experts</span>
+            <h2>Trusted by hundreds of premium educators</h2>
+          </div>
+          <div className="testimonial-grid">
+            {TESTIMONIALS.map((testimonial) => (
+              <div key={testimonial.name} className="testimonial-card">
+                <p className="testimonial-quote">&ldquo;{testimonial.quote}&rdquo;</p>
+                <div className="testimonial-author">
+                  <span className="testimonial-avatar">
+                    {testimonial.name
+                      .split(' ')
+                      .map((part) => part[0])
+                      .join('')}
+                  </span>
+                  <div>
+                    <div className="testimonial-author-name">{testimonial.name}</div>
+                    <div className="testimonial-author-role">{testimonial.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <Footer
+        linkGroups={[
+          {
+            heading: 'Account',
+            links: [
+              { label: 'Log in', to: '/login' },
+              { label: 'Register', to: '/register' },
+              { label: 'Forgot password', to: '/forgot-password' },
+            ],
+          },
+          {
+            heading: 'Platform',
+            links: [
+              { label: 'Attendance', to: null },
+              { label: 'Fee Payments', to: null },
+            ],
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+export default HomePage;

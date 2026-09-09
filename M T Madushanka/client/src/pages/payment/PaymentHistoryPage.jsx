@@ -3,6 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchMyPaymentHistory, retryPayment } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
+import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
+
+const NAV_ITEMS = [
+  { to: '/', label: 'Dashboard', icon: 'home', end: true },
+  { to: '/attendance/history', label: 'Attendance', icon: 'calendar' },
+  { to: '/payments', label: 'Fees', icon: 'card' },
+  { to: '/payments/history', label: 'History', icon: 'receipt' },
+];
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -50,57 +58,65 @@ function PaymentHistoryPage() {
     }
   }
 
-  if (isLoading) return <LoadingSpinner label="Loading payment history..." />;
-
   return (
-    <div className="page">
-      <h1>Payment History</h1>
-      <Alert type="error" message={errorMessage} />
-
-      {payments.length === 0 ? (
-        <p className="muted">You have not made any payments yet.</p>
-      ) : (
-        <div className="card">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Class</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Receipt</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map((payment) => (
-                <tr key={payment.id}>
-                  <td>{payment.createdAt}</td>
-                  <td>{payment.subject}</td>
-                  <td>{formatCurrency(payment.amount)}</td>
-                  <td>
-                    <span className={statusBadgeClass(payment.status)}>{payment.status}</span>
-                  </td>
-                  <td>{payment.receiptNumber || '-'}</td>
-                  <td>
-                    {payment.status === 'PENDING' && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        disabled={retryingId === payment.id}
-                        onClick={() => handleRetry(payment.id)}
-                      >
-                        {retryingId === payment.id ? 'Retrying...' : 'Retry payment'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <PortalShell navItems={NAV_ITEMS}>
+      <div className="page">
+        <div className="page-header">
+          <h1>Payment History</h1>
+          <p className="muted">Review past payments, receipts, and retry anything still pending.</p>
         </div>
-      )}
-    </div>
+
+        <Alert type="error" message={errorMessage} />
+
+        {isLoading ? (
+          <LoadingSpinner label="Loading payment history..." />
+        ) : payments.length === 0 ? (
+          <p className="muted">You have not made any payments yet.</p>
+        ) : (
+          <div className="card">
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Class</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Receipt</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td>{payment.createdAt}</td>
+                      <td>{payment.subject}</td>
+                      <td>{formatCurrency(payment.amount)}</td>
+                      <td>
+                        <span className={statusBadgeClass(payment.status)}>{payment.status}</span>
+                      </td>
+                      <td>{payment.receiptNumber || '-'}</td>
+                      <td>
+                        {payment.status === 'PENDING' && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={retryingId === payment.id}
+                            onClick={() => handleRetry(payment.id)}
+                          >
+                            {retryingId === payment.id ? 'Retrying...' : 'Retry payment'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </PortalShell>
   );
 }
 

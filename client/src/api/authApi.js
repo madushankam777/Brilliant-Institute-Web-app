@@ -1,0 +1,69 @@
+/**
+ * authApi.js
+ * -----------------------------------------------------------------------
+ * Every network call for the Registration & Authentication module lives
+ * in this one file. Components never call axios/httpClient directly -
+ * they call these named functions instead, which keeps API endpoints
+ * and payload shapes in one predictable place.
+ * -----------------------------------------------------------------------
+ */
+
+import httpClient from '../../../shared/client/src/api/httpClient';
+
+/** CREATE - register a new Student/Parent account. */
+export async function registerAccount({ fullName, email, phone, password, acceptedTerms }) {
+  const response = await httpClient.post('/auth/register', {
+    fullName,
+    email,
+    phone,
+    password,
+    acceptedTerms: acceptedTerms ? 'true' : 'false',
+  });
+  return response.data.data.user;
+}
+
+/** READ + authenticate - log in and start a session (cookie is set by the server). */
+export async function login({ email, password }) {
+  const response = await httpClient.post('/auth/login', { email, password });
+  return response.data.data.user;
+}
+
+export async function logout() {
+  await httpClient.post('/auth/logout');
+}
+
+/** READ - "am I logged in, and as whom?" - used on app start-up. */
+export async function fetchCurrentSession() {
+  const response = await httpClient.get('/auth/session');
+  return response.data.data.user;
+}
+
+/** READ - the logged-in user's own profile. */
+export async function fetchMyProfile() {
+  const response = await httpClient.get('/auth/profile');
+  return response.data.data.user;
+}
+
+/** UPDATE - edit the logged-in user's own profile (REG-07). */
+export async function updateMyProfile({ fullName, phone }) {
+  const response = await httpClient.put('/auth/profile', { fullName, phone });
+  return response.data.data.user;
+}
+
+/** UPDATE - change the logged-in user's own password. */
+export async function changeMyPassword({ currentPassword, newPassword }) {
+  const response = await httpClient.put('/auth/password', { currentPassword, newPassword });
+  return response.data.message;
+}
+
+/** CREATE - request a password-reset link (REG-05). */
+export async function requestPasswordReset(email) {
+  const response = await httpClient.post('/auth/forgot-password', { email });
+  return response.data; // { success, message, data: { devOnlyResetToken? } }
+}
+
+/** UPDATE - complete a password reset using the emailed token (REG-05). */
+export async function resetPassword({ token, newPassword }) {
+  const response = await httpClient.post('/auth/reset-password', { token, newPassword });
+  return response.data.message;
+}

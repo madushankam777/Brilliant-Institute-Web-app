@@ -11,6 +11,7 @@ import PlaceholderLoginPage from './pages/PlaceholderLoginPage';
 import ClassSessionsPage from './pages/attendance/ClassSessionsPage';
 import MarkAttendancePage from './pages/attendance/MarkAttendancePage';
 import AttendanceHistoryPage from './pages/attendance/AttendanceHistoryPage';
+import TutorStudentHistoryPage from './pages/attendance/TutorStudentHistoryPage';
 
 import FeeBalancePage from './pages/payment/FeeBalancePage';
 import PaymentHistoryPage from './pages/payment/PaymentHistoryPage';
@@ -30,6 +31,7 @@ function App() {
             <Route path="/attendance/classes" element={<ClassSessionsPage />} />
             <Route path="/attendance/classes/:classId/sessions" element={<ClassSessionsPage />} />
             <Route path="/attendance/sessions/:sessionId" element={<MarkAttendancePage />} />
+            <Route path="/attendance/students/:studentId" element={<TutorStudentHistoryPage />} />
           </Route>
 
           {/* Student / Parent only - Attendance history + Payments */}

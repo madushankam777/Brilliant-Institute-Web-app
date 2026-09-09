@@ -1,9 +1,10 @@
-// Placeholder login (real auth module is N Danushika's)
+// Placeholder login (the real Registration & Login module is N Danushika's)
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import FormField from '../../../../shared/client/src/components/common/FormField';
+import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
 
 function PlaceholderLoginPage() {
   const { login } = useAuth();
@@ -28,33 +29,44 @@ function PlaceholderLoginPage() {
   }
 
   return (
-    <div className="page form-page">
-      <h1>Log in</h1>
+    <AuthLayout
+      quote={{
+        text: 'The real-time notification engine has saved countless frantic calls. When a tutor is sick, parents get notified with a rescheduled date in under 30 seconds.',
+        author: 'Len Fernando',
+        role: 'Co-Director',
+      }}
+    >
+      <h1>Welcome Back</h1>
       <p className="muted">
-        Placeholder sign-in for this module. Use a demo account created by
-        <code> npm run db:seed</code>.
+        Placeholder sign-in for this module - use a demo account created by <code>npm run db:seed</code>.
       </p>
+
       {error && <Alert type="error" message={error} />}
-      <form onSubmit={handleSubmit} className="form">
+
+      <form onSubmit={handleSubmit} noValidate>
         <FormField
+          id="email"
           label="Email"
           type="email"
+          icon="mail"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
         <FormField
+          id="password"
           label="Password"
           type="password"
+          icon="lock"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-          {isSubmitting ? 'Logging in...' : 'Log in'}
+        <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
+          {isSubmitting ? 'Logging in...' : 'Login'}
         </button>
       </form>
-    </div>
+    </AuthLayout>
   );
 }
 

@@ -20,6 +20,9 @@ export default defineConfig({
   resolve: {
     alias: sharedPackageAliases,
   },
+  // Static files (favicon, etc.) live once in shared/client/public instead
+  // of a separate copy per app.
+  publicDir: path.resolve(__dirname, '../../shared/client/public'),
   server: {
     port: 5173,
     // Lets the dev server read shared/, which sits outside this app's own
