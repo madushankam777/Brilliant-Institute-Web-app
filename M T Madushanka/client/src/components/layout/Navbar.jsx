@@ -1,15 +1,6 @@
-/**
- * Navbar.jsx
- * -----------------------------------------------------------------------
- * Top bar for this module (Attendance & Payment). Renders the public
- * marketing navbar when signed out, and the authenticated "portal topbar"
- * (search, notification bell, avatar chip, log out) once signed in -
- * matching the two navbar styles used throughout the design mockups.
- * Sidebar/bottom-tab navigation for signed-in pages is handled separately
- * by <PortalShell>.
- * -----------------------------------------------------------------------
- */
-
+// Top navbar. Shows the public menu when signed out, and switches to the
+// signed-in topbar (search, bell, avatar, log out) once a user logs in.
+// (Sidebar navigation is handled by <PortalShell>.)
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';

@@ -1,11 +1,5 @@
-/**
- * LoginPage.jsx
- * -----------------------------------------------------------------------
- * REG-03 / REG-04: authenticate, then redirect to the page the user was
- * originally trying to reach (or a sensible default for their role).
- * -----------------------------------------------------------------------
- */
-
+// Login page: check the user's email/password, then send them to the
+// page they were trying to reach (or the dashboard).
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -51,8 +45,7 @@ function LoginPage() {
     setIsSubmitting(true);
     try {
       await login({ email, password });
-      // REG-04: land on the role's own dashboard ("/") after login -
-      // HomePage.jsx already renders the right dashboard content per role.
+      // Go back to the page the user came from, or the dashboard.
       navigate(redirectTo || '/', { replace: true });
     } catch (error) {
       setFormError(error.message);

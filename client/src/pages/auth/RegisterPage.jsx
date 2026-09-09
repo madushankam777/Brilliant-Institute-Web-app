@@ -1,16 +1,6 @@
-/**
- * RegisterPage.jsx
- * -----------------------------------------------------------------------
- * REG-01 / REG-08: Student/Parent self-registration, with the same
- * password strength rule the server enforces (see
- * server/src/utils/passwordPolicy.js) shown up-front so the user gets
- * instant feedback instead of a round-trip to the server.
- *
- * Client-side validation is a courtesy only - the server re-validates
- * everything, because client checks can always be bypassed.
- * -----------------------------------------------------------------------
- */
-
+// Registration page for new Student/Parent accounts.
+// Note: this form's checks are just for a nicer experience - the server
+// always re-checks everything too, since client-side checks can be bypassed.
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerAccount } from '../../api/authApi';
@@ -161,8 +151,7 @@ function RegisterPage() {
           value={form.phone}
           onChange={(e) => updateField('phone', e.target.value)}
           onFocus={() => {
-            // Click into an empty field and Sri Lanka's country code is
-            // typed in for you - just type the rest of the number after it.
+            // Fill in Sri Lanka's country code when the field is first clicked.
             if (!form.phone) updateField('phone', '+94 ');
           }}
           error={fieldErrors.phone}

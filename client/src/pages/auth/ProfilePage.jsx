@@ -1,11 +1,5 @@
-/**
- * ProfilePage.jsx
- * -----------------------------------------------------------------------
- * REG-07: view and edit your own profile, and change your password.
- * Two independent forms, two independent CRUD "UPDATE" operations.
- * -----------------------------------------------------------------------
- */
-
+// Profile page: two separate forms - one to edit your details, one to
+// change your password.
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, changeMyPassword } from '../../api/authApi';
