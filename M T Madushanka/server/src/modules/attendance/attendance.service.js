@@ -74,6 +74,17 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     throw ApiError.badRequest('No attendance entries were provided.');
   }
 
+  // Reject any studentId that isn't actually enrolled in this class -
+  // otherwise a submitted studentId could be *any* user id in the system
+  // (the attendance_records FK only requires users.id to exist), not just
+  // one of this class's own students.
+  const enrolledStudents = await repository.listActiveStudentsForClass(session.class_id);
+  const enrolledStudentIds = new Set(enrolledStudents.map((student) => student.student_id));
+  const hasUnenrolledStudent = records.some((record) => !enrolledStudentIds.has(record.studentId));
+  if (hasUnenrolledStudent) {
+    throw ApiError.badRequest('One or more students are not enrolled in this class.');
+  }
+
   let createdCount = 0;
   let updatedCount = 0;
 
