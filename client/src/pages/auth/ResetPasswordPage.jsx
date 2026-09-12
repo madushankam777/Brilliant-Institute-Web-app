@@ -1,13 +1,3 @@
-/**
- * ResetPasswordPage.jsx
- * -----------------------------------------------------------------------
- * REG-05 (step 2 of 2): the user follows the link they were sent (or, in
- * local development, the token shown on ForgotPasswordPage) and sets a
- * new password. Styled with the same auth split-screen shell as the rest
- * of the login/register flow for a consistent look.
- * -----------------------------------------------------------------------
- */
-
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../../api/authApi';
@@ -80,6 +70,7 @@ function ResetPasswordPage() {
           label="New Password"
           type="password"
           icon="lock"
+          placeholder="Create a new password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           error={fieldErrors.newPassword}
@@ -93,6 +84,7 @@ function ResetPasswordPage() {
           label="Confirm New Password"
           type="password"
           icon="lock"
+          placeholder="Re-enter new password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           error={fieldErrors.confirmPassword}

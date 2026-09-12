@@ -1,14 +1,13 @@
-// Landing page (logged out) / role-based dashboard (logged in) for the
-// combined site. The dashboard only ever shows numbers this site can
-// actually back with real data (attendance rate, pending fees).
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchMyAttendanceHistory } from '../api/attendanceApi';
 import { fetchMyBalances } from '../api/paymentApi';
 import Icon from '../../../shared/client/src/components/common/Icon';
 import StatCard from '../../../shared/client/src/components/common/StatCard';
 import Footer from '../../../shared/client/src/components/layout/Footer';
+import PortalShell from '../../../shared/client/src/components/layout/PortalShell';
+import { getNavItems } from '../../../shared/client/src/components/layout/navItems';
 
 const FEATURES = [
   {
@@ -112,6 +111,20 @@ function StudentDashboard({ user }) {
       )}
 
       <div className="summary-grid">
+        <Link to="/courses/classes" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="search" size={22} />
+          </div>
+          <h2>Browse Classes</h2>
+          <p className="muted">Find and enrol in classes taught by our tutors.</p>
+        </Link>
+        <Link to="/courses/my-courses" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="book" size={22} />
+          </div>
+          <h2>My Courses</h2>
+          <p className="muted">See the classes you&apos;re currently enrolled in.</p>
+        </Link>
         <Link to="/attendance/history" className="card link-card">
           <div className="feature-icon-box">
             <Icon name="calendar" size={22} />
@@ -132,6 +145,13 @@ function StudentDashboard({ user }) {
           </div>
           <h2>Payment History</h2>
           <p className="muted">Review past payments and download receipts.</p>
+        </Link>
+        <Link to="/feedback" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="chat" size={22} />
+          </div>
+          <h2>Feedback</h2>
+          <p className="muted">Raise a complaint or share feedback with staff.</p>
         </Link>
         <Link to="/profile" className="card link-card">
           <div className="feature-icon-box">
@@ -161,6 +181,27 @@ function TutorDashboard({ user }) {
           <h2>Mark Attendance</h2>
           <p className="muted">Open a class session and record who attended.</p>
         </Link>
+        <Link to="/courses/manage" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="book" size={22} />
+          </div>
+          <h2>My Classes</h2>
+          <p className="muted">Manage the classes you teach and see who&apos;s enrolled.</p>
+        </Link>
+        <Link to="/courses/classes" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="search" size={22} />
+          </div>
+          <h2>Browse Classes</h2>
+          <p className="muted">See every class currently offered at the institute.</p>
+        </Link>
+        <Link to="/admin/feedback" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="chat" size={22} />
+          </div>
+          <h2>Feedback</h2>
+          <p className="muted">Review and respond to student/parent feedback.</p>
+        </Link>
         <Link to="/profile" className="card link-card">
           <div className="feature-icon-box">
             <Icon name="user" size={22} />
@@ -177,8 +218,14 @@ function HomePage() {
   const { user, isLoggedIn } = useAuth();
 
   if (isLoggedIn) {
-    const isTutorOrAdmin = user.role === 'TUTOR' || user.role === 'ADMIN';
-    return isTutorOrAdmin ? <TutorDashboard user={user} /> : <StudentDashboard user={user} />;
+    if (user.role === 'ADMIN') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return (
+      <PortalShell navItems={getNavItems(user.role)}>
+        {user.role === 'TUTOR' ? <TutorDashboard user={user} /> : <StudentDashboard user={user} />}
+      </PortalShell>
+    );
   }
 
   return (

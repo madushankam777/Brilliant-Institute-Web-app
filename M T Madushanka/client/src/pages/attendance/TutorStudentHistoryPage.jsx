@@ -21,8 +21,7 @@ function TutorStudentHistoryPage() {
   const [searchParams] = useSearchParams();
   const classId = searchParams.get('classId');
   const location = useLocation();
-  // Passed from MarkAttendancePage's "View history" link - the attendance
-  // history rows themselves don't carry the student's name.
+
   const studentName = location.state && location.state.studentName;
 
   const [history, setHistory] = useState([]);

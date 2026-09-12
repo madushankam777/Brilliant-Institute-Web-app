@@ -1,6 +1,6 @@
 // Student/Parent: payment history, retry pending
 import { useCallback, useEffect, useState } from 'react';
-import { fetchMyPaymentHistory, retryPayment } from '../../api/paymentApi';
+import { fetchMyPaymentHistory, retryPayment, getReceiptImageUrl } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
@@ -16,6 +16,36 @@ function statusBadgeClass(status) {
   if (status === 'SUCCESSFUL') return 'badge badge-success';
   if (status === 'PENDING') return 'badge badge-warning';
   return 'badge badge-danger';
+}
+
+function statusLabel(payment) {
+  if (payment.status === 'PENDING' && payment.paymentMethod === 'BANK_TRANSFER') {
+    return 'Awaiting Verification';
+  }
+  return payment.status;
+}
+
+const METHOD_LABELS = {
+  CARD: 'Card',
+  EZ_CASH: 'eZ Cash',
+  MCASH: 'mCash',
+  BANK_TRANSFER: 'Bank Transfer',
+};
+
+// The one non-sensitive detail worth showing per method - never a full
+// card number, always just what a real receipt would show.
+function paymentMethodSummary(payment) {
+  const details = payment.paymentDetails;
+  if (payment.paymentMethod === 'CARD' && details?.cardLast4) {
+    return `${details.cardBrand || 'Card'} •••• ${details.cardLast4}`;
+  }
+  if ((payment.paymentMethod === 'EZ_CASH' || payment.paymentMethod === 'MCASH') && details?.walletPhone) {
+    return `${METHOD_LABELS[payment.paymentMethod]} • ${details.walletPhone}`;
+  }
+  if (payment.paymentMethod === 'BANK_TRANSFER' && details?.bankReference) {
+    return `Bank Transfer • ${details.bankReference}`;
+  }
+  return METHOD_LABELS[payment.paymentMethod] || payment.paymentMethod;
 }
 
 function PaymentHistoryPage() {
@@ -77,6 +107,7 @@ function PaymentHistoryPage() {
                     <th>Date</th>
                     <th>Class</th>
                     <th>Amount</th>
+                    <th>Method</th>
                     <th>Status</th>
                     <th>Receipt</th>
                     <th></th>
@@ -88,12 +119,23 @@ function PaymentHistoryPage() {
                       <td>{payment.createdAt}</td>
                       <td>{payment.subject}</td>
                       <td>{formatCurrency(payment.amount)}</td>
+                      <td>{paymentMethodSummary(payment)}</td>
                       <td>
-                        <span className={statusBadgeClass(payment.status)}>{payment.status}</span>
+                        <span className={statusBadgeClass(payment.status)}>{statusLabel(payment)}</span>
                       </td>
                       <td>{payment.receiptNumber || '-'}</td>
                       <td>
-                        {payment.status === 'PENDING' && (
+                        {payment.status === 'PENDING' && payment.paymentMethod === 'BANK_TRANSFER' && (
+                          <a
+                            href={getReceiptImageUrl(payment.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-secondary btn-sm"
+                          >
+                            View Receipt
+                          </a>
+                        )}
+                        {payment.status === 'PENDING' && payment.paymentMethod !== 'BANK_TRANSFER' && (
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"

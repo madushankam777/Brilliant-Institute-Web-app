@@ -1,7 +1,12 @@
 // Student/Parent: view balance, pay online
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { fetchMyBalances, makePayment } from '../../api/paymentApi';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  fetchMyBalances,
+  makePayment,
+  payByBankTransfer,
+  fetchBankTransferAvailability,
+} from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../shared/client/src/components/common/Icon';
@@ -17,14 +22,74 @@ const PAYMENT_METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
+// Placeholder institute bank account - swap for the real one before going
+// live; students transfer here, then upload the receipt for verification.
+const BANK_DETAILS = {
+  bankName: "People's Bank",
+  accountName: 'Brilliant Institute (Pvt) Ltd',
+  accountNumber: '100-2-001-5-0123456',
+  branch: 'Colombo 07',
+  swiftCode: 'PSBKLKLX',
+};
+
+// Sri Lankan mobile number - what eZ Cash / mCash payments are actually
+// tied to (07XXXXXXXX, or the same number as +947XXXXXXXX).
+const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
+
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
-const emptyCardDetails = { cardholderName: '', cardNumber: '', expiryDate: '', cvv: '', saveCard: false };
+// Standard card-number checksum - catches typos/fake numbers before they
+// ever get near a submit, same as any real checkout form.
+function luhnCheck(digits) {
+  if (digits.length < 13 || digits.length > 19) return false;
+  let sum = 0;
+  let shouldDouble = false;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let digit = Number(digits[i]);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+  return sum % 10 === 0;
+}
+
+function detectCardBrand(digits) {
+  if (/^4/.test(digits)) return 'Visa';
+  if (/^(5[1-5]|2[2-7])/.test(digits)) return 'Mastercard';
+  if (/^3[47]/.test(digits)) return 'Amex';
+  if (/^6(?:011|5)/.test(digits)) return 'Discover';
+  return 'Card';
+}
+
+// Auto-inserts the "/" after the month is typed (MM/YY), the way every
+// real checkout form does - `previousFormatted` lets it tell typing
+// forward apart from backspacing, so deleting the "/" also removes the
+// month digit right before it instead of getting stuck re-inserting it.
+function formatExpiryInput(rawValue, previousFormatted) {
+  const isDeleting = rawValue.length < previousFormatted.length;
+  let digits = rawValue.replace(/\D/g, '').slice(0, 4);
+
+  if (isDeleting && previousFormatted.endsWith('/') && digits.length === 2) {
+    digits = digits.slice(0, 1);
+  }
+
+  if (digits.length >= 2) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+  return digits;
+}
+
+const emptyCardDetails = { cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' };
 
 function FeeBalancePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const autoStartedRef = useRef(false);
   const [balances, setBalances] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -32,12 +97,17 @@ function FeeBalancePage() {
   const [activeEnrollment, setActiveEnrollment] = useState(null);
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CARD');
-  // Card fields are UI-only and never sent to the server or the API - see
-  // the "never stored" note under the Pay button, and server/paymentGateway.js.
   const [cardDetails, setCardDetails] = useState(emptyCardDetails);
+  const [walletPhone, setWalletPhone] = useState('');
+  const [bankReference, setBankReference] = useState('');
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isPaying, setIsPaying] = useState(false);
   const [payError, setPayError] = useState('');
-  const [outcome, setOutcome] = useState(null); // { status: 'SUCCESSFUL' | 'FAILED' | 'PENDING', payment? }
+  const [outcome, setOutcome] = useState(null); // { status: 'SUCCESSFUL' | 'FAILED' | 'PENDING' | 'AWAITING_VERIFICATION', payment? }
+
+  const [bankTransferAvailable, setBankTransferAvailable] = useState(true);
+  const [bankTransferClosedMessage, setBankTransferClosedMessage] = useState('');
 
   const loadBalances = useCallback(async () => {
     setIsLoading(true);
@@ -54,6 +124,15 @@ function FeeBalancePage() {
 
   useEffect(() => {
     loadBalances();
+    fetchBankTransferAvailability()
+      .then(({ available, message }) => {
+        setBankTransferAvailable(available);
+        setBankTransferClosedMessage(message || '');
+      })
+      .catch(() => {
+        // If this check itself fails, fail open on the UI - the server
+        // still enforces the real cutoff when the form is submitted.
+      });
   }, [loadBalances]);
 
   function startPayment(enrollment) {
@@ -61,38 +140,142 @@ function FeeBalancePage() {
     setAmount(String(enrollment.balance));
     setPaymentMethod('CARD');
     setCardDetails(emptyCardDetails);
+    setWalletPhone('');
+    setBankReference('');
+    setReceiptFile(null);
+    setFieldErrors({});
     setPayError('');
     setOutcome(null);
   }
+
+  // Arriving here right after clicking "Enrol Now" on a class (see
+  // ClassDetailsPage.jsx) - jump straight into checkout for that specific
+  // enrollment instead of making them find it in the list themselves.
+  useEffect(() => {
+    const targetEnrollmentId = location.state && location.state.enrollmentId;
+    if (!targetEnrollmentId || autoStartedRef.current || balances.length === 0) return;
+    const target = balances.find((b) => b.enrollmentId === targetEnrollmentId);
+    if (target) {
+      autoStartedRef.current = true;
+      startPayment(target);
+    }
+  }, [location.state, balances]);
 
   function updateCardField(field, value) {
     setCardDetails((previous) => ({ ...previous, [field]: value }));
   }
 
+  function validatePaymentFields() {
+    const errors = {};
+
+    if (paymentMethod === 'CARD') {
+      if (cardDetails.cardholderName.trim().length < 2) {
+        errors.cardholderName = 'Enter the name on the card.';
+      }
+      const digits = cardDetails.cardNumber.replace(/\D/g, '');
+      if (!luhnCheck(digits)) {
+        errors.cardNumber = 'Enter a valid card number.';
+      }
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardDetails.expiryDate)) {
+        errors.expiryDate = 'Use MM/YY format.';
+      } else {
+        const [mm, yy] = cardDetails.expiryDate.split('/').map(Number);
+        const firstDayAfterExpiry = new Date(2000 + yy, mm); // month is 0-indexed, so this is the 1st of the month AFTER expiry
+        if (firstDayAfterExpiry <= new Date()) {
+          errors.expiryDate = 'This card has expired.';
+        }
+      }
+      if (!/^\d{3,4}$/.test(cardDetails.cvv)) {
+        errors.cvv = 'Enter a valid CVV.';
+      }
+    } else if (paymentMethod === 'EZ_CASH' || paymentMethod === 'MCASH') {
+      if (!WALLET_PHONE_REGEX.test(walletPhone.trim())) {
+        errors.walletPhone = 'Enter a valid mobile number (e.g. 0771234567).';
+      }
+    } else if (paymentMethod === 'BANK_TRANSFER') {
+      if (!bankTransferAvailable) {
+        errors.bankReference = bankTransferClosedMessage;
+      } else {
+        if (bankReference.trim().length < 4) {
+          errors.bankReference = 'Enter your bank account number or transfer reference.';
+        }
+        if (!receiptFile) {
+          errors.receiptFile = 'Attach a photo or screenshot of your transfer receipt.';
+        }
+      }
+    }
+
+    return errors;
+  }
+
+  function buildPaymentDetailsPayload() {
+    if (paymentMethod === 'CARD') {
+      const digits = cardDetails.cardNumber.replace(/\D/g, '');
+      return {
+        cardholderName: cardDetails.cardholderName.trim(),
+        cardLast4: digits.slice(-4),
+        cardBrand: detectCardBrand(digits),
+      };
+    }
+    if (paymentMethod === 'EZ_CASH' || paymentMethod === 'MCASH') {
+      return { walletPhone: walletPhone.trim() };
+    }
+    if (paymentMethod === 'BANK_TRANSFER') {
+      return { bankReference: bankReference.trim() };
+    }
+    return {};
+  }
+
   async function handlePaySubmit(event) {
     event.preventDefault();
     setPayError('');
-    setIsPaying(true);
 
     const parsedAmount = Number(amount);
     if (!(parsedAmount > 0)) {
       setPayError('Please enter a valid amount greater than zero.');
-      setIsPaying(false);
       return;
     }
 
+    const errors = validatePaymentFields();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setPayError('Please fix the highlighted fields.');
+      return;
+    }
+
+    setIsPaying(true);
     try {
-      const payment = await makePayment({
-        enrollmentId: activeEnrollment.enrollmentId,
-        amount: parsedAmount,
-        paymentMethod,
-      });
-      setOutcome({ status: payment.status, payment });
+      if (paymentMethod === 'BANK_TRANSFER') {
+        const payment = await payByBankTransfer({
+          enrollmentId: activeEnrollment.enrollmentId,
+          amount: parsedAmount,
+          bankReference: bankReference.trim(),
+          receiptFile,
+        });
+        setOutcome({ status: 'AWAITING_VERIFICATION', payment });
+      } else {
+        const payment = await makePayment({
+          enrollmentId: activeEnrollment.enrollmentId,
+          amount: parsedAmount,
+          paymentMethod,
+          paymentDetails: buildPaymentDetailsPayload(),
+        });
+        setOutcome({ status: payment.status, payment });
+      }
       setActiveEnrollment(null);
       await loadBalances();
     } catch (error) {
-      setOutcome({ status: 'FAILED', reason: error.message, enrollment: activeEnrollment });
-      setActiveEnrollment(null);
+      setPayError(error.message);
+      if (error.details) {
+        const mapped = {};
+        error.details.forEach((detail) => {
+          // Server field paths look like "paymentDetails.cardNumber" -
+          // map them to this form's own field names.
+          const key = detail.field.split('.').pop();
+          mapped[key] = detail.message;
+        });
+        setFieldErrors(mapped);
+      }
     } finally {
       setIsPaying(false);
     }
@@ -235,6 +418,28 @@ function FeeBalancePage() {
               />
             )}
 
+            {outcome && outcome.status === 'AWAITING_VERIFICATION' && (
+              <div className="card auth-result">
+                <div className="auth-result-icon" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
+                  <Icon name="clock" size={30} />
+                </div>
+                <h2>Awaiting Verification</h2>
+                <p className="muted">
+                  Your bank transfer receipt has been submitted. An Administrator will verify it against your
+                  transfer, usually within one business day - your balance will update automatically once
+                  approved. You can log in and use the site normally in the meantime.
+                </p>
+                <div className="result-actions">
+                  <button type="button" className="btn btn-primary btn-block" onClick={() => navigate('/payments/history')}>
+                    View Payment Status
+                  </button>
+                  <button type="button" className="btn btn-link" onClick={() => navigate('/')}>
+                    Back to Dashboard
+                  </button>
+                </div>
+              </div>
+            )}
+
             {!inCheckout && (balances.length === 0 ? (
               <p className="muted">You have no active enrollments yet.</p>
             ) : (
@@ -301,17 +506,30 @@ function FeeBalancePage() {
                   <Alert type="error" message={payError} />
                   <form onSubmit={handlePaySubmit} noValidate>
                     <div className="payment-tabs">
-                      {PAYMENT_METHODS.map((method) => (
-                        <button
-                          key={method.value}
-                          type="button"
-                          className={`payment-tab${paymentMethod === method.value ? ' active' : ''}`}
-                          onClick={() => setPaymentMethod(method.value)}
-                        >
-                          {method.label}
-                        </button>
-                      ))}
+                      {PAYMENT_METHODS.map((method) => {
+                        const isDisabled = method.value === 'BANK_TRANSFER' && !bankTransferAvailable;
+                        return (
+                          <button
+                            key={method.value}
+                            type="button"
+                            className={`payment-tab${paymentMethod === method.value ? ' active' : ''}`}
+                            disabled={isDisabled}
+                            title={isDisabled ? bankTransferClosedMessage : undefined}
+                            onClick={() => {
+                              setPaymentMethod(method.value);
+                              setFieldErrors({});
+                            }}
+                          >
+                            {method.label}
+                            {isDisabled && ' (Closed)'}
+                          </button>
+                        );
+                      })}
                     </div>
+
+                    {paymentMethod === 'BANK_TRANSFER' && !bankTransferAvailable && (
+                      <Alert type="warning" message={bankTransferClosedMessage} />
+                    )}
 
                     {paymentMethod === 'CARD' && (
                       <>
@@ -323,7 +541,9 @@ function FeeBalancePage() {
                             placeholder="e.g. Kavindu S. Perera"
                             value={cardDetails.cardholderName}
                             onChange={(e) => updateCardField('cardholderName', e.target.value)}
+                            className={fieldErrors.cardholderName ? 'input-error' : ''}
                           />
+                          {fieldErrors.cardholderName && <p className="field-error">{fieldErrors.cardholderName}</p>}
                         </div>
                         <div className="form-field">
                           <label htmlFor="cardNumber">Card Number</label>
@@ -335,19 +555,29 @@ function FeeBalancePage() {
                             maxLength={19}
                             value={cardDetails.cardNumber}
                             onChange={(e) => updateCardField('cardNumber', e.target.value)}
+                            className={fieldErrors.cardNumber ? 'input-error' : ''}
                           />
+                          {fieldErrors.cardNumber && <p className="field-error">{fieldErrors.cardNumber}</p>}
                         </div>
                         <div className="card-field-row">
                           <div className="form-field">
-                            <label htmlFor="expiryDate">Expiry Date</label>
+                            <label htmlFor="expiryDate">Expiry Date (MM/YY)</label>
                             <input
                               id="expiryDate"
                               type="text"
+                              inputMode="numeric"
                               placeholder="MM/YY"
                               maxLength={5}
                               value={cardDetails.expiryDate}
-                              onChange={(e) => updateCardField('expiryDate', e.target.value)}
+                              onChange={(e) =>
+                                updateCardField(
+                                  'expiryDate',
+                                  formatExpiryInput(e.target.value, cardDetails.expiryDate)
+                                )
+                              }
+                              className={fieldErrors.expiryDate ? 'input-error' : ''}
                             />
+                            {fieldErrors.expiryDate && <p className="field-error">{fieldErrors.expiryDate}</p>}
                           </div>
                           <div className="form-field">
                             <label htmlFor="cvv">CVV</label>
@@ -359,28 +589,87 @@ function FeeBalancePage() {
                               maxLength={4}
                               value={cardDetails.cvv}
                               onChange={(e) => updateCardField('cvv', e.target.value)}
+                              className={fieldErrors.cvv ? 'input-error' : ''}
                             />
+                            {fieldErrors.cvv && <p className="field-error">{fieldErrors.cvv}</p>}
                           </div>
-                        </div>
-                        <div className="form-field checkbox-field">
-                          <label htmlFor="saveCard">
-                            <input
-                              id="saveCard"
-                              type="checkbox"
-                              checked={cardDetails.saveCard}
-                              onChange={(e) => updateCardField('saveCard', e.target.checked)}
-                            />
-                            Save this card for future payments
-                          </label>
                         </div>
                       </>
                     )}
 
-                    {paymentMethod !== 'CARD' && (
-                      <p className="muted" style={{ marginBottom: '18px' }}>
-                        You will be redirected to {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} to
-                        complete this payment.
-                      </p>
+                    {(paymentMethod === 'EZ_CASH' || paymentMethod === 'MCASH') && (
+                      <div className="form-field">
+                        <label htmlFor="walletPhone">
+                          {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} Mobile Number
+                        </label>
+                        <input
+                          id="walletPhone"
+                          type="tel"
+                          placeholder="07XXXXXXXX"
+                          value={walletPhone}
+                          onChange={(e) => setWalletPhone(e.target.value)}
+                          className={fieldErrors.walletPhone ? 'input-error' : ''}
+                        />
+                        {fieldErrors.walletPhone ? (
+                          <p className="field-error">{fieldErrors.walletPhone}</p>
+                        ) : (
+                          <p className="field-help">
+                            You&apos;ll get a {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} confirmation prompt on this number.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {paymentMethod === 'BANK_TRANSFER' && (
+                      <>
+                        <div className="callout" style={{ marginBottom: '16px' }}>
+                          <span>
+                            <strong>Transfer to this account, then fill in the details below:</strong>
+                            <br />
+                            Bank: {BANK_DETAILS.bankName}
+                            <br />
+                            Account Name: {BANK_DETAILS.accountName}
+                            <br />
+                            Account Number: <strong>{BANK_DETAILS.accountNumber}</strong>
+                            <br />
+                            Branch: {BANK_DETAILS.branch} &middot; SWIFT: {BANK_DETAILS.swiftCode}
+                          </span>
+                        </div>
+                        <div className="form-field">
+                          <label htmlFor="bankReference">Your Bank Account Number / Reference</label>
+                          <input
+                            id="bankReference"
+                            type="text"
+                            placeholder="e.g. 8001234567"
+                            value={bankReference}
+                            onChange={(e) => setBankReference(e.target.value)}
+                            className={fieldErrors.bankReference ? 'input-error' : ''}
+                          />
+                          {fieldErrors.bankReference ? (
+                            <p className="field-error">{fieldErrors.bankReference}</p>
+                          ) : (
+                            <p className="field-help">Used to reconcile your transfer with this invoice.</p>
+                          )}
+                        </div>
+                        <div className="form-field">
+                          <label htmlFor="receiptFile">Transfer Receipt (photo or screenshot)</label>
+                          <input
+                            id="receiptFile"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) => setReceiptFile(e.target.files[0] || null)}
+                            className={fieldErrors.receiptFile ? 'input-error' : ''}
+                          />
+                          {fieldErrors.receiptFile ? (
+                            <p className="field-error">{fieldErrors.receiptFile}</p>
+                          ) : (
+                            <p className="field-help">
+                              An Administrator verifies this against your bank transfer before your balance
+                              updates - usually within one business day.
+                            </p>
+                          )}
+                        </div>
+                      </>
                     )}
 
                     <div className="form-field">
@@ -399,7 +688,11 @@ function FeeBalancePage() {
 
                     <button type="submit" className="btn btn-primary btn-block" disabled={isPaying}>
                       {isPaying && <span className="btn-spinner" aria-hidden="true" />}
-                      {isPaying ? 'Processing...' : `Pay ${formatCurrency(amount || 0)}`}
+                      {isPaying
+                        ? 'Submitting...'
+                        : paymentMethod === 'BANK_TRANSFER'
+                          ? 'Submit for Verification'
+                          : `Pay ${formatCurrency(amount || 0)}`}
                     </button>
                     <button
                       type="button"
@@ -410,7 +703,9 @@ function FeeBalancePage() {
                       Cancel
                     </button>
                     <p className="secure-note">
-                      Your card details are encrypted and never stored by Brilliant Institute.
+                      {paymentMethod === 'BANK_TRANSFER'
+                        ? 'Your receipt is only ever visible to you and to Administrators reviewing your transfer.'
+                        : 'Your card details are validated in your browser and never stored by Brilliant Institute - only the card brand and last 4 digits are kept on your receipt.'}
                     </p>
                   </form>
                 </div>

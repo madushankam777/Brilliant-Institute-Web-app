@@ -1,11 +1,6 @@
 import { Link } from 'react-router-dom';
 import Logo from '../common/Logo';
 
-/**
- * Marketing footer shown at the bottom of each module's public landing
- * page. `linkGroups` lets each module list only the routes that actually
- * exist in its own app (no dead links to pages owned by other modules).
- */
 function Footer({ linkGroups = [] }) {
   return (
     <footer className="site-footer">

@@ -1,11 +1,3 @@
-/**
- * LoginPage.jsx
- * -----------------------------------------------------------------------
- * REG-03 / REG-04: authenticate, then redirect to the page the user was
- * originally trying to reach (or a sensible default for their role).
- * -----------------------------------------------------------------------
- */
-
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -95,6 +87,7 @@ function LoginPage() {
           label="Password"
           type="password"
           icon="lock"
+          placeholder="Enter your password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fieldErrors.password}

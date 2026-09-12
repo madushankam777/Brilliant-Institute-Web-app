@@ -1,19 +1,14 @@
-/**
- * ProfilePage.jsx
- * -----------------------------------------------------------------------
- * REG-07: view and edit your own profile, and change your password.
- * Two independent forms, two independent CRUD "UPDATE" operations.
- * -----------------------------------------------------------------------
- */
-
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { updateMyProfile, changeMyPassword } from '../../api/authApi';
+import { updateMyProfile, uploadMyProfilePicture, changeMyPassword } from '../../api/authApi';
 import FormField from '../../../../shared/client/src/components/common/FormField';
 import Alert from '../../../../shared/client/src/components/common/Alert';
+import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PasswordStrength from '../../../../shared/client/src/components/common/PasswordStrength';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+
+const MAX_PICTURE_BYTES = 3 * 1024 * 1024;
 
 const PASSWORD_RULE_MESSAGE =
   'New password must be at least 8 characters long and include an uppercase letter, ' +
@@ -29,14 +24,46 @@ function ProfilePage() {
 
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone || '');
+  const [bio, setBio] = useState(user.bio || '');
   const [profileFieldErrors, setProfileFieldErrors] = useState({});
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  const pictureInputRef = useRef(null);
+  const [pictureError, setPictureError] = useState('');
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+
+  async function handlePictureSelected(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = ''; // let the same file be picked again if they retry
+    if (!file) return;
+
+    setPictureError('');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setPictureError('Please choose a JPG, PNG, or WEBP image.');
+      return;
+    }
+    if (file.size > MAX_PICTURE_BYTES) {
+      setPictureError('Image is too large - please choose one under 3MB.');
+      return;
+    }
+
+    setIsUploadingPicture(true);
+    try {
+      await uploadMyProfilePicture(file);
+      await refreshProfile();
+    } catch (error) {
+      setPictureError(error.message);
+    } finally {
+      setIsUploadingPicture(false);
+    }
+  }
+
   useEffect(() => {
     setFullName(user.fullName);
     setPhone(user.phone || '');
+    setBio(user.bio || '');
   }, [user]);
 
   async function handleProfileSubmit(event) {
@@ -53,7 +80,7 @@ function ProfilePage() {
 
     setIsSavingProfile(true);
     try {
-      await updateMyProfile({ fullName, phone });
+      await updateMyProfile({ fullName, phone, bio });
       await refreshProfile();
       setProfileMessage('Profile updated successfully.');
     } catch (error) {
@@ -106,6 +133,34 @@ function ProfilePage() {
         </div>
 
         <div className="card">
+          <h2>Profile picture</h2>
+          <Alert type="error" message={pictureError} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <Avatar name={user.fullName} pictureUrl={user.profilePictureUrl} size={72} />
+            <div>
+              <input
+                ref={pictureInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={handlePictureSelected}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isUploadingPicture}
+                onClick={() => pictureInputRef.current && pictureInputRef.current.click()}
+              >
+                {isUploadingPicture ? 'Uploading...' : 'Change photo'}
+              </button>
+              <p className="field-help" style={{ marginTop: '8px' }}>
+                JPG, PNG, or WEBP, up to 3MB. Shown next to your name across the site.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
           <h2>Account details</h2>
           <Alert type="success" message={profileMessage} />
           <Alert type="error" message={profileError} />
@@ -133,6 +188,21 @@ function ProfilePage() {
               onChange={(e) => setPhone(e.target.value)}
             />
 
+            {user.role === 'TUTOR' && (
+              <div className="form-field">
+                <label htmlFor="bio">About you</label>
+                <textarea
+                  id="bio"
+                  placeholder="A short bio students and parents will see on your tutor profile - your subjects, experience, teaching style..."
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  maxLength={1000}
+                  style={{ minHeight: '110px' }}
+                />
+                <p className="field-help">Shown on your public tutor profile. {bio.length}/1000</p>
+              </div>
+            )}
+
             <button type="submit" className="btn btn-primary" disabled={isSavingProfile}>
               {isSavingProfile ? 'Saving...' : 'Save changes'}
             </button>
@@ -150,6 +220,7 @@ function ProfilePage() {
               label="Current password"
               type="password"
               icon="lock"
+              placeholder="Enter your current password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               error={passwordFieldErrors.currentPassword}
@@ -161,6 +232,7 @@ function ProfilePage() {
               label="New password"
               type="password"
               icon="lock"
+              placeholder="Create a new password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               error={passwordFieldErrors.newPassword}
@@ -173,6 +245,7 @@ function ProfilePage() {
               label="Confirm new password"
               type="password"
               icon="lock"
+              placeholder="Re-enter new password"
               value={confirmNewPassword}
               onChange={(e) => setConfirmNewPassword(e.target.value)}
               error={passwordFieldErrors.confirmNewPassword}

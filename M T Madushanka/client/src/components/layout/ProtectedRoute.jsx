@@ -1,4 +1,4 @@
-// Frontend route guard (server still re-checks access)
+// Frontend route guard 
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';

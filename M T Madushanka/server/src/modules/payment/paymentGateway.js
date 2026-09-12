@@ -1,10 +1,6 @@
-// Mock payment gateway (no card data ever stored)
 const { randomUUID } = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 
-// A real integration would call the gateway's HTTPS API here using
-// config.paymentGateway.apiKey. Decline/timeout below are deterministic
-// so those code paths are reachable in tests without a real sandbox.
 async function chargePaymentToken({ amount }) {
   const gatewayTransactionId = `${config.paymentGateway.providerName}_${randomUUID()}`;
 

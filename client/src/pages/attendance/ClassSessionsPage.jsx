@@ -9,10 +9,6 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 
 const NAV_ITEMS = getNavItems("TUTOR");
 
-// A class id is always a plain positive integer (see attendance.validation.js
-// on the server). Rejecting anything else here - before it ever reaches
-// navigate() - closes off open-redirect payloads smuggled through the URL's
-// own :classId segment (e.g. a link containing "\\evil.com" as the id).
 function isValidClassId(value) {
   return /^[1-9][0-9]*$/.test(String(value || ''));
 }

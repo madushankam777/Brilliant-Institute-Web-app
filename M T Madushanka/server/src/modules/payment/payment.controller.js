@@ -1,5 +1,7 @@
 // HTTP layer for payment routes
+const path = require('path');
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
+const { UPLOADS_ROOT_DIR, toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
 const service = require('./payment.service');
 
 const getMyBalances = asyncHandler(async (req, res) => {
@@ -8,8 +10,13 @@ const getMyBalances = asyncHandler(async (req, res) => {
 });
 
 const makePayment = asyncHandler(async (req, res) => {
-  const { enrollmentId, amount, paymentMethod } = req.body;
-  const result = await service.makePayment(req.user, { enrollmentId, amount, paymentMethod });
+  const { enrollmentId, amount, paymentMethod, paymentDetails } = req.body;
+  const result = await service.makePayment(req.user, {
+    enrollmentId,
+    amount,
+    paymentMethod,
+    paymentDetails,
+  });
 
   if (result.pending) {
     // SRS ATP-UC-02 exception path: gateway timeout - the payment is
@@ -54,4 +61,83 @@ const getMyPaymentHistory = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { payments } });
 });
 
-module.exports = { getMyBalances, makePayment, retryPendingPayment, getMyPaymentHistory };
+// GET /api/payments/bank-transfer/availability - lets the client show/hide
+// the Bank Transfer option before the student fills out the whole form.
+const getBankTransferAvailability = asyncHandler(async (req, res) => {
+  const availability = service.getBankTransferAvailability();
+  res.status(200).json({ success: true, data: availability });
+});
+
+// POST /api/payments/bank-transfer - the receipt image has already been
+// validated/saved by the upload middleware ahead of this handler.
+const submitBankTransferPayment = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'Please attach your transfer receipt.' });
+  }
+  const { enrollmentId, amount, bankReference } = req.body;
+  const result = await service.submitBankTransferPayment(req.user, {
+    enrollmentId,
+    amount,
+    bankReference,
+    receiptImagePath: toPublicUploadPath(req.file.path),
+  });
+  res.status(202).json({
+    success: true,
+    message: 'Your bank transfer receipt has been submitted and is awaiting verification by an Administrator.',
+    data: { payment: result.payment },
+  });
+});
+
+const listPendingBankTransfers = asyncHandler(async (req, res) => {
+  const payments = await service.listPendingBankTransfers();
+  res.status(200).json({ success: true, data: { payments } });
+});
+
+const approveBankTransferPayment = asyncHandler(async (req, res) => {
+  const paymentId = Number(req.params.paymentId);
+  const payment = await service.approveBankTransferPayment(req.user, paymentId);
+  res.status(200).json({ success: true, message: 'Bank transfer approved.', data: { payment } });
+});
+
+const rejectBankTransferPayment = asyncHandler(async (req, res) => {
+  const paymentId = Number(req.params.paymentId);
+  const payment = await service.rejectBankTransferPayment(req.user, paymentId);
+  res.status(200).json({ success: true, message: 'Bank transfer rejected.', data: { payment } });
+});
+
+const getReceiptImage = asyncHandler(async (req, res) => {
+  const paymentId = Number(req.params.paymentId);
+  const publicPath = await service.getReceiptImagePath(req.user, paymentId);
+  const absolutePath = path.join(UPLOADS_ROOT_DIR, publicPath.replace(/^\/uploads\//, ''));
+  res.sendFile(absolutePath);
+});
+
+const payTutor = asyncHandler(async (req, res) => {
+  const { tutorId, amount, note, periodLabel } = req.body;
+  const payout = await service.payTutor(req.user, { tutorId, amount, note, periodLabel });
+  res.status(201).json({
+    success: true,
+    message: `Payout recorded for ${payout.tutorName}.`,
+    data: { payout },
+  });
+});
+
+const listTutorPayouts = asyncHandler(async (req, res) => {
+  const data = await service.listTutorPayouts();
+  res.status(200).json({ success: true, data });
+});
+
+module.exports = {
+  getMyBalances,
+  makePayment,
+  retryPendingPayment,
+  getMyPaymentHistory,
+  getBankTransferAvailability,
+  submitBankTransferPayment,
+  listPendingBankTransfers,
+  approveBankTransferPayment,
+  rejectBankTransferPayment,
+  getReceiptImage,
+  payTutor,
+  listTutorPayouts,
+};

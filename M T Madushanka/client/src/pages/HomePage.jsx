@@ -1,7 +1,3 @@
-// Landing page (logged out) / dashboard (logged in) for the Attendance &
-// Payment module. The dashboard only ever shows numbers this module can
-// actually back with real data (attendance rate, pending fees) - it does
-// not invent stats owned by modules that don't exist in this repo yet.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

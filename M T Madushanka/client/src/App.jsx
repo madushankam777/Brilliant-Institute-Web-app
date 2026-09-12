@@ -12,9 +12,12 @@ import ClassSessionsPage from './pages/attendance/ClassSessionsPage';
 import MarkAttendancePage from './pages/attendance/MarkAttendancePage';
 import AttendanceHistoryPage from './pages/attendance/AttendanceHistoryPage';
 import TutorStudentHistoryPage from './pages/attendance/TutorStudentHistoryPage';
+import CheckInPage from './pages/attendance/CheckInPage';
 
 import FeeBalancePage from './pages/payment/FeeBalancePage';
 import PaymentHistoryPage from './pages/payment/PaymentHistoryPage';
+import PaymentVerificationPage from './pages/payment/PaymentVerificationPage';
+import PayTutorsPage from './pages/payment/PayTutorsPage';
 
 function App() {
   return (
@@ -37,8 +40,15 @@ function App() {
           {/* Student / Parent only - Attendance history + Payments */}
           <Route element={<ProtectedRoute allowedRoles={['STUDENT_PARENT']} />}>
             <Route path="/attendance/history" element={<AttendanceHistoryPage />} />
+            <Route path="/attendance/checkin/:sessionId" element={<CheckInPage />} />
             <Route path="/payments" element={<FeeBalancePage />} />
             <Route path="/payments/history" element={<PaymentHistoryPage />} />
+          </Route>
+
+          {/* Admin only - verify bank transfer receipts + pay tutors */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+            <Route path="/admin/payments/verify" element={<PaymentVerificationPage />} />
+            <Route path="/admin/payments/tutors" element={<PayTutorsPage />} />
           </Route>
 
           {/* Catch-all */}

@@ -1,14 +1,3 @@
-/**
- * ForgotPasswordPage.jsx
- * -----------------------------------------------------------------------
- * REG-05 (step 1 of 2): request a password reset link. Once the request
- * succeeds we swap to a "Check Your Email" confirmation screen - the
- * confirmation message is always the same whether or not the email is
- * registered, matching the server's anti-enumeration behaviour (see
- * server/src/modules/auth/auth.service.js requestPasswordReset).
- * -----------------------------------------------------------------------
- */
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../../api/authApi';

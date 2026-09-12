@@ -1,6 +1,3 @@
-// Visual 3-bar strength meter shown under the password field on
-// Register/Reset password pages. Purely a UI hint - the real rule is
-// still enforced by isStrongPassword()/the server, this just reflects it.
 function scorePassword(password) {
   if (!password) return 0;
   let score = 0;

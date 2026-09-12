@@ -1,0 +1,35 @@
+{
+  "name": "brilliant-institute-server-feedback-complaint",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Brilliant Institute Tuition Class Management System - REST API (Feedback & Complaint module, owner: H A S Hapuarachchi)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "db:seed": "node scripts/seed.js",
+    "check": "node --check src/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "2.4.3",
+    "cookie-parser": "1.4.7",
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "express": "4.22.2",
+    "express-rate-limit": "7.4.0",
+    "express-validator": "7.3.2",
+    "helmet": "7.1.0",
+    "jsonwebtoken": "9.0.2",
+    "morgan": "1.12.0",
+    "mysql2": "3.24.3"
+  },
+  "devDependencies": {
+    "nodemon": "3.1.14"
+  },
+  "overrides": {
+    "qs": "6.16.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

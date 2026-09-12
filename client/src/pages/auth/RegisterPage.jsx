@@ -1,16 +1,3 @@
-/**
- * RegisterPage.jsx
- * -----------------------------------------------------------------------
- * REG-01 / REG-08: Student/Parent self-registration, with the same
- * password strength rule the server enforces (see
- * server/src/utils/passwordPolicy.js) shown up-front so the user gets
- * instant feedback instead of a round-trip to the server.
- *
- * Client-side validation is a courtesy only - the server re-validates
- * everything, because client checks can always be bypassed.
- * -----------------------------------------------------------------------
- */
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerAccount } from '../../api/authApi';
@@ -18,6 +5,7 @@ import FormField from '../../../../shared/client/src/components/common/FormField
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import PasswordStrength from '../../../../shared/client/src/components/common/PasswordStrength';
 import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
+import { GRADES } from '../../../../shared/client/src/constants/grades';
 
 const PASSWORD_RULE_MESSAGE =
   'Password must be at least 8 characters long and include an uppercase letter, ' +
@@ -34,6 +22,9 @@ const initialFormState = {
   password: '',
   confirmPassword: '',
   acceptedTerms: false,
+  role: 'STUDENT_PARENT',
+  enrollmentKey: '',
+  grade: '',
 };
 
 function RegisterPage() {
@@ -42,7 +33,6 @@ function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [roleNotice, setRoleNotice] = useState('');
 
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
@@ -64,6 +54,12 @@ function RegisterPage() {
     }
     if (!form.acceptedTerms) {
       errors.acceptedTerms = 'You must accept the Terms of Service and Privacy Policy.';
+    }
+    if (form.role === 'TUTOR' && !form.enrollmentKey.trim()) {
+      errors.enrollmentKey = 'Enter the enrollment key an Administrator gave you.';
+    }
+    if (form.role === 'STUDENT_PARENT' && !form.grade) {
+      errors.grade = 'Please select your grade.';
     }
     return errors;
   }
@@ -111,20 +107,21 @@ function RegisterPage() {
         I am registering as a:
       </label>
       <div className="segmented">
-        <button type="button" className="active">
+        <button
+          type="button"
+          className={form.role === 'STUDENT_PARENT' ? 'active' : ''}
+          onClick={() => updateField('role', 'STUDENT_PARENT')}
+        >
           Student / Parent
         </button>
         <button
           type="button"
-          title="Tutor and Admin accounts are created by an Administrator."
-          onClick={() =>
-            setRoleNotice('Tutor / Instructor accounts are created by an Administrator - please contact the office.')
-          }
+          className={form.role === 'TUTOR' ? 'active' : ''}
+          onClick={() => updateField('role', 'TUTOR')}
         >
           Tutor / Instructor
         </button>
       </div>
-      {roleNotice && <Alert type="info" message={roleNotice} />}
 
       <Alert type="error" message={formError} />
 
@@ -168,11 +165,63 @@ function RegisterPage() {
           error={fieldErrors.phone}
           autoComplete="tel"
         />
+
+        {form.role === 'STUDENT_PARENT' && (
+          <div className="form-field">
+            <label htmlFor="grade">
+              Grade <span aria-hidden="true"> *</span>
+            </label>
+            <select
+              id="grade"
+              value={form.grade}
+              onChange={(e) => updateField('grade', e.target.value)}
+              className={fieldErrors.grade ? 'input-error' : ''}
+              required
+            >
+              <option value="" disabled>
+                Select your grade
+              </option>
+              {GRADES.map((grade) => (
+                <option key={grade} value={grade}>
+                  {grade}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.grade ? (
+              <p className="field-error">{fieldErrors.grade}</p>
+            ) : (
+              <p className="field-help">Used to match you with classes and announcements for your grade.</p>
+            )}
+          </div>
+        )}
+
+        {form.role === 'TUTOR' && (
+          <>
+            <FormField
+              id="enrollmentKey"
+              label="Enrollment Key"
+              icon="lock"
+              placeholder="TUT-XXXX-XXXX-XXXX"
+              value={form.enrollmentKey}
+              onChange={(e) => updateField('enrollmentKey', e.target.value)}
+              error={fieldErrors.enrollmentKey}
+              required
+            />
+            <div className="callout">
+              <span>
+                <strong>Need a key?</strong> Contact the office first - an Administrator will verify
+                you and generate a one-time enrollment key for you to use here.
+              </span>
+            </div>
+          </>
+        )}
+
         <FormField
           id="password"
           label="Password"
           type="password"
           icon="lock"
+          placeholder="Create a password"
           value={form.password}
           onChange={(e) => updateField('password', e.target.value)}
           error={fieldErrors.password}

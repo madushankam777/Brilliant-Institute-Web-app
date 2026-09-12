@@ -1,6 +1,3 @@
-// Small dependency-free icon set (stroke-style, 24x24 viewBox) shared by
-// both modules so neither has to pull in an icon library just to match
-// the mockups' sidebar / topbar / stat-card glyphs.
 const PATHS = {
   home: 'M4 11.5 12 4l8 7.5M6 9.5V20h12V9.5',
   calendar:
@@ -31,6 +28,15 @@ const PATHS = {
   plus: 'M12 5v14M5 12h14',
   wallet: 'M3 7.5h15a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1.5 1.5 0 0 1 1.5-1.5H17M16.5 13.2h.01',
   more: 'M12 12.5a.6.6 0 1 0 0-1.2.6.6 0 0 0 0 1.2ZM19 12.5a.6.6 0 1 0 0-1.2.6.6 0 0 0 0 1.2ZM5 12.5a.6.6 0 1 0 0-1.2.6.6 0 0 0 0 1.2Z',
+  // Added for Course Management / Feedback & Complaint / Admin & Notifications.
+  chat: 'M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9l-5 4V16h0a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z',
+  megaphone: 'M3 10v4h3l6 4V6l-6 4H3ZM15 8.5a4 4 0 0 1 0 7M18 6a7.5 7.5 0 0 1 0 12',
+  users: 'M9 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM2.5 20c.9-3.2 3.3-5 6.5-5s5.6 1.8 6.5 5M16.5 8a3 3 0 1 1 0 6M16 15c2.5.3 4 1.8 4.7 5',
+  barChart: 'M4 20.5V11M10 20.5V4M16 20.5v-7M3 20.5h18',
+  filter: 'M3.5 5.5h17L14 13v6l-4 2v-8L3.5 5.5Z',
+  edit: 'M4 20.5h4L19.5 9a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16.5v4ZM14 6.5l3.5 3.5',
+  trash: 'M4.5 7.5h15M9.5 7.5V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2.5M18 7.5 17.2 19a2 2 0 0 1-2 1.9H8.8a2 2 0 0 1-2-1.9L6 7.5',
+  alertTriangle: 'M12 4.5 2.5 20h19L12 4.5ZM12 10v4.5M12 17.5h.01',
 };
 
 function Icon({ name, size = 20, strokeWidth = 1.8, className = '' }) {

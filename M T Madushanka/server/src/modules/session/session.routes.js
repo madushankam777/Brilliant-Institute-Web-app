@@ -1,4 +1,3 @@
-// Placeholder login only (real auth module is N Danushika's)
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../../../../../shared/server/src/config/db');
@@ -11,10 +10,7 @@ const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
-// A bcrypt hash of no real password, used only so a login for a non-existent
-// or inactive account still runs a comparison of the same cost - without
-// this, responses for "no such user" would return measurably faster than
-// "wrong password", letting an attacker detect which emails are registered.
+
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
 
 function issueSessionCookie(res, user) {
@@ -30,7 +26,7 @@ function issueSessionCookie(res, user) {
   });
 }
 
-// POST /api/session/login - placeholder sign-in for standalone testing only.
+
 router.post(
   '/login',
   authLimiter,
@@ -43,8 +39,7 @@ router.post(
     const user = rows[0];
     const isAccountUsable = Boolean(user) && user.status === 'ACTIVE';
 
-    // Always compare against a real bcrypt hash - even when there's no such
-    // user - so this takes the same time either way (see DUMMY_PASSWORD_HASH).
+    
     const passwordMatches = await bcrypt.compare(
       password || '',
       isAccountUsable ? user.password_hash : DUMMY_PASSWORD_HASH
@@ -62,13 +57,11 @@ router.post(
   })
 );
 
-// POST /api/session/logout
 router.post('/logout', (req, res) => {
   res.clearCookie(SESSION_COOKIE_NAME);
   res.status(200).json({ success: true, message: 'Logged out.' });
 });
 
-// GET /api/session/me - lets the frontend know who is currently logged in.
 router.get(
   '/me',
   asyncHandler(async (req, res) => {

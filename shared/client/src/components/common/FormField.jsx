@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import Icon from './Icon';
 
-// Reusable labeled input with validation error text. Optional `icon`
-// renders a leading glyph (mail/lock/user/...) inside the input, and any
-// type="password" field automatically gets a show/hide toggle - matching
-// the input style used across every form in the design mockups.
 function FormField({
   id,
   label,

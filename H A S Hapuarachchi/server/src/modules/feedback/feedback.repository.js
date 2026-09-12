@@ -1,0 +1,130 @@
+// All the SQL for the Feedback & Complaint module lives here.
+const { pool } = require('../../../../../shared/server/src/config/db');
+
+const TICKET_WITH_SUBMITTER_SELECT = `
+  SELECT f.*, u.full_name AS submitted_by_name, u.role AS submitted_by_role,
+         t.full_name AS recipient_tutor_name
+  FROM feedback_complaints f
+  JOIN users u ON u.id = f.submitted_by
+  LEFT JOIN users t ON t.id = f.recipient_tutor_id
+`;
+
+async function createTicket({
+  ticketNumber,
+  submittedBy,
+  category,
+  recipientType,
+  recipientTutorId,
+  subject,
+  message,
+}) {
+  const [result] = await pool.execute(
+    `INSERT INTO feedback_complaints
+       (ticket_number, submitted_by, category, recipient_type, recipient_tutor_id,
+        subject, message, status, responses, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', JSON_ARRAY(), NOW())`,
+    [ticketNumber, submittedBy, category, recipientType, recipientTutorId || null, subject, message]
+  );
+  return result.insertId;
+}
+
+async function findActiveTutorById(tutorId) {
+  const [rows] = await pool.execute(
+    `SELECT id, full_name FROM users WHERE id = ? AND role = 'TUTOR' AND status = 'ACTIVE' LIMIT 1`,
+    [tutorId]
+  );
+  return rows[0] || null;
+}
+
+async function setTicketNumber(ticketId, ticketNumber) {
+  await pool.execute(`UPDATE feedback_complaints SET ticket_number = ? WHERE id = ?`, [
+    ticketNumber,
+    ticketId,
+  ]);
+}
+
+async function findTicketById(ticketId) {
+  const [rows] = await pool.execute(`${TICKET_WITH_SUBMITTER_SELECT} WHERE f.id = ? LIMIT 1`, [
+    ticketId,
+  ]);
+  return rows[0] || null;
+}
+
+async function listTicketsBySubmitter(userId) {
+  const [rows] = await pool.execute(
+    `${TICKET_WITH_SUBMITTER_SELECT} WHERE f.submitted_by = ? ORDER BY f.created_at DESC`,
+    [userId]
+  );
+  return rows;
+}
+
+// An Admin sees every ticket addressed to Admin (alone or alongside a
+// Tutor); a Tutor only ever sees tickets addressed to them specifically -
+// never another Tutor's, and never an Admin-only ticket.
+async function listTicketsForStaff({ role, userId, status }) {
+  const clauses = [];
+  const params = [];
+
+  if (role === 'ADMIN') {
+    clauses.push(`f.recipient_type IN ('ADMIN', 'ADMIN_TUTOR')`);
+  } else {
+    clauses.push(`f.recipient_type IN ('TUTOR', 'ADMIN_TUTOR') AND f.recipient_tutor_id = ?`);
+    params.push(userId);
+  }
+
+  if (status) {
+    clauses.push('f.status = ?');
+    params.push(status);
+  }
+
+  const [rows] = await pool.execute(
+    `${TICKET_WITH_SUBMITTER_SELECT} WHERE ${clauses.join(' AND ')} ORDER BY f.created_at DESC`,
+    params
+  );
+  return rows;
+}
+
+async function appendResponse(ticketId, responseEntry, newStatus) {
+  await pool.execute(
+    `UPDATE feedback_complaints
+     SET responses = JSON_ARRAY_APPEND(COALESCE(responses, JSON_ARRAY()), '$', CAST(? AS JSON)),
+         status = ?,
+         updated_at = NOW()
+     WHERE id = ?`,
+    [JSON.stringify(responseEntry), newStatus, ticketId]
+  );
+}
+
+async function markResolved(ticketId, resolvedBy) {
+  await pool.execute(
+    `UPDATE feedback_complaints
+     SET status = 'RESOLVED', resolved_by = ?, resolved_at = NOW(), updated_at = NOW()
+     WHERE id = ?`,
+    [resolvedBy, ticketId]
+  );
+}
+
+async function findUserFullName(userId) {
+  const [rows] = await pool.execute(`SELECT full_name FROM users WHERE id = ? LIMIT 1`, [userId]);
+  return rows[0] ? rows[0].full_name : null;
+}
+
+async function countTicketsByStatus() {
+  const [rows] = await pool.execute(
+    `SELECT status, COUNT(*) AS total FROM feedback_complaints GROUP BY status`
+  );
+  return rows;
+}
+
+module.exports = {
+  createTicket,
+  findActiveTutorById,
+  setTicketNumber,
+  findTicketById,
+  listTicketsBySubmitter,
+  listTicketsForStaff,
+  appendResponse,
+  markResolved,
+  findUserFullName,
+  countTicketsByStatus,
+};

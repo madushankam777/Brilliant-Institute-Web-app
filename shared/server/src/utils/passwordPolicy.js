@@ -1,9 +1,6 @@
 // Password strength rule (unused in this module)
 const MIN_LENGTH = 8;
 
-// Requires at least one lowercase letter, one uppercase letter, one digit.
-// Special characters are allowed but not mandatory, to stay realistic for
-// non-technical users (SRS NFR-01: Usability).
 const STRENGTH_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
 
 const PASSWORD_RULE_MESSAGE =

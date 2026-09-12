@@ -1,29 +1,11 @@
-/**
- * Navbar.jsx
- * -----------------------------------------------------------------------
- * Top bar for this module (Attendance & Payment). Renders the public
- * marketing navbar when signed out, and the authenticated "portal topbar"
- * (search, notification bell, avatar chip, log out) once signed in -
- * matching the two navbar styles used throughout the design mockups.
- * Sidebar/bottom-tab navigation for signed-in pages is handled separately
- * by <PortalShell>.
- * -----------------------------------------------------------------------
- */
+//Navbar.jsx
 
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../../../../../shared/client/src/components/common/Icon';
 import Logo from '../../../../../shared/client/src/components/common/Logo';
-
-function initialsOf(fullName) {
-  return (fullName || '')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('');
-}
+import Avatar from '../../../../../shared/client/src/components/common/Avatar';
 
 function Navbar() {
   const { user, isLoggedIn, logout } = useAuth();
@@ -50,11 +32,17 @@ function Navbar() {
         </div>
 
         <div className="navbar-actions">
-          <button type="button" className="topbar-icon-btn" aria-label="Notifications">
+          <button
+            type="button"
+            className="topbar-icon-btn"
+            aria-label="Notifications - available on the combined site"
+            title="Notifications are available when this module runs as part of the combined site"
+            disabled
+          >
             <Icon name="bell" size={18} />
           </button>
           <span className="avatar-chip">
-            <span className="avatar-circle">{initialsOf(user.fullName) || <Icon name="user" size={16} />}</span>
+            <Avatar name={user.fullName} pictureUrl={user.profilePictureUrl} size={36} />
             <span className="avatar-chip-text">
               <span className="avatar-chip-name">{user.fullName}</span>
               <span className="avatar-chip-role">{user.role.replace('_', ' / ')}</span>

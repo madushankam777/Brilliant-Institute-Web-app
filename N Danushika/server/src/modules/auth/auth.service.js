@@ -1,6 +1,5 @@
-// Business logic for registration, login, profile, and password reset.
-// This file never touches req/res directly, so it stays easy to test -
-// the controller handles HTTP, this file handles the actual rules.
+const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -9,23 +8,50 @@ const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { toSafeUser } = require('../../../../../shared/server/src/utils/sanitize');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { ROLES, SESSION_COOKIE_NAME } = require('../../../../../shared/server/src/config/roles');
+const { UPLOADS_ROOT_DIR } = require('../../../../../shared/server/src/middleware/upload');
+const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const repository = require('./auth.repository');
 
-// A bcrypt hash of no real password, compared against when the account
-// doesn't exist (or isn't usable) so a login attempt takes the same amount
-// of time either way - without this, "no such user" would return
-// measurably faster than "wrong password", letting an attacker enumerate
-// registered emails via response timing even though the error message
-// itself is identical.
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
 
-// Create a new Student/Parent account.
-async function registerStudentParent({ fullName, email, password, phone }) {
+// ST0000001, ST0000002, ... - built from the row's own auto-increment id,
+// so it's only ever known once the INSERT has actually happened.
+function buildStudentCode(userId) {
+  return `ST${String(userId).padStart(7, '0')}`;
+}
+
+async function registerUser({ fullName, email, password, phone, role, enrollmentKey, grade }) {
   const existing = await repository.findUserByEmail(email);
   if (existing) {
     // It's fine to say "this email is taken" on a public sign-up form -
     // unlike login, there's no security downside to telling them that here.
     throw ApiError.conflict('An account with this email already exists. Try logging in instead.');
+  }
+
+  const targetRole = role === ROLES.TUTOR ? ROLES.TUTOR : ROLES.STUDENT_PARENT;
+
+  let consumedKey = null;
+  if (targetRole === ROLES.TUTOR) {
+    const normalizedKey = String(enrollmentKey || '').trim().toUpperCase();
+    if (!normalizedKey) {
+      throw ApiError.badRequest(
+        'A tutor enrollment key from an Administrator is required to register as a Tutor.'
+      );
+    }
+    consumedKey = await repository.findValidTutorKeyByCode(normalizedKey);
+    if (!consumedKey) {
+      throw ApiError.badRequest(
+        'This enrollment key is invalid, already used, or has been revoked. Please contact the office.'
+      );
+    }
+  }
+
+  let normalizedGrade = null;
+  if (targetRole === ROLES.STUDENT_PARENT) {
+    if (!grade || !GRADES.includes(grade)) {
+      throw ApiError.badRequest('Please select your grade.');
+    }
+    normalizedGrade = grade;
   }
 
   const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
@@ -34,14 +60,24 @@ async function registerStudentParent({ fullName, email, password, phone }) {
     email,
     passwordHash,
     phone,
-    role: ROLES.STUDENT_PARENT,
+    role: targetRole,
+    grade: normalizedGrade,
   });
+
+  if (targetRole === ROLES.STUDENT_PARENT) {
+    await repository.setStudentCode(userId, buildStudentCode(userId));
+  }
+
+  if (consumedKey) {
+    await repository.markTutorKeyUsed(consumedKey.id, userId);
+  }
 
   await recordAuditEvent({
     actorId: userId,
-    action: 'USER_REGISTERED',
+    action: targetRole === ROLES.TUTOR ? 'TUTOR_REGISTERED' : 'USER_REGISTERED',
     entityType: 'user',
     entityId: userId,
+    details: consumedKey ? { enrollmentKeyId: consumedKey.id } : undefined,
   });
 
   const user = await repository.findUserById(userId);
@@ -89,18 +125,12 @@ async function loginWithEmailAndPassword({ email, password }, res) {
     );
   }
 
-  // Always compare against a real bcrypt hash - even when there's no such
-  // user, or the account isn't active - so this takes the same time either
-  // way (see DUMMY_PASSWORD_HASH above).
   const passwordMatches = await bcrypt.compare(
     password || '',
     isAccountUsable ? user.password_hash : DUMMY_PASSWORD_HASH
   );
 
   if (!isAccountUsable || !passwordMatches) {
-    // Only a real, active account has a row to update / an id to log
-    // against - there's nothing to record for an email that isn't
-    // registered (or belongs to a suspended/deleted account).
     if (user) {
       const attempts = (user.failed_login_attempts || 0) + 1;
       const shouldLock = attempts >= config.auth.maxFailedLoginAttempts;
@@ -145,15 +175,36 @@ async function getProfile(userId) {
   return toSafeUser(user);
 }
 
-// Update the logged-in user's own name/phone.
-async function updateProfile(userId, { fullName, phone }) {
-  const user = await repository.updateUserProfile(userId, { fullName, phone });
+async function updateProfile(userId, { fullName, phone, bio }) {
+  const user = await repository.updateUserProfile(userId, { fullName, phone, bio });
   await recordAuditEvent({
     actorId: userId,
     action: 'PROFILE_UPDATED',
     entityType: 'user',
     entityId: userId,
   });
+  return toSafeUser(user);
+}
+
+async function updateProfilePicture(userId, publicPath) {
+  const existing = await repository.findUserById(userId);
+  const user = await repository.updateProfilePicture(userId, publicPath);
+
+  if (existing && existing.profile_picture_path && existing.profile_picture_path !== publicPath) {
+    const oldAbsolutePath = path.join(
+      UPLOADS_ROOT_DIR,
+      existing.profile_picture_path.replace(/^\/uploads\//, '')
+    );
+    fs.unlink(oldAbsolutePath, () => {});
+  }
+
+  await recordAuditEvent({
+    actorId: userId,
+    action: 'PROFILE_PICTURE_UPDATED',
+    entityType: 'user',
+    entityId: userId,
+  });
+
   return toSafeUser(user);
 }
 
@@ -186,10 +237,6 @@ function hashResetToken(rawToken) {
   return crypto.createHash('sha256').update(rawToken).digest('hex');
 }
 
-// Start a "forgot password" flow. Always responds the same way whether
-// or not the email is registered, so this can't be used to guess emails.
-// Returns the raw token only outside production, as a stand-in for a
-// real email service that would send this link instead.
 async function requestPasswordReset(email) {
   const user = await repository.findUserByEmail(email);
 
@@ -239,11 +286,12 @@ async function resetPasswordWithToken(rawToken, newPassword) {
 }
 
 module.exports = {
-  registerStudentParent,
+  registerUser,
   loginWithEmailAndPassword,
   logout,
   getProfile,
   updateProfile,
+  updateProfilePicture,
   changePassword,
   requestPasswordReset,
   resetPasswordWithToken,

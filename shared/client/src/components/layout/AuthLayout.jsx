@@ -27,12 +27,6 @@ function AuthArt() {
   );
 }
 
-/**
- * Split-screen shell used by every auth page (Login / Register /
- * Forgot & Reset password): a plain white form column, plus a dark
- * decorative column with a quote - matching the design mockups. The
- * right-hand panel is hidden automatically on mobile (see theme.css).
- */
 function AuthLayout({ children, quote, backTo = '/', backLabel = 'Back to Home' }) {
   return (
     <div className="auth-shell">

@@ -10,12 +10,11 @@ A full-stack web application designed to digitize and centralize the day-to-day 
 ## Features
 
 - Secure registration & role-based login (Student/Parent, Tutor, Admin)
-- Course & class management with conflict-free scheduling
+- Course & class management: browse/search/filter, enrol/drop, tutor CRUD with conflict-free scheduling (CRS-05)
 - Digital attendance marking and low-attendance alerts
 - Online fee payment with digital receipts
-- Feedback & complaint portal
-- Automated email/SMS notifications
-- Admin dashboard for users, classes, and payments
+- Feedback & complaint portal with a staff triage queue
+- Admin dashboard (users/classes/revenue/complaints), user management, announcements, and automated fee/attendance reminders
 
 ---
 
@@ -37,23 +36,28 @@ A full-stack web application designed to digitize and centralize the day-to-day 
 
 This repository holds three things:
 
-1. **`client/` + `server/` at the root** - the combined site. One login
-   (N Danushika's real Registration & Login), one running app, with
-   Attendance & Payment (M T Madushanka) as protected pages behind that
-   same login. This is what you deploy / demo.
-2. **`M T Madushanka/` and `N Danushika/`** - each contributor's own
-   complete, independently runnable copy of their module, for individual
-   review and submission. The combined app mounts their *actual* server
-   route files directly (not copies), so there is one source of truth for
-   the server-side logic either way.
+1. **`client/` + `server/` at the root** - the combined site: one login
+   (N Danushika's Registration & Login), one running app, with every other
+   module's pages mounted behind that same login. This is what you deploy
+   / demo. All five modules are wired in:
+   - Registration & Login (N Danushika)
+   - Attendance & Payment (M T Madushanka)
+   - Course Management (C D Kumanan)
+   - Feedback & Complaint (H A S Hapuarachchi)
+   - Admin, Notifications & Announcements (S Vithushan)
+2. **One folder per contributor** (`M T Madushanka/`, `N Danushika/`,
+   `C D Kumanan/`, `H A S Hapuarachchi/`, `S Vithushan/`) - each a
+   complete, independently runnable copy of that person's module, for
+   individual review and submission. The combined app mounts their
+   *actual* server route files directly (not copies), so there is one
+   source of truth for the server-side logic either way; client-side pages
+   are identical copies in both places (see the note on `index.html` etc.
+   below for why client code can't be mounted the same way server code is).
 3. **`shared/`** - the one place for everything genuinely common to the
    **whole NexusDev team** (env validation, the MySQL pool, JWT/RBAC
    middleware, rate limiters, the safe-DTO helper, common UI components,
-   the institute logo and other brand assets) - not just Attendance/Payment
-   and Registration/Login. When C D Kumanan, H A S Hapuarachchi or
-   S Vithushan add Course Management, Feedback & Complaint, or
-   Admin & Notifications, their code should import from here too, instead
-   of copy-pasting a second version of the logo, the auth middleware, etc.
+   the institute logo and other brand assets), so no module copy-pastes a
+   second version of the logo, the auth middleware, etc.
 
 ```
 Brilliant-Institute-Web-app/
@@ -74,29 +78,35 @@ Brilliant-Institute-Web-app/
 │           ├── components/layout/  AuthLayout, Footer, PortalShell, navItems.js
 │           └── pages/NotFoundPage.jsx
 │
+├── N Danushika/                    Registration & Login module (SRS REG-01..REG-08)
+│   ├── server/src/modules/auth/
+│   └── client/src/{api/authApi.js, pages/auth/, context/, components/layout/, App.jsx}
+│
 ├── M T Madushanka/                 Attendance & Payment module (SRS ATP-01..ATP-07)
 │   ├── server/
 │   │   ├── scripts/seed.js         Demo tutor + student + class
-│   │   └── src/
-│   │       ├── modules/session/    Placeholder login only (real login is N Danushika's)
-│   │       ├── modules/attendance/
-│   │       ├── modules/payment/
-│   │       ├── app.js
-│   │       └── server.js
-│   └── client/src/
-│       ├── api/                    sessionApi (placeholder), attendanceApi, paymentApi
-│       ├── pages/attendance/, pages/payment/, pages/PlaceholderLoginPage.jsx
-│       ├── context/AuthContext.jsx, components/layout/{Navbar,ProtectedRoute}.jsx
-│       └── App.jsx
+│   │   └── src/modules/{session (placeholder login), attendance/, payment/}
+│   └── client/src/{api/, pages/attendance/, pages/payment/, App.jsx}
 │
-└── N Danushika/                    Registration & Login module (SRS REG-01..REG-08)
-    ├── server/src/modules/auth/
-    └── client/src/
-        ├── api/authApi.js
-        ├── pages/auth/
-        ├── context/AuthContext.jsx, components/layout/{Navbar,ProtectedRoute}.jsx
-        └── App.jsx
+├── C D Kumanan/                    Course Management module (SRS CRS-01..CRS-06)
+│   ├── server/src/modules/course/  browse/search/filter, tutor CRUD, CRS-05 conflict detection
+│   └── client/src/pages/courses/   BrowseClasses, ClassDetails, MyCourses, ManageClasses, CreateEditClass
+│
+├── H A S Hapuarachchi/             Feedback & Complaint module (SRS FBC-01..FBC-04)
+│   ├── server/src/modules/feedback/
+│   └── client/src/pages/feedback/  SubmitFeedbackPage (student/tutor), StaffFeedbackPage (tutor/admin triage)
+│
+└── S Vithushan/                    Admin, Notifications & Announcements module (SRS ADM-01..ADM-04)
+    ├── server/src/modules/admin/   dashboard stats, user mgmt, announcements, mock Email/SMS reminders
+    └── client/src/pages/admin/     AdminDashboardPage, ManageUsersPage, AnnouncementsPage
 ```
+
+Every module folder above follows the same internal shape: `server/` has
+`src/app.js` + `src/server.js` + `src/modules/<feature>/` (routes →
+controller → service → repository → validation, plus a `session/`
+placeholder login for standalone testing) and `client/` has its own
+`package.json`, `vite.config.js`, `App.jsx`, `AuthContext.jsx`, `Navbar.jsx`
+and page components under `src/pages/`.
 
 > **Why `shared/` exists:** `config/`, `middleware/`, `utils/`, `httpClient.js`,
 > the common UI components, the institute logo, and the 404 page were
@@ -143,18 +153,36 @@ mysql -u root -p < sql/schema.sql
 
 ### 2. Run the combined site
 
-`shared/server` has a few packages of its own (`dotenv`, `mysql2`, etc.) that
-its code needs - install those once, then run the site as usual:
+The combined `server/` requires each module's *actual* route files
+directly out of their own folder (see above) - Node resolves each of
+those file's own `require()` calls starting from **that file's own
+folder**, not from `server/`. So every module's own `server/node_modules`
+has to exist too, not just the root one:
 
 ```bash
 cd shared/server && npm install && cd ../..
 
+for dir in "N Danushika/server" "M T Madushanka/server" "C D Kumanan/server" "H A S Hapuarachchi/server" "S Vithushan/server" server; do
+  (cd "$dir" && npm install)
+done
+
 cd server
 cp .env.example .env         # fill in your DB password + a generated JWT_SECRET
-npm install
-npm run db:seed              # optional: creates a demo tutor + student + class
+npm run db:seed              # creates the default Admin/Tutor/Student logins (see below) + a demo class
 npm run dev                  # http://localhost:5000
 ```
+
+> **There is no separate "admin sign-up" screen** - creating the very first
+> admin account has to happen server-side, since anyone who could self-register
+> as Admin from the public `/register` page would defeat the point of an
+> Admin role. `npm run db:seed` is that step: it inserts one ready-to-use
+> Admin account (bcrypt-hashed password, same as any other account) directly
+> into the database, alongside the demo Tutor and Student. Skip this step and
+> there is no way to reach `/admin/*` until someone manually promotes a user's
+> `role` to `ADMIN` in the database. Once you have one admin login, that
+> account creates every other admin/tutor account from then on (see
+> "Tutor Enrollment Keys" in Manage Users) - `db:seed` only ever needs to run
+> once per database.
 
 ```bash
 cd client
@@ -164,43 +192,65 @@ npm run dev                  # http://localhost:5173
 ```
 
 Open **http://localhost:5173** - register an account (or log in with a demo
-account below), and every page - profile, mark attendance, fee balance,
-payment history - is reachable from that one login.
+account below), and every page - profile, browse/manage classes, mark
+attendance, fee balance, feedback tickets, and (for the admin account) the
+operations dashboard - is reachable from that one login.
 
-Demo accounts created by `npm run db:seed` (password `Demo@1234` unless you
-set `SEED_DEMO_PASSWORD`):
+Each module's own `npm run db:seed` creates that module's own demo data (a
+demo tutor/student, plus its module-specific rows - a class, a feedback
+ticket, an announcement, ...) using `INSERT ... IF NOT EXISTS`-style upserts,
+so it's safe to run all five without duplicating the shared demo accounts:
+
+```bash
+for dir in server "C D Kumanan/server" "H A S Hapuarachchi/server" "S Vithushan/server"; do
+  (cd "$dir" && npm run db:seed)
+done
+```
+
+Demo accounts (password `Demo@1234` unless you set `SEED_DEMO_PASSWORD`):
 
 | Role    | Email                  |
 |---------|------------------------|
+| Admin   | admin@brilliant.test   |
 | Tutor   | tutor@brilliant.test   |
 | Student | student@brilliant.test |
 
 ### 3. Run one person's module standalone instead
 
-Each contributor's folder is also a complete, independently runnable app on
-its own ports (useful for individually reviewing just that person's work):
+Each contributor's folder is also a complete, independently runnable app
+(useful for individually reviewing just that person's work). All five
+default to the same ports (`5000` server / `5173` client) since they're
+meant to be run **one at a time** - change `PORT` in that module's `.env`
+and the `server.port` in its `vite.config.js` if you need two running
+together (N Danushika's is already offset to `5001`/`5174` as an example):
 
 ```bash
-cd "M T Madushanka/server"   # or: cd "N Danushika/server"
+cd "C D Kumanan/server"   # or any of: "N Danushika/server", "M T Madushanka/server",
+                          #            "H A S Hapuarachchi/server", "S Vithushan/server"
 cp .env.example .env
 npm install
-npm run dev                  # M T Madushanka: http://localhost:5000, N Danushika: http://localhost:5001
+npm run dev
 ```
 
 ```bash
-cd "M T Madushanka/client"   # or: cd "N Danushika/client"
+cd "C D Kumanan/client"   # the matching client/ for whichever module you picked above
 cp .env.example .env
 npm install
-npm run dev                  # M T Madushanka: http://localhost:5173, N Danushika: http://localhost:5174
+npm run dev                  # http://localhost:5173
 ```
 
-M T Madushanka's standalone copy ships a placeholder login (the real one is
-N Danushika's module) so it can be tested without her code. Only her server
-has `npm run db:seed`.
-To test N Danushika's module, register a new account via the Register page.
+Every module except N Danushika's ships a **placeholder login** (the real
+Registration & Login is her module) so the rest of the module can be
+reviewed without her code - `npm run db:seed` in that module's `server/`
+creates a demo tutor/student/admin plus whatever that module needs to be
+useful standalone (a browsable class, a feedback ticket, an announcement).
+To test N Danushika's module itself, register a new account via the
+Register page - it has no seed script since it has no data of its own to
+seed beyond what registration already creates.
 
 | Role    | Email                  |
 |---------|------------------------|
+| Admin   | admin@brilliant.test   |
 | Tutor   | tutor@brilliant.test   |
 | Student | student@brilliant.test |
 

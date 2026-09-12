@@ -1,4 +1,3 @@
-// Placeholder login (the real Registration & Login module is N Danushika's)
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

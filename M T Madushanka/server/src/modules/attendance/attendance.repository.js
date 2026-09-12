@@ -1,4 +1,3 @@
-// SQL for class_sessions / attendance_records
 const { pool } = require('../../../../../shared/server/src/config/db');
 
 async function findClassById(classId) {
@@ -9,7 +8,7 @@ async function findClassById(classId) {
 async function findSessionWithClass(sessionId) {
   const [rows] = await pool.execute(
     `SELECT cs.id, cs.class_id, cs.session_date, cs.start_time, cs.end_time,
-            c.subject, c.tutor_id
+            c.subject, c.tutor_id, c.level
      FROM class_sessions cs
      JOIN classes c ON c.id = cs.class_id
      WHERE cs.id = ?
@@ -30,16 +29,39 @@ async function listSessionsForClass(classId) {
   return rows;
 }
 
+// Only a student who has actually paid at least once shows up here - an
+// enrollment that's never had a successful payment stays payment_status
+// 'UNPAID' (see payment.repository.js's updateEnrollmentBalance), and
+// never appears on a Tutor's attendance sheet.
 async function listActiveStudentsForClass(classId) {
   const [rows] = await pool.execute(
-    `SELECT u.id AS student_id, u.full_name AS student_name
+    `SELECT u.id AS student_id, u.full_name AS student_name, u.student_code,
+            u.profile_picture_path
      FROM enrollments e
      JOIN users u ON u.id = e.student_id
-     WHERE e.class_id = ? AND e.status = 'ACTIVE'
+     WHERE e.class_id = ? AND e.status = 'ACTIVE' AND e.payment_status = 'PAID'
      ORDER BY u.full_name ASC`,
     [classId]
   );
   return rows;
+}
+
+async function findSessionByClassAndDate(classId, sessionDate) {
+  const [rows] = await pool.execute(
+    `SELECT id, class_id, session_date, start_time, end_time
+     FROM class_sessions WHERE class_id = ? AND session_date = ? LIMIT 1`,
+    [classId, sessionDate]
+  );
+  return rows[0] || null;
+}
+
+async function createSession({ classId, sessionDate, startTime, endTime }) {
+  const [result] = await pool.execute(
+    `INSERT INTO class_sessions (class_id, session_date, start_time, end_time, created_at)
+     VALUES (?, ?, ?, ?, NOW())`,
+    [classId, sessionDate, startTime, endTime]
+  );
+  return result.insertId;
 }
 
 async function listAttendanceForSession(sessionId) {
@@ -126,6 +148,8 @@ module.exports = {
   findClassById,
   findSessionWithClass,
   listSessionsForClass,
+  findSessionByClassAndDate,
+  createSession,
   listActiveStudentsForClass,
   listAttendanceForSession,
   findAttendanceRecord,

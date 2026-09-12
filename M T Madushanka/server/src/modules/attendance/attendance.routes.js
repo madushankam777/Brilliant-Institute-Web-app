@@ -25,6 +25,14 @@ router.get(
   controller.listClassSessions
 );
 
+router.post(
+  '/classes/:classId/today-session',
+  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  classIdParamRules,
+  validateRequest,
+  controller.getOrCreateTodaySession
+);
+
 router.get(
   '/sessions/:sessionId',
   authorize(ROLES.TUTOR, ROLES.ADMIN),
@@ -39,6 +47,22 @@ router.post(
   markAttendanceRules,
   validateRequest,
   controller.markAttendance
+);
+
+router.get(
+  '/sessions/:sessionId/qrcode',
+  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  sessionIdParamRules,
+  validateRequest,
+  controller.getSessionQrCode
+);
+
+router.post(
+  '/sessions/:sessionId/checkin',
+  authorize(ROLES.STUDENT_PARENT),
+  sessionIdParamRules,
+  validateRequest,
+  controller.checkInWithQr
 );
 
 router.get(

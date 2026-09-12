@@ -1,23 +1,24 @@
-/**
- * authApi.js
- * -----------------------------------------------------------------------
- * Every network call for the Registration & Authentication module lives
- * in this one file. Components never call axios/httpClient directly -
- * they call these named functions instead, which keeps API endpoints
- * and payload shapes in one predictable place.
- * -----------------------------------------------------------------------
- */
-
 import httpClient from '../../../shared/client/src/api/httpClient';
 
-/** CREATE - register a new Student/Parent account. */
-export async function registerAccount({ fullName, email, phone, password, acceptedTerms }) {
+export async function registerAccount({
+  fullName,
+  email,
+  phone,
+  password,
+  acceptedTerms,
+  role,
+  enrollmentKey,
+  grade,
+}) {
   const response = await httpClient.post('/auth/register', {
     fullName,
     email,
     phone,
     password,
     acceptedTerms: acceptedTerms ? 'true' : 'false',
+    role,
+    enrollmentKey,
+    grade,
   });
   return response.data.data.user;
 }
@@ -45,8 +46,18 @@ export async function fetchMyProfile() {
 }
 
 /** UPDATE - edit the logged-in user's own profile (REG-07). */
-export async function updateMyProfile({ fullName, phone }) {
-  const response = await httpClient.put('/auth/profile', { fullName, phone });
+export async function updateMyProfile({ fullName, phone, bio }) {
+  const response = await httpClient.put('/auth/profile', { fullName, phone, bio });
+  return response.data.data.user;
+}
+
+/** UPDATE - upload/replace the logged-in user's own profile picture. */
+export async function uploadMyProfilePicture(file) {
+  const formData = new FormData();
+  formData.append('profilePicture', file);
+  const response = await httpClient.post('/auth/profile/picture', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data.data.user;
 }
 

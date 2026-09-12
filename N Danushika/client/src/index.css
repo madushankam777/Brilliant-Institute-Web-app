@@ -1,0 +1,4 @@
+/* Global styles for the Registration & Login module (owner: N Danushika).
+   The actual design system lives in one shared place so both modules stay
+   visually identical - see the file below. */
+@import '../../../shared/client/src/styles/theme.css';

@@ -10,6 +10,16 @@ server/node_modules/
 .env.production.local
 *.env
 
+# Locally-generated setup script with a real password filled in - the
+# committed templates (sql/schema.sql, sql/create_app_user.sql) never
+# contain a real secret, only this convenience copy does.
+sql/full_database_setup.sql
+
+# User-uploaded files (profile pictures, tutor CVs/certificates) - always
+# land in this one shared physical folder regardless of which module's
+# server handled the upload; never committed.
+shared/server/uploads/
+
 build/
 dist/
 client/build/

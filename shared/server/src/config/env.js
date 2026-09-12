@@ -1,7 +1,3 @@
-// Loads and validates environment variables
-// Resolved relative to process.cwd() (the app's own server/ folder, e.g.
-// "npm run dev" run from inside it), not __dirname - this file is shared
-// across multiple apps, each with its own separate .env.
 require('dotenv').config();
 
 // Every variable in this list MUST be present in the environment (.env file)

@@ -1,4 +1,3 @@
-// Express app: middleware, routes, error handlers
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -41,7 +40,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'API is running.' });
 });
 
-app.use('/api/session', sessionRoutes); // placeholder login only
+app.use('/api/session', sessionRoutes); 
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/payments', paymentRoutes);
 

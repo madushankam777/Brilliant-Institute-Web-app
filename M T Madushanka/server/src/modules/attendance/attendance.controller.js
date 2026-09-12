@@ -8,6 +8,15 @@ const listClassSessions = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+// POST /api/attendance/classes/:classId/today-session - the one call the
+// "Mark Attendance" button on My Classes makes: no class-id lookup, no
+// session picker, just "give me today's sheet, creating it if needed."
+const getOrCreateTodaySession = asyncHandler(async (req, res) => {
+  const classId = Number(req.params.classId);
+  const data = await service.getOrCreateTodaySession(req.user, classId);
+  res.status(200).json({ success: true, data });
+});
+
 const getAttendanceSheet = asyncHandler(async (req, res) => {
   const sessionId = Number(req.params.sessionId);
   const data = await service.getAttendanceSheet(req.user, sessionId);
@@ -38,10 +47,31 @@ const getStudentHistoryForTutor = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+const getSessionQrCode = asyncHandler(async (req, res) => {
+  const sessionId = Number(req.params.sessionId);
+  const data = await service.getSessionQrCode(req.user, sessionId);
+  res.status(200).json({ success: true, data });
+});
+
+const checkInWithQr = asyncHandler(async (req, res) => {
+  const sessionId = Number(req.params.sessionId);
+  const result = await service.checkInWithQr(req.user, sessionId);
+  res.status(200).json({
+    success: true,
+    message: result.alreadyCheckedIn
+      ? `You were already checked in to ${result.subject}.`
+      : `Checked in to ${result.subject}. See you in class!`,
+    data: result,
+  });
+});
+
 module.exports = {
   listClassSessions,
+  getOrCreateTodaySession,
   getAttendanceSheet,
   markAttendance,
+  getSessionQrCode,
+  checkInWithQr,
   getMyHistory,
   getStudentHistoryForTutor,
 };

@@ -1,28 +1,19 @@
 // Tutor: mark/correct attendance for a session
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchAttendanceSheet, saveAttendance } from '../../api/attendanceApi';
+import { fetchAttendanceSheet, saveAttendance, fetchSessionQrCode } from '../../api/attendanceApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
+import Icon from '../../../../../shared/client/src/components/common/Icon';
+import Avatar from '../../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
+import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: 'home', end: true },
-  { to: '/attendance/classes', label: 'Mark Attendance', icon: 'calendar' },
-];
+const NAV_ITEMS = getNavItems("TUTOR");
 
 const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
 
 const STATUS_LABEL = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent' };
-
-function initialsOf(fullName) {
-  return (fullName || '')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('');
-}
 
 function MarkAttendancePage() {
   const { sessionId } = useParams();
@@ -34,6 +25,12 @@ function MarkAttendancePage() {
   const [loadError, setLoadError] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [search, setSearch] = useState('');
+
+  const [showQr, setShowQr] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+  const [isLoadingQr, setIsLoadingQr] = useState(false);
+  const [qrError, setQrError] = useState('');
 
   const loadSheet = useCallback(async () => {
     setIsLoading(true);
@@ -89,6 +86,25 @@ function MarkAttendancePage() {
     }
   }
 
+  async function handleShowQr() {
+    setShowQr(true);
+    if (qrCodeDataUrl) return;
+    setIsLoadingQr(true);
+    setQrError('');
+    try {
+      const data = await fetchSessionQrCode(sessionId);
+      setQrCodeDataUrl(data.qrCodeDataUrl);
+    } catch (error) {
+      setQrError(error.message);
+    } finally {
+      setIsLoadingQr(false);
+    }
+  }
+
+  const filteredRows = rows.filter((row) =>
+    row.studentName.toLowerCase().includes(search.trim().toLowerCase())
+  );
+
   const counts = STATUS_OPTIONS.reduce((acc, status) => {
     acc[status] = rows.filter((row) => row.status === status).length;
     return acc;
@@ -97,16 +113,44 @@ function MarkAttendancePage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Mark Attendance</h1>
-          {sessionInfo && (
-            <p className="muted">
-              {sessionInfo.subject} &middot; {sessionInfo.sessionDate} &middot; {sessionInfo.startTime}
-              {' - '}
-              {sessionInfo.endTime}
-            </p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Mark Attendance</h1>
+            {sessionInfo && (
+              <p className="muted">
+                {sessionInfo.subject} &middot; {sessionInfo.sessionDate} &middot; {sessionInfo.startTime}
+                {' - '}
+                {sessionInfo.endTime}
+              </p>
+            )}
+          </div>
+          {sessionInfo && sessionInfo.isAdvancedLevel && sessionInfo.isToday && (
+            <button type="button" className="btn btn-secondary" onClick={handleShowQr}>
+              <Icon name="search" size={15} /> Show Self Check-In QR Code
+            </button>
           )}
         </div>
+
+        {showQr && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <h3 style={{ marginTop: 0 }}>Self Check-In QR Code</h3>
+            <p className="muted" style={{ fontSize: '0.85rem' }}>
+              Display this on the board - enrolled, paid A/L students scan it with their phone (while
+              logged in) to mark themselves present.
+            </p>
+            <Alert type="error" message={qrError} />
+            {isLoadingQr ? (
+              <LoadingSpinner label="Generating QR code..." />
+            ) : (
+              qrCodeDataUrl && <img src={qrCodeDataUrl} alt="Attendance check-in QR code" style={{ maxWidth: '260px' }} />
+            )}
+            <div>
+              <button type="button" className="btn btn-link" onClick={() => setShowQr(false)}>
+                Hide
+              </button>
+            </div>
+          </div>
+        )}
 
         {isLoading && <LoadingSpinner label="Loading attendance sheet..." />}
         {loadError && <Alert type="error" message={loadError} />}
@@ -117,10 +161,27 @@ function MarkAttendancePage() {
             <Alert type="error" message={saveError} />
 
             {rows.length === 0 ? (
-              <p className="muted">No students are enrolled in this class yet.</p>
+              <p className="muted">
+                No paid, enrolled students yet - a student has to enrol and complete at least one
+                payment before they appear here.
+              </p>
             ) : (
               <form onSubmit={handleSave}>
                 <div className="card">
+                  <div className="form-field has-icon" style={{ marginBottom: '14px', maxWidth: '320px' }}>
+                    <div className="input-shell">
+                      <span className="input-icon">
+                        <Icon name="search" size={16} />
+                      </span>
+                      <input
+                        type="search"
+                        placeholder="Search student by name..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="table-scroll">
                     <table className="data-table">
                       <thead>
@@ -132,14 +193,17 @@ function MarkAttendancePage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map((row) => (
+                        {filteredRows.map((row) => (
                           <tr key={row.studentId}>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span className="avatar-circle" style={{ width: 32, height: 32, fontSize: '0.75rem' }}>
-                                  {initialsOf(row.studentName)}
-                                </span>
-                                {row.studentName}
+                                <Avatar name={row.studentName} pictureUrl={row.profilePictureUrl} size={32} />
+                                <div>
+                                  <div>{row.studentName}</div>
+                                  {row.studentCode && (
+                                    <div className="muted" style={{ fontSize: '0.75rem' }}>{row.studentCode}</div>
+                                  )}
+                                </div>
                               </div>
                             </td>
                             <td>
@@ -185,6 +249,13 @@ function MarkAttendancePage() {
                             </td>
                           </tr>
                         ))}
+                        {filteredRows.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="muted" style={{ textAlign: 'center', padding: '16px' }}>
+                              No students match &quot;{search}&quot;.
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>

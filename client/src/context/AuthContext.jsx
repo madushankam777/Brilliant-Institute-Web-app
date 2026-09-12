@@ -1,17 +1,3 @@
-/**
- * AuthContext.jsx
- * -----------------------------------------------------------------------
- * Holds "who is logged in right now" for the whole app. Because the
- * session token lives in an httpOnly cookie (invisible to JavaScript),
- * this context does NOT store any token - only the non-sensitive profile
- * fields the server chose to send back (see server/utils/sanitize.js).
- *
- * On first load it asks the server "am I logged in?" via
- * fetchCurrentSession(); if that fails (no cookie / expired), the app
- * simply treats the user as logged out.
- * -----------------------------------------------------------------------
- */
-
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as authApi from '../api/authApi';
 import { setSessionExpiredHandler } from '../../../shared/client/src/api/httpClient';
