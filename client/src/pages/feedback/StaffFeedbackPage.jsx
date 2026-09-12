@@ -200,7 +200,14 @@ function StaffFeedbackPage() {
                     })}
                   </div>
 
-                  {selectedTicket.status !== 'RESOLVED' && (
+                  {selectedTicket.status === 'RESOLVED' ? (
+                    <div style={{ marginTop: '14px' }}>
+                      <Alert
+                        type="success"
+                        message="This conversation has been marked as resolved, so replies are closed. Ask the sender to raise a new ticket if the issue comes back."
+                      />
+                    </div>
+                  ) : (
                     <form onSubmit={handleReply} style={{ marginTop: '14px' }}>
                       <div className="form-field">
                         <textarea
@@ -210,9 +217,19 @@ function StaffFeedbackPage() {
                           style={{ minHeight: '90px' }}
                         />
                       </div>
-                      <button type="submit" className="btn btn-primary" disabled={isReplying || !replyText.trim()}>
-                        {isReplying ? 'Sending...' : 'Send Reply'}
-                      </button>
+                      <div className="flex-between">
+                        <button type="submit" className="btn btn-primary" disabled={isReplying || !replyText.trim()}>
+                          {isReplying ? 'Sending...' : 'Send Reply'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          disabled={isResolving}
+                          onClick={handleResolve}
+                        >
+                          {isResolving ? 'Resolving...' : 'Mark Problem Solved'}
+                        </button>
+                      </div>
                     </form>
                   )}
                 </>

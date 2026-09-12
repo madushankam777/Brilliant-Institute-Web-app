@@ -168,6 +168,28 @@ function toSafeTutorKey(row, { includeCode = false } = {}) {
   };
 }
 
+const NOTIFICATION_TYPE_LABELS = {
+  FEE_DUE: 'Fee Due Reminder',
+  LOW_ATTENDANCE: 'Low Attendance Alert',
+  CLASS_REMINDER: 'Class Reminder',
+  ANNOUNCEMENT: 'Announcement',
+};
+
+// A row from notification_log - a reminder actually addressed to one
+// person, as opposed to a broadcast Announcement. Shown in the same
+// notification bell so a targeted fee-due/low-attendance reminder is
+// something the recipient can actually see, not just a server-side log.
+function toSafeNotification(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    type: row.type,
+    title: NOTIFICATION_TYPE_LABELS[row.type] || 'Notification',
+    message: row.message,
+    sentAt: row.sent_at,
+  };
+}
+
 function toSafeTutorProfile(row) {
   if (!row) return null;
   return {
@@ -186,6 +208,7 @@ module.exports = {
   toSafePayment,
   toSafeClass,
   toSafeFeedback,
+  toSafeNotification,
   toSafeAnnouncement,
   toSafeTutorKey,
   toSafeTutorProfile,

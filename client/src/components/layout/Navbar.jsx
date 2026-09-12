@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { fetchMyAnnouncements } from '../../api/adminApi';
+import { fetchMyAnnouncements, fetchMyNotifications } from '../../api/adminApi';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import Logo from '../../../../shared/client/src/components/common/Logo';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
@@ -46,6 +46,7 @@ function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const [announcements, setAnnouncements] = useState([]);
+  const [personalNotifications, setPersonalNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [lastSeenAt, setLastSeenAt] = useState(null);
   const [dismissedVersions, setDismissedVersions] = useState({});
@@ -54,10 +55,19 @@ function Navbar() {
   const lastSeenKey = user ? `brilliant_notif_last_seen_${user.id}` : null;
   const dismissedKey = user ? `brilliant_notif_dismissed_${user.id}` : null;
 
-  const loadAnnouncements = useCallback(async () => {
+  // Two different sources feed the same bell: broadcast Announcements
+  // (everyone in an audience/grade) and personal notifications from
+  // notification_log (a fee-due/low-attendance reminder Admin sent to
+  // this specific person) - without this second fetch, a reminder the
+  // Admin "sends" would never actually show up anywhere for the student.
+  const loadNotifications = useCallback(async () => {
     try {
-      const data = await fetchMyAnnouncements();
-      setAnnouncements(data);
+      const [announcementData, personalData] = await Promise.all([
+        fetchMyAnnouncements(),
+        fetchMyNotifications(),
+      ]);
+      setAnnouncements(announcementData);
+      setPersonalNotifications(personalData);
     } catch {
       // Notifications are a convenience, not critical - fail silently
       // rather than showing an alert over the whole page.
@@ -76,8 +86,8 @@ function Navbar() {
     if (dismissedKey) {
       setDismissedVersions(readVersionMap(dismissedKey));
     }
-    loadAnnouncements();
-  }, [isLoggedIn, lastSeenKey, dismissedKey, loadAnnouncements]);
+    loadNotifications();
+  }, [isLoggedIn, lastSeenKey, dismissedKey, loadNotifications]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -89,25 +99,47 @@ function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Announcements and personal reminders are two different tables with
+  // their own id sequences - prefix each so they can share one dismissal
+  // map and one sorted feed without ever colliding.
+  const feedItems = [
+    ...announcements.map((item) => ({
+      feedId: `ann:${item.id}`,
+      kind: 'announcement',
+      title: item.title,
+      body: item.body,
+      isUpdated: item.isUpdated,
+      priority: item.priority,
+      version: item.version || 1,
+      effectiveDate: item.updatedAt || item.createdAt,
+    })),
+    ...personalNotifications.map((item) => ({
+      feedId: `notif:${item.id}`,
+      kind: 'notification',
+      title: item.title,
+      body: item.message,
+      isUpdated: false,
+      priority: null,
+      version: 1,
+      effectiveDate: item.sentAt,
+    })),
+  ].sort((a, b) => new Date(b.effectiveDate) - new Date(a.effectiveDate));
+
   // A dismissed notice only stays hidden while it's still the same version -
   // an Admin's later edit bumps the version, so it reappears as new.
-  const visibleAnnouncements = announcements.filter(
-    (item) => (dismissedVersions[item.id] ?? 0) < (item.version || 1)
-  );
+  const visibleItems = feedItems.filter((item) => (dismissedVersions[item.feedId] ?? 0) < item.version);
 
   // The later of created/updated is what actually matters for "is this
   // new to me" - an edited notice should re-trigger the unread badge too.
   const unreadCount = lastSeenAt
-    ? visibleAnnouncements.filter(
-        (item) => new Date(item.updatedAt || item.createdAt) > new Date(lastSeenAt)
-      ).length
-    : visibleAnnouncements.length;
+    ? visibleItems.filter((item) => new Date(item.effectiveDate) > new Date(lastSeenAt)).length
+    : visibleItems.length;
 
   function toggleNotifications() {
     const opening = !isNotifOpen;
     setIsNotifOpen(opening);
     if (opening) {
-      loadAnnouncements();
+      loadNotifications();
       if (lastSeenKey) {
         const now = new Date().toISOString();
         try {
@@ -124,7 +156,7 @@ function Navbar() {
   function dismissNotification(item) {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
-      const next = { ...prev, [item.id]: item.version || 1 };
+      const next = { ...prev, [item.feedId]: item.version };
       writeVersionMap(dismissedKey, next);
       return next;
     });
@@ -134,8 +166,8 @@ function Navbar() {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
       const next = { ...prev };
-      visibleAnnouncements.forEach((item) => {
-        next[item.id] = item.version || 1;
+      visibleItems.forEach((item) => {
+        next[item.feedId] = item.version;
       });
       writeVersionMap(dismissedKey, next);
       return next;
@@ -177,20 +209,21 @@ function Navbar() {
               <div className="notification-panel">
                 <div className="notification-panel-header flex-between">
                   <span>Notifications</span>
-                  {visibleAnnouncements.length > 0 && (
+                  {visibleItems.length > 0 && (
                     <button type="button" className="notification-clear-all" onClick={clearAllNotifications}>
                       Clear all
                     </button>
                   )}
                 </div>
-                {visibleAnnouncements.length === 0 ? (
-                  <p className="notification-empty">You&apos;re all caught up - no announcements yet.</p>
+                {visibleItems.length === 0 ? (
+                  <p className="notification-empty">You&apos;re all caught up - nothing new yet.</p>
                 ) : (
-                  visibleAnnouncements.map((item) => (
-                    <div key={item.id} className="notification-item">
+                  visibleItems.map((item) => (
+                    <div key={item.feedId} className="notification-item">
                       <div className="notification-item-title">
-                        <Icon name="bell" size={14} />
+                        <Icon name={item.kind === 'notification' ? 'alertTriangle' : 'bell'} size={14} />
                         <span style={{ flex: 1 }}>{item.title}</span>
+                        {item.kind === 'notification' && <span className="badge badge-warning">Reminder</span>}
                         {item.isUpdated && <span className="badge">Updated</span>}
                         {item.priority === 'HIGH' && <span className="badge badge-danger">High</span>}
                         <button
@@ -205,7 +238,7 @@ function Navbar() {
                       <p className="notification-item-body">{item.body}</p>
                       <span className="notification-item-time">
                         {item.isUpdated ? 'Updated ' : ''}
-                        {timeAgo(item.updatedAt || item.createdAt)}
+                        {timeAgo(item.effectiveDate)}
                       </span>
                     </div>
                   ))

@@ -126,13 +126,24 @@ const listMyAnnouncements = asyncHandler(async (req, res) => {
 });
 
 const sendReminders = asyncHandler(async (req, res) => {
-  const { type } = req.body;
-  const result = await service.sendReminders(req.user, type);
+  const { type, studentIds } = req.body;
+  const result = await service.sendReminders(req.user, { type, studentIds });
   res.status(200).json({
     success: true,
     message: `Sent ${result.sentCount} of ${result.recipientCount} reminder(s).`,
     data: { result },
   });
+});
+
+const getReminderCandidates = asyncHandler(async (req, res) => {
+  const { type } = req.query;
+  const candidates = await service.getReminderCandidates(type);
+  res.status(200).json({ success: true, data: { candidates } });
+});
+
+const listMyNotifications = asyncHandler(async (req, res) => {
+  const notifications = await service.listMyNotifications(req.user);
+  res.status(200).json({ success: true, data: { notifications } });
 });
 
 module.exports = {
@@ -152,4 +163,6 @@ module.exports = {
   listAllAnnouncements,
   listMyAnnouncements,
   sendReminders,
+  getReminderCandidates,
+  listMyNotifications,
 };

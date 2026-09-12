@@ -280,6 +280,23 @@ async function logNotification({ recipientId, channel, type, message, sentBy }) 
   );
 }
 
+// The bell only ever showed broadcast Announcements - a reminder "sent" to
+// a specific Student/Parent had nowhere to actually surface for them. This
+// is that surface: every logged-in user can read their own notification
+// log (fee-due / low-attendance reminders, etc.) alongside Announcements.
+async function listNotificationsForUser(userId, limit) {
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 30;
+  const [rows] = await pool.query(
+    `SELECT id, type, message, sent_at
+     FROM notification_log
+     WHERE recipient_id = ?
+     ORDER BY sent_at DESC
+     LIMIT ${safeLimit}`,
+    [userId]
+  );
+  return rows;
+}
+
 module.exports = {
   getCoreCounts,
   getRevenueTrend,
@@ -304,4 +321,5 @@ module.exports = {
   findStudentsWithOverdueFees,
   findStudentsWithLowAttendance,
   logNotification,
+  listNotificationsForUser,
 };

@@ -94,19 +94,26 @@ function StudentDashboard({ user }) {
 
       {!isLoading && (
         <div className="stat-grid">
-          <StatCard icon="book" label="Enrolled Classes" value={balances.length || summaryByClass.length} />
+          <StatCard
+            icon="book"
+            label="Enrolled Classes"
+            value={balances.length || summaryByClass.length}
+            to="/courses/my-courses"
+          />
           <StatCard
             icon="calendar"
             label="Attendance Rate"
             value={overallRate === null ? '-' : `${overallRate}%`}
             sub={overallRate === null ? 'No sessions yet' : overallRate >= 80 ? 'On track' : 'Needs attention'}
             tone={overallRate !== null && overallRate < 80 ? 'warning' : 'success'}
+            to="/attendance/history"
           />
           <StatCard
             icon="wallet"
             label="Pending Fees"
             value={formatCurrency(pendingFees)}
             tone={pendingFees > 0 ? 'warning' : 'success'}
+            to="/payments"
           />
         </div>
       )}
@@ -189,12 +196,12 @@ function TutorDashboard({ user }) {
           <h2>My Classes</h2>
           <p className="muted">Manage the classes you teach and see who&apos;s enrolled.</p>
         </Link>
-        <Link to="/courses/classes" className="card link-card">
+        <Link to="/students/mine" className="card link-card">
           <div className="feature-icon-box">
-            <Icon name="search" size={22} />
+            <Icon name="users" size={22} />
           </div>
-          <h2>Browse Classes</h2>
-          <p className="muted">See every class currently offered at the institute.</p>
+          <h2>My Students</h2>
+          <p className="muted">See every student enrolled across your classes.</p>
         </Link>
         <Link to="/admin/feedback" className="card link-card">
           <div className="feature-icon-box">

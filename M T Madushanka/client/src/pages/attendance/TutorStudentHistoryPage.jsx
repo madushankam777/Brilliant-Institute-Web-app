@@ -7,8 +7,7 @@ import Alert from '../../../../../shared/client/src/components/common/Alert';
 import StatCard from '../../../../../shared/client/src/components/common/StatCard';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
-
-const NAV_ITEMS = getNavItems('TUTOR');
+import { useAuth } from '../../context/AuthContext';
 
 function statusBadgeClass(status) {
   if (status === 'PRESENT') return 'badge badge-success';
@@ -18,6 +17,8 @@ function statusBadgeClass(status) {
 
 function TutorStudentHistoryPage() {
   const { studentId } = useParams();
+  const { user } = useAuth();
+  const NAV_ITEMS = getNavItems(user.role);
   const [searchParams] = useSearchParams();
   const classId = searchParams.get('classId');
   const location = useLocation();

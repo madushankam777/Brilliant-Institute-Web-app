@@ -64,6 +64,15 @@ const updateAnnouncementRules = [...announcementIdParamRules, ...createAnnouncem
 
 const sendRemindersRules = [
   body('type').isIn(REMINDER_TYPES).withMessage('Invalid reminder type.'),
+  body('studentIds')
+    .optional()
+    .isArray()
+    .withMessage('studentIds must be a list of student ids.'),
+  body('studentIds.*').optional().isInt({ min: 1 }).withMessage('Invalid student id.'),
+];
+
+const reminderCandidatesQueryRules = [
+  query('type').isIn(REMINDER_TYPES).withMessage('Invalid reminder type.'),
 ];
 
 module.exports = {
@@ -78,4 +87,5 @@ module.exports = {
   createAnnouncementRules,
   updateAnnouncementRules,
   sendRemindersRules,
+  reminderCandidatesQueryRules,
 };

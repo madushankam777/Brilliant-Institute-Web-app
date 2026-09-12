@@ -8,8 +8,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
-
-const NAV_ITEMS = getNavItems("TUTOR");
+import { useAuth } from '../../context/AuthContext';
 
 const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
 
@@ -17,6 +16,8 @@ const STATUS_LABEL = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent' };
 
 function MarkAttendancePage() {
   const { sessionId } = useParams();
+  const { user } = useAuth();
+  const NAV_ITEMS = getNavItems(user.role);
 
   const [sessionInfo, setSessionInfo] = useState(null);
   const [rows, setRows] = useState([]);

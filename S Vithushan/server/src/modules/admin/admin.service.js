@@ -9,6 +9,7 @@ const {
   toSafeUserForAdmin,
   toSafeAnnouncement,
   toSafeTutorKey,
+  toSafeNotification,
 } = require('../../../../../shared/server/src/utils/sanitize');
 const { USER_STATUS, ROLES } = require('../../../../../shared/server/src/config/roles');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
@@ -115,7 +116,10 @@ async function getDashboardStats() {
   const [counts, revenueTrend, recentActivity] = await Promise.all([
     repository.getCoreCounts(),
     repository.getRevenueTrend(),
-    repository.listRecentActivity(10),
+    // The panel only shows ~10 rows at a time and scrolls for the rest, so
+    // fetch a bigger batch than that up front rather than a whole extra
+    // round trip every time the admin scrolls.
+    repository.listRecentActivity(50),
   ]);
 
   return {
@@ -311,13 +315,50 @@ async function listAnnouncementsForUser(user) {
   return rows.map(toSafeAnnouncement);
 }
 
-// Finds everyone matching the reminder type and "sends" (mock) one
-// notification each, logging every send for the audit trail.
-async function sendReminders(adminUser, type) {
+async function findReminderRows(type) {
+  return type === 'FEE_DUE'
+    ? repository.findStudentsWithOverdueFees()
+    : repository.findStudentsWithLowAttendance(config.business.lowAttendanceThresholdPercent);
+}
+
+// Lets the Admin see who a reminder batch would actually reach before
+// sending anything - one row per Student, even if they have several
+// overdue classes / low-attendance classes underneath it.
+async function getReminderCandidates(type) {
+  const rows = await findReminderRows(type);
+
+  const byStudent = new Map();
+  for (const row of rows) {
+    if (!byStudent.has(row.student_id)) {
+      byStudent.set(row.student_id, {
+        studentId: row.student_id,
+        fullName: row.full_name,
+        email: row.email,
+        details: [],
+      });
+    }
+    const entry = byStudent.get(row.student_id);
+    entry.details.push(
+      type === 'FEE_DUE'
+        ? `${row.subject}: LKR ${Number(row.balance).toFixed(2)} due`
+        : `${row.subject}: ${Math.round((row.attended_sessions / row.total_sessions) * 100)}% attendance`
+    );
+  }
+
+  return Array.from(byStudent.values());
+}
+
+// Finds everyone matching the reminder type, optionally narrowed down to
+// just the Student ids the Admin picked, and "sends" (mock) one
+// notification each - logging every send both to the audit trail and to
+// notification_log, which is what actually lets that Student see it in
+// their own notification bell.
+async function sendReminders(adminUser, { type, studentIds }) {
+  const allRows = await findReminderRows(type);
   const recipients =
-    type === 'FEE_DUE'
-      ? await repository.findStudentsWithOverdueFees()
-      : await repository.findStudentsWithLowAttendance(config.business.lowAttendanceThresholdPercent);
+    Array.isArray(studentIds) && studentIds.length > 0
+      ? allRows.filter((row) => studentIds.includes(row.student_id))
+      : allRows;
 
   let sentCount = 0;
   for (const recipient of recipients) {
@@ -343,10 +384,15 @@ async function sendReminders(adminUser, type) {
     actorId: adminUser.id,
     action: 'REMINDERS_SENT',
     entityType: 'notification_batch',
-    details: { type, sentCount },
+    details: { type, sentCount, targeted: Array.isArray(studentIds) && studentIds.length > 0 },
   });
 
   return { type, recipientCount: recipients.length, sentCount };
+}
+
+async function listMyNotifications(user) {
+  const rows = await repository.listNotificationsForUser(user.id, 30);
+  return rows.map(toSafeNotification);
 }
 
 module.exports = {
@@ -366,4 +412,6 @@ module.exports = {
   listAllAnnouncements,
   listAnnouncementsForUser,
   sendReminders,
+  getReminderCandidates,
+  listMyNotifications,
 };

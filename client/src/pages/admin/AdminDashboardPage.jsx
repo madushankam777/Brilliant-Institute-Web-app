@@ -120,14 +120,21 @@ function AdminDashboardPage() {
         ) : (
           <>
             <div className="stat-grid">
-              <StatCard icon="users" label="Total Users" value={stats.totalUsers} />
-              <StatCard icon="book" label="Active Classes" value={stats.activeClasses} />
-              <StatCard icon="wallet" label="Monthly Revenue" value={formatCurrency(stats.monthlyRevenue)} tone="success" />
+              <StatCard icon="users" label="Total Users" value={stats.totalUsers} to="/admin/users" />
+              <StatCard icon="book" label="Active Classes" value={stats.activeClasses} to="/courses/manage" />
+              <StatCard
+                icon="wallet"
+                label="Monthly Revenue"
+                value={formatCurrency(stats.monthlyRevenue)}
+                tone="success"
+                to="/admin/payments/verify"
+              />
               <StatCard
                 icon="chat"
                 label="Open Complaints"
                 value={stats.openComplaints}
                 tone={stats.openComplaints > 0 ? 'warning' : 'success'}
+                to="/admin/feedback"
               />
             </div>
 
@@ -142,7 +149,16 @@ function AdminDashboardPage() {
                 {stats.recentActivity.length === 0 ? (
                   <p className="muted">No activity recorded yet.</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      maxHeight: '520px',
+                      overflowY: 'auto',
+                      paddingRight: '4px',
+                    }}
+                  >
                     {stats.recentActivity.map((entry) => (
                       <div key={entry.id} style={{ borderBottom: '1px solid var(--color-border-soft)', paddingBottom: '10px' }}>
                         <div className="flex-between">

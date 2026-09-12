@@ -5,6 +5,7 @@ import {
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  fetchReminderCandidates,
   sendReminders,
 } from '../../api/adminApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
@@ -36,9 +37,14 @@ function AnnouncementsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  const [reminderType, setReminderType] = useState(null); // 'FEE_DUE' | 'LOW_ATTENDANCE' | null
+  const [candidates, setCandidates] = useState([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  const [candidatesError, setCandidatesError] = useState('');
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [reminderStatus, setReminderStatus] = useState('');
   const [reminderError, setReminderError] = useState('');
-  const [sendingType, setSendingType] = useState(null);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -141,17 +147,65 @@ function AnnouncementsPage() {
     }
   }
 
-  async function handleSendReminders(type) {
-    setReminderError('');
+  // Loads who a reminder batch would reach *before* sending anything, so
+  // the Admin can pick specific students instead of blindly blasting
+  // everyone who matches.
+  async function handleOpenReminderType(type) {
+    setReminderType(type);
     setReminderStatus('');
-    setSendingType(type);
+    setReminderError('');
+    setCandidatesError('');
+    setSelectedStudentIds([]);
+    setIsLoadingCandidates(true);
     try {
-      const result = await sendReminders(type);
-      setReminderStatus(`Sent ${result.sentCount} of ${result.recipientCount} ${type === 'FEE_DUE' ? 'fee-due' : 'low-attendance'} reminder(s).`);
+      const data = await fetchReminderCandidates(type);
+      setCandidates(data);
+    } catch (error) {
+      setCandidatesError(error.message);
+    } finally {
+      setIsLoadingCandidates(false);
+    }
+  }
+
+  function closeReminderPanel() {
+    setReminderType(null);
+    setCandidates([]);
+    setSelectedStudentIds([]);
+    setCandidatesError('');
+  }
+
+  function toggleCandidate(studentId) {
+    setSelectedStudentIds((previous) =>
+      previous.includes(studentId) ? previous.filter((id) => id !== studentId) : [...previous, studentId]
+    );
+  }
+
+  function toggleSelectAllCandidates() {
+    setSelectedStudentIds((previous) =>
+      previous.length === candidates.length ? [] : candidates.map((c) => c.studentId)
+    );
+  }
+
+  async function handleSendReminders() {
+    if (!reminderType) return;
+    setReminderError('');
+    if (selectedStudentIds.length === 0) {
+      setReminderError('Select at least one student, or check "Select all" below.');
+      return;
+    }
+
+    setReminderStatus('');
+    setIsSendingReminders(true);
+    try {
+      const result = await sendReminders({ type: reminderType, studentIds: selectedStudentIds });
+      setReminderStatus(
+        `Sent ${result.sentCount} of ${result.recipientCount} ${reminderType === 'FEE_DUE' ? 'fee-due' : 'low-attendance'} reminder(s). Recipients will see it in their notification bell.`
+      );
+      closeReminderPanel();
     } catch (error) {
       setReminderError(error.message);
     } finally {
-      setSendingType(null);
+      setIsSendingReminders(false);
     }
   }
 
@@ -265,28 +319,113 @@ function AnnouncementsPage() {
             <div className="card">
               <h2>Send Reminders</h2>
               <p className="muted" style={{ fontSize: '0.88rem' }}>
-                Notify every student with an outstanding balance or attendance below the configured threshold.
+                Pick a reminder type to see exactly who it would reach, then choose specific students or
+                send to everyone in the list.
               </p>
               {reminderStatus && <Alert type="success" message={reminderStatus} />}
-              <Alert type="error" message={reminderError} />
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={sendingType !== null}
-                  onClick={() => handleSendReminders('FEE_DUE')}
-                >
-                  <Icon name="wallet" size={16} /> {sendingType === 'FEE_DUE' ? 'Sending...' : 'Fee-Due Reminders'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={sendingType !== null}
-                  onClick={() => handleSendReminders('LOW_ATTENDANCE')}
-                >
-                  <Icon name="calendar" size={16} /> {sendingType === 'LOW_ATTENDANCE' ? 'Sending...' : 'Low-Attendance Reminders'}
-                </button>
-              </div>
+              {!reminderType && <Alert type="error" message={reminderError} />}
+
+              {!reminderType ? (
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => handleOpenReminderType('FEE_DUE')}>
+                    <Icon name="wallet" size={16} /> Fee-Due Reminders
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => handleOpenReminderType('LOW_ATTENDANCE')}
+                  >
+                    <Icon name="calendar" size={16} /> Low-Attendance Reminders
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex-between" style={{ marginBottom: '8px' }}>
+                    <strong>
+                      {reminderType === 'FEE_DUE' ? 'Students with an outstanding balance' : 'Students below the attendance threshold'}
+                    </strong>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={closeReminderPanel}>
+                      Cancel
+                    </button>
+                  </div>
+
+                  <Alert type="error" message={candidatesError} />
+                  <Alert type="error" message={reminderError} />
+
+                  {isLoadingCandidates ? (
+                    <LoadingSpinner label="Finding students..." />
+                  ) : candidates.length === 0 ? (
+                    <p className="muted">
+                      {reminderType === 'FEE_DUE'
+                        ? 'No students currently have an outstanding balance.'
+                        : 'No students are currently below the attendance threshold.'}
+                    </p>
+                  ) : (
+                    <>
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontWeight: 600,
+                          fontSize: '0.88rem',
+                          padding: '8px 0',
+                          borderBottom: '1px solid var(--color-border-soft)',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedStudentIds.length === candidates.length}
+                          onChange={toggleSelectAllCandidates}
+                        />
+                        Select all ({candidates.length})
+                      </label>
+
+                      <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                        {candidates.map((candidate) => (
+                          <label
+                            key={candidate.studentId}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '10px',
+                              padding: '10px 0',
+                              borderBottom: '1px solid var(--color-border-soft)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              style={{ marginTop: '3px' }}
+                              checked={selectedStudentIds.includes(candidate.studentId)}
+                              onChange={() => toggleCandidate(candidate.studentId)}
+                            />
+                            <span>
+                              <span style={{ fontWeight: 600, display: 'block' }}>{candidate.fullName}</span>
+                              <span className="muted" style={{ fontSize: '0.8rem' }}>{candidate.email}</span>
+                              <span className="muted" style={{ fontSize: '0.8rem', display: 'block' }}>
+                                {candidate.details.join(' · ')}
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-block"
+                        style={{ marginTop: '14px' }}
+                        disabled={isSendingReminders}
+                        onClick={handleSendReminders}
+                      >
+                        {isSendingReminders
+                          ? 'Sending...'
+                          : `Send to Selected (${selectedStudentIds.length})`}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

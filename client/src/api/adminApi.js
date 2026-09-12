@@ -69,6 +69,14 @@ export async function fetchMyAnnouncements() {
   return response.data.data.announcements;
 }
 
+// Reminders addressed specifically to the logged-in user (fee-due,
+// low-attendance, ...) - distinct from broadcast Announcements above, but
+// shown together in the same notification bell.
+export async function fetchMyNotifications() {
+  const response = await httpClient.get('/notifications/mine');
+  return response.data.data.notifications;
+}
+
 export async function fetchAllAnnouncements() {
   const response = await httpClient.get('/admin/announcements');
   return response.data.data.announcements;
@@ -88,7 +96,17 @@ export async function deleteAnnouncement(announcementId) {
   await httpClient.delete(`/admin/announcements/${announcementId}`);
 }
 
-export async function sendReminders(type) {
-  const response = await httpClient.post('/admin/reminders/send', { type });
+// Who a reminder batch would actually reach, before sending anything -
+// one row per Student, grouped from every overdue/low-attendance class
+// they have.
+export async function fetchReminderCandidates(type) {
+  const response = await httpClient.get('/admin/reminders/candidates', { params: { type } });
+  return response.data.data.candidates;
+}
+
+// `studentIds` narrows the send to just those Students; omit it (or pass
+// an empty array) to send to everyone the candidate list matched.
+export async function sendReminders({ type, studentIds }) {
+  const response = await httpClient.post('/admin/reminders/send', { type, studentIds });
   return response.data.data.result;
 }

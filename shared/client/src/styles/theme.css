@@ -710,6 +710,21 @@ button, input, select, textarea {
   gap: 10px;
 }
 
+/* Dashboard KPI tiles that link somewhere (e.g. "Total Users" -> Manage
+   Users) get a hover lift so it reads as clickable, same card otherwise. */
+.stat-card-link {
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.stat-card-link:hover,
+.stat-card-link:focus-visible {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
 .stat-card-top {
   display: flex;
   align-items: flex-start;

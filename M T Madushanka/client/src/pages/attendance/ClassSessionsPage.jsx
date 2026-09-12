@@ -1,28 +1,49 @@
+// Tutor/Admin: pick a class (by name, not a raw id) to see its sessions and mark attendance.
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchClassSessions } from '../../api/attendanceApi';
+import { fetchMyTaughtClasses } from '../../api/courseApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
+import { useAuth } from '../../context/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/attendance/classes', label: 'Mark Attendance', icon: 'calendar' },
 ];
 
-function isValidClassId(value) {
-  return /^[1-9][0-9]*$/.test(String(value || ''));
-}
-
 function ClassSessionsPage() {
   const { classId: classIdParam } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user.role === 'ADMIN';
 
-  const [classIdInput, setClassIdInput] = useState(isValidClassId(classIdParam) ? classIdParam : '');
+  const [classes, setClasses] = useState([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [classesError, setClassesError] = useState('');
+
   const [classSubject, setClassSubject] = useState('');
   const [sessions, setSessions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchMyTaughtClasses()
+      .then((data) => {
+        if (isMounted) setClasses(data);
+      })
+      .catch((error) => {
+        if (isMounted) setClassesError(error.message);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingClasses(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const loadSessions = useCallback(async (classId) => {
     setIsLoading(true);
@@ -40,20 +61,18 @@ function ClassSessionsPage() {
   }, []);
 
   useEffect(() => {
-    if (isValidClassId(classIdParam)) {
+    if (classIdParam) {
       loadSessions(classIdParam);
-    } else if (classIdParam) {
-      setErrorMessage('Invalid class id in the URL.');
     }
   }, [classIdParam, loadSessions]);
 
-  function handleFindClass(event) {
-    event.preventDefault();
-    if (!isValidClassId(classIdInput)) {
-      setErrorMessage('Please enter a valid class id (a positive number).');
+  function handleSelectClass(event) {
+    const selectedId = event.target.value;
+    if (!selectedId) {
+      navigate('/attendance/classes');
       return;
     }
-    navigate(`/attendance/classes/${classIdInput}/sessions`);
+    navigate(`/attendance/classes/${selectedId}/sessions`);
   }
 
   return (
@@ -61,26 +80,36 @@ function ClassSessionsPage() {
       <div className="page">
         <div className="page-header">
           <h1>Mark Attendance</h1>
-          <p className="muted">Look up a class to see its scheduled sessions.</p>
+          <p className="muted">
+            {isAdmin
+              ? 'Pick a class to see its scheduled sessions.'
+              : 'Pick one of your classes to see its scheduled sessions.'}
+          </p>
         </div>
 
         <div className="card">
-          <form className="inline-form" onSubmit={handleFindClass}>
-            <div>
-              <label htmlFor="classId">Class ID</label>
-              <input
-                id="classId"
-                type="number"
-                min="1"
-                value={classIdInput}
-                onChange={(e) => setClassIdInput(e.target.value)}
-                required
-              />
+          <Alert type="error" message={classesError} />
+          {isLoadingClasses ? (
+            <LoadingSpinner label="Loading your classes..." />
+          ) : classes.length === 0 ? (
+            <p className="muted">
+              {isAdmin ? 'No classes have been created yet.' : 'You have not created any classes yet.'}
+            </p>
+          ) : (
+            <div className="form-field" style={{ maxWidth: '420px' }}>
+              <label htmlFor="classPicker">Class</label>
+              <select id="classPicker" value={classIdParam || ''} onChange={handleSelectClass}>
+                <option value="">Select a class...</option>
+                {classes.map((classItem) => (
+                  <option key={classItem.id} value={classItem.id}>
+                    {classItem.subject} &middot; {classItem.dayOfWeek} {classItem.startTime}-
+                    {classItem.endTime}
+                    {isAdmin ? ` (${classItem.tutorName})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
-            <button type="submit" className="btn btn-primary">
-              Load sessions
-            </button>
-          </form>
+          )}
         </div>
 
         <Alert type="error" message={errorMessage} />

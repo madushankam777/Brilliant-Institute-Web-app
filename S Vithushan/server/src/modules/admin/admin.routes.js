@@ -17,14 +17,17 @@ const {
   createAnnouncementRules,
   updateAnnouncementRules,
   sendRemindersRules,
+  reminderCandidatesQueryRules,
 } = require('./admin.validation');
 
 const router = express.Router();
 
 router.use(authenticate);
 
-// --- Any authenticated role: read published announcements targeted at them ---
+// --- Any authenticated role: read published announcements + their own
+// personal notifications (reminders addressed specifically to them) ---
 router.get('/announcements', controller.listMyAnnouncements);
+router.get('/notifications/mine', controller.listMyNotifications);
 
 router.patch(
   '/admin/users/:userId/suspend',
@@ -93,6 +96,12 @@ router.delete(
   controller.deleteAnnouncement
 );
 
+router.get(
+  '/admin/reminders/candidates',
+  reminderCandidatesQueryRules,
+  validateRequest,
+  controller.getReminderCandidates
+);
 router.post('/admin/reminders/send', sendRemindersRules, validateRequest, controller.sendReminders);
 
 module.exports = router;
