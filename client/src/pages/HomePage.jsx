@@ -8,6 +8,7 @@ import StatCard from '../../../shared/client/src/components/common/StatCard';
 import Footer from '../../../shared/client/src/components/layout/Footer';
 import PortalShell from '../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../shared/client/src/components/layout/navItems';
+import heroMediaImg from '../../../shared/client/src/assets/hero-media.png';
 
 const FEATURES = [
   {
@@ -251,7 +252,9 @@ function HomePage() {
             </Link>
           </div>
         </div>
-        <div className="hero-media" />
+        <div className="hero-media">
+          <img src={heroMediaImg} alt="Students collaborating in a Brilliant Institute classroom" />
+        </div>
       </section>
 
       <section className="section section-bg-soft">
