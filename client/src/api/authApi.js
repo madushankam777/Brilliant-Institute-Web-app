@@ -1,5 +1,16 @@
+/**
+ * authApi.js
+ * -----------------------------------------------------------------------
+ * Every network call for the Registration & Authentication module lives
+ * in this one file. Components never call axios/httpClient directly -
+ * they call these named functions instead, which keeps API endpoints
+ * and payload shapes in one predictable place.
+ * -----------------------------------------------------------------------
+ */
+
 import httpClient from '../../../shared/client/src/api/httpClient';
 
+/** CREATE - register a new account (Student/Parent, or Tutor via enrollment key). */
 export async function registerAccount({
   fullName,
   email,

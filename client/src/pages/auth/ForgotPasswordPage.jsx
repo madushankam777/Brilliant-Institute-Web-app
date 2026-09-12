@@ -1,3 +1,7 @@
+// Step 1 of password reset: ask for the account's email and send a reset
+// link. We always show the same "check your email" message whether or not
+// that email is actually registered, so no one can use this to guess
+// which emails have an account.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../../api/authApi';
@@ -33,8 +37,8 @@ function ForgotPasswordPage() {
       const result = await requestPasswordReset(email);
       setSubmitted(true);
       if (result.data && result.data.devOnlyResetToken) {
-        // Only ever present outside production - stands in for a real
-        // email/SMS gateway, which is still TBD per the SRS.
+        // Only sent by the server outside production, since there's no
+        // real email service hooked up yet in development.
         setDevOnlyResetToken(result.data.devOnlyResetToken);
       }
     } catch (error) {

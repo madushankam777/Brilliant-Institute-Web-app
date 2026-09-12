@@ -1,3 +1,5 @@
+// Profile page: two separate forms - one to edit your details, one to
+// change your password.
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, uploadMyProfilePicture, changeMyPassword } from '../../api/authApi';

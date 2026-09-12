@@ -1,3 +1,6 @@
+// Keeps track of who is logged in for the whole app.
+// The session itself lives in an httpOnly cookie (JavaScript can't read
+// it), so this only stores the safe profile fields the server sends back.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as authApi from '../api/authApi';
 import { setSessionExpiredHandler } from '../../../shared/client/src/api/httpClient';
@@ -16,8 +19,7 @@ export function AuthProvider({ children }) {
         const currentUser = await authApi.fetchCurrentSession();
         if (isMounted) setUser(currentUser);
       } catch (error) {
-        // No valid session yet - this is a normal state for a fresh visit,
-        // not something to show an error message for.
+        // Not logged in yet - that's normal on a fresh visit, no error needed.
         if (isMounted) setUser(null);
       } finally {
         if (isMounted) setIsCheckingSession(false);
@@ -30,8 +32,7 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  // Whenever any API call comes back 401 (session expired), clear the
-  // user everywhere in the app automatically.
+  // If any API call comes back "session expired", log the user out here too.
   useEffect(() => {
     setSessionExpiredHandler(() => setUser(null));
   }, []);
@@ -71,7 +72,7 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/** Hook every component uses to read the current user / auth actions. */
+// Hook components use to read the current user and call login/logout.
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
