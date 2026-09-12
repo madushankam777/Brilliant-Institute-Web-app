@@ -7,6 +7,7 @@ const controller = require('./course.controller');
 const {
   classIdParamRules,
   enrollmentIdParamRules,
+  deleteEnrollmentRecordRules,
   tutorIdParamRules,
   browseQueryRules,
   createClassRules,
@@ -20,10 +21,7 @@ router.use(authenticate);
 // --- Browse (any logged-in role) ---
 router.get('/classes', browseQueryRules, validateRequest, controller.browseClasses);
 router.get('/classes/:classId', classIdParamRules, validateRequest, controller.getClassDetails);
-// Registered ahead of /tutors/:tutorId so the literal path always wins -
-// used by Admin's "assign a tutor" picker and Feedback's "message a
-// tutor" picker, so any authenticated role can read it (name/email/photo
-// only, nothing sensitive).
+// tutor picker list
 router.get('/tutors', controller.listTutors);
 router.get('/tutors/:tutorId', tutorIdParamRules, validateRequest, controller.getTutorProfile);
 
@@ -70,6 +68,13 @@ router.delete(
   enrollmentIdParamRules,
   validateRequest,
   controller.dropClass
+);
+router.delete(
+  '/my-courses/:enrollmentId/permanent',
+  authorize(ROLES.STUDENT_PARENT),
+  deleteEnrollmentRecordRules,
+  validateRequest,
+  controller.deleteEnrollmentRecord
 );
 
 module.exports = router;

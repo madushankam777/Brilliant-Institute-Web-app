@@ -135,10 +135,6 @@ function MarkAttendancePage() {
         {showQr && (
           <div className="card" style={{ textAlign: 'center' }}>
             <h3 style={{ marginTop: 0 }}>Self Check-In QR Code</h3>
-            <p className="muted" style={{ fontSize: '0.85rem' }}>
-              Display this on the board - enrolled, paid A/L students scan it with their phone (while
-              logged in) to mark themselves present.
-            </p>
             <Alert type="error" message={qrError} />
             {isLoadingQr ? (
               <LoadingSpinner label="Generating QR code..." />

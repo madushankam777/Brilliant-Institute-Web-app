@@ -1,4 +1,4 @@
-// All the SQL for the Admin, Notifications & Announcements module.
+// Admin module - all database queries
 const { pool } = require('../../../../../shared/server/src/config/db');
 
 // --- Dashboard -----------------------------------------------------------
@@ -168,6 +168,11 @@ async function revokeTutorKey(keyId) {
   await pool.execute(`UPDATE tutor_enrollment_keys SET status = 'REVOKED' WHERE id = ?`, [keyId]);
 }
 
+// delete btn - remove key record
+async function deleteTutorKey(keyId) {
+  await pool.execute(`DELETE FROM tutor_enrollment_keys WHERE id = ?`, [keyId]);
+}
+
 // --- Announcements -----------------------------------------------------------
 
 async function createAnnouncement({ title, body, priority, targetAudience, targetGrade, publishedBy }) {
@@ -225,9 +230,7 @@ async function listAllAnnouncements() {
   return rows;
 }
 
-// `grade` narrows Student/Parent-targeted notices to the ones relevant to
-// this particular student - an announcement with no target_grade is a
-// general one and still reaches everyone in its target_audience.
+// filter announcements by role + grade
 async function listAnnouncementsForAudience(role, grade) {
   const [rows] = await pool.execute(
     `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name
@@ -280,10 +283,7 @@ async function logNotification({ recipientId, channel, type, message, sentBy }) 
   );
 }
 
-// The bell only ever showed broadcast Announcements - a reminder "sent" to
-// a specific Student/Parent had nowhere to actually surface for them. This
-// is that surface: every logged-in user can read their own notification
-// log (fee-due / low-attendance reminders, etc.) alongside Announcements.
+// notification bell - personal reminders sent to this user
 async function listNotificationsForUser(userId, limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 30;
   const [rows] = await pool.query(
@@ -312,6 +312,7 @@ module.exports = {
   listTutorKeys,
   findTutorKeyById,
   revokeTutorKey,
+  deleteTutorKey,
   createAnnouncement,
   findAnnouncementById,
   updateAnnouncement,

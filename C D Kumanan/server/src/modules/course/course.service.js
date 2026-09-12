@@ -1,5 +1,4 @@
-// Course Management business logic: browsing/search, tutor CRUD with
-// CRS-05 conflict detection, and student enroll/drop.
+// Course module - business logic
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { toSafeClass, toSafeTutorProfile } = require('../../../../../shared/server/src/utils/sanitize');
@@ -51,8 +50,7 @@ function assertOwnsClass(user, classRow) {
   }
 }
 
-// Checks CRS-05 (venue+time clash = hard block) and warns (non-blocking)
-// if the tutor themselves already has another class at an overlapping time.
+// check for schedule clash
 async function checkScheduleConflicts({ tutorId, venue, dayOfWeek, startTime, endTime, excludeClassId }) {
   const venueClash = await repository.findConflictingVenueClass({
     venue,
@@ -84,9 +82,7 @@ async function checkScheduleConflicts({ tutorId, venue, dayOfWeek, startTime, en
   return [];
 }
 
-// An Admin doesn't teach - they have to say which Tutor a class belongs
-// to. A Tutor can only ever create a class for themselves, no matter what
-// (if anything) they send as tutorId.
+// pick the tutor for a new class
 async function resolveTutorForNewClass(actingUser, requestedTutorId) {
   if (actingUser.role !== ROLES.ADMIN) {
     return actingUser.id;
@@ -156,9 +152,7 @@ async function cancelClass(tutorUser, classId) {
   });
 }
 
-// An Admin doesn't teach, so they're never `tutor_id` on any class - "My
-// Classes" has to mean "every class" for them, not "classes I personally
-// teach" (which would always come back empty).
+// My Classes - all classes for admin, own classes for tutor
 async function listMyTaughtClasses(user) {
   const rows =
     user.role === ROLES.ADMIN
@@ -185,8 +179,7 @@ async function enrollInClass(studentUser, classId) {
 
   let enrollmentId;
   if (existing) {
-    // Re-enrolling after a previous drop - the unique (student, class) key
-    // means we reactivate that row rather than insert a duplicate.
+    // re-add btn - reuse the old row instead of a duplicate
     await repository.reactivateEnrollment(existing.id, classRow.fee);
     enrollmentId = existing.id;
   } else {
@@ -218,6 +211,30 @@ async function dropClass(studentUser, enrollmentId) {
   await recordAuditEvent({
     actorId: studentUser.id,
     action: 'CLASS_DROPPED',
+    entityType: 'enrollment',
+    entityId: enrollmentId,
+  });
+}
+
+// delete btn - only for already-dropped classes
+async function deleteEnrollmentRecord(studentUser, enrollmentId, confirmText) {
+  if (confirmText !== 'DELETE') {
+    throw ApiError.badRequest('Please type DELETE in capital letters to confirm.');
+  }
+
+  const rows = await repository.listMyEnrollments(studentUser.id);
+  const enrollment = rows.find((row) => row.enrollment_id === enrollmentId);
+  if (!enrollment) {
+    throw ApiError.notFound('Enrollment not found.');
+  }
+  if (enrollment.enrollment_status !== 'DROPPED') {
+    throw ApiError.badRequest('Drop this class before removing it from your history.');
+  }
+
+  await repository.removeEnrollmentRecord(enrollmentId);
+  await recordAuditEvent({
+    actorId: studentUser.id,
+    action: 'CLASS_ENROLLMENT_REMOVED',
     entityType: 'enrollment',
     entityId: enrollmentId,
   });
@@ -255,5 +272,6 @@ module.exports = {
   listMyTaughtClasses,
   enrollInClass,
   dropClass,
+  deleteEnrollmentRecord,
   listMyCourses,
 };

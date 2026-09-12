@@ -10,9 +10,7 @@ async function createUser({ fullName, email, passwordHash, phone, role, grade })
   return result.insertId;
 }
 
-// The student-facing id (ST0000001, ...) can only be built once we know
-// the auto-increment id, so this is a second UPDATE right after createUser
-// rather than something createUser can set in its own INSERT.
+// set student code (ST0000001...) after createUser gives us the id
 async function setStudentCode(userId, studentCode) {
   await pool.execute(`UPDATE users SET student_code = ? WHERE id = ?`, [studentCode, userId]);
 }

@@ -8,9 +8,7 @@ const listClassSessions = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
-// POST /api/attendance/classes/:classId/today-session - the one call the
-// "Mark Attendance" button on My Classes makes: no class-id lookup, no
-// session picker, just "give me today's sheet, creating it if needed."
+// mark attendance btn
 const getOrCreateTodaySession = asyncHandler(async (req, res) => {
   const classId = Number(req.params.classId);
   const data = await service.getOrCreateTodaySession(req.user, classId);

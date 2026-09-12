@@ -37,9 +37,7 @@ async function listBalancesForStudent(studentId, executor = pool) {
   return rows;
 }
 
-// Every call site is "a payment for this enrollment just succeeded" - so
-// this is also the one place that flips payment_status to PAID, which is
-// what actually lets that student show up on the Tutor's attendance sheet.
+// update balance after payment (marks as paid)
 async function updateEnrollmentBalance(enrollmentId, newBalance, executor = pool) {
   await executor.execute(
     `UPDATE enrollments SET balance = ?, payment_status = 'PAID' WHERE id = ?`,

@@ -50,6 +50,12 @@ const revokeTutorKey = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Enrollment key revoked.' });
 });
 
+const deleteTutorKey = asyncHandler(async (req, res) => {
+  const keyId = Number(req.params.keyId);
+  await service.deleteTutorKey(req.user, keyId);
+  res.status(200).json({ success: true, message: 'Enrollment key deleted.' });
+});
+
 const downloadTutorKeyDocument = asyncHandler(async (req, res) => {
   const keyId = Number(req.params.keyId);
   const { type } = req.params;
@@ -153,6 +159,7 @@ module.exports = {
   generateTutorKey,
   listTutorKeys,
   revokeTutorKey,
+  deleteTutorKey,
   downloadTutorKeyDocument,
   suspendUser,
   activateUser,

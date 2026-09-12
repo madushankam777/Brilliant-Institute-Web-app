@@ -23,14 +23,11 @@ async function listClassSessions(tutorUser, classId) {
   return { classSubject: classRow.subject, sessions };
 }
 
-// The one action a Tutor actually wants: "let me mark today's attendance
-// for this class" - no session-management UI, no class id to look up.
-// Finds today's session if it already exists, or creates it on the spot
-// using the class's own scheduled start/end time.
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// mark attendance btn - find or make today's session
 async function getOrCreateTodaySession(tutorUser, classId) {
   const classRow = await repository.findClassById(classId);
   await assertTutorOwnsClass(tutorUser, classRow);
@@ -53,9 +50,7 @@ async function getOrCreateTodaySession(tutorUser, classId) {
   return { sessionId };
 }
 
-// QR self-check-in only exists for A/L classes - a room full of Advanced
-// Level students all scanning one code on the board is worth building;
-// every other class still uses the Tutor's own attendance sheet.
+// QR code btn - A/L classes only
 async function getSessionQrCode(tutorUser, sessionId) {
   const session = await repository.findSessionWithClass(sessionId);
   if (!session) {
@@ -165,8 +160,7 @@ async function getAttendanceSheet(tutorUser, sessionId) {
   };
 }
 
-// Saves a full sheet in one request: inserts new records, updates existing
-// ones (with an audit entry) if the tutor is correcting a mistake.
+// save attendance sheet
 async function markSessionAttendance(tutorUser, sessionId, records) {
   const session = await repository.findSessionWithClass(sessionId);
   if (!session) {

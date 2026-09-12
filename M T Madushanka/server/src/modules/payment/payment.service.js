@@ -7,13 +7,10 @@ const { PAYMENT_STATUS } = require('./payment.constants');
 const gateway = require('./paymentGateway');
 const repository = require('./payment.repository');
 
-// Marks a gateway timeout/network failure so it can be reported as "pending"
-// instead of a generic error.
+// gateway timeout error
 class GatewayUnavailableError extends Error {}
 
-// A bank transfer needs at least a day for an Admin to actually verify it
-// before the new month of classes starts, so it closes on the last day of
-// each month and reopens automatically on the 1st.
+// bank transfer closes on the last day of each month
 function lastDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
@@ -97,8 +94,7 @@ async function withTransaction(work) {
   }
 }
 
-// Committed on its own so the PENDING row survives even if the gateway
-// call in finalizePendingPayment() fails.
+// save payment as pending first
 async function createPendingPaymentRecord(
   studentUser,
   { enrollmentId, amount, paymentMethod, paymentDetails }
@@ -255,11 +251,7 @@ async function retryPendingPayment(studentUser, paymentId) {
   return finalizePendingPayment(studentUser, paymentId);
 }
 
-// Bank transfer never touches the mock gateway - a real transfer takes
-// time to clear and has to be reconciled by a person, so this just
-// records the PENDING payment with the uploaded receipt and stops there.
-// An Admin has to approve it (see approveBankTransferPayment) before the
-// balance moves or a receipt number is issued.
+// bank transfer form - saves receipt, waits for admin approval
 async function submitBankTransferPayment(
   studentUser,
   { enrollmentId, amount, bankReference, receiptImagePath }
@@ -372,9 +364,7 @@ async function rejectBankTransferPayment(adminUser, paymentId) {
   return toSafePayment(payment);
 }
 
-// Only the paying student or an Admin can ever see a receipt image - it's
-// personal banking correspondence, never served as a public static file
-// (see profilePictureUpload vs. this in shared/server's upload middleware).
+// only the student or admin can view the receipt image
 async function getReceiptImagePath(requestingUser, paymentId) {
   const payment = await repository.findPaymentById(paymentId);
   if (!payment || payment.payment_method !== 'BANK_TRANSFER') {
@@ -398,9 +388,7 @@ async function getMyPaymentHistory(studentUser) {
   return rows.map(toSafePayment);
 }
 
-// --- Tutor payouts - a simple ledger of what an Admin has paid each
-// Tutor. This is a record-keeping tool, not an automatic payroll run -
-// the Admin decides the amount for each entry themselves.
+// pay tutor btn
 async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
   if (!(amount > 0)) {
     throw ApiError.badRequest('Payout amount must be greater than zero.');
@@ -435,8 +423,7 @@ async function listTutorPayouts() {
     repository.sumPayoutsByTutor(),
   ]);
 
-  // Plain object keyed by tutorId - easiest shape for the client to look
-  // up "how much has this Tutor been paid in total" per row.
+  // total paid per tutor
   const totalsByTutor = {};
   totals.forEach((row) => {
     totalsByTutor[row.tutor_id] = Number(row.total_paid);

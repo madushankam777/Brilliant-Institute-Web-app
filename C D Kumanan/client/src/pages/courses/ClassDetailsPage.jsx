@@ -49,10 +49,7 @@ function ClassDetailsPage() {
     setIsEnrolling(true);
     try {
       const enrollment = await enrollInClass(classId);
-      // Straight to checkout for this exact class - a seat is reserved,
-      // but nothing about it (attendance, "My Courses") is really usable
-      // until the fee is actually paid, so skip the "you're enrolled!"
-      // detour and take them straight to the payment page.
+      // go straight to payment page
       navigate('/payments', { state: { enrollmentId: enrollment.enrollmentId } });
     } catch (error) {
       setEnrollError(error.message);

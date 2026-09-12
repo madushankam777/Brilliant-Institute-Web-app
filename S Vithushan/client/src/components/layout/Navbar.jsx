@@ -6,10 +6,7 @@ import Icon from '../../../../../shared/client/src/components/common/Icon';
 import Logo from '../../../../../shared/client/src/components/common/Logo';
 import Avatar from '../../../../../shared/client/src/components/common/Avatar';
 
-// Dismissals are stored as { [announcementId]: versionDismissedAt } rather
-// than a plain id list - that's what lets an Admin's edit resurface a
-// notice someone already cleared: the new version number no longer
-// matches what they dismissed, so it counts as unseen again.
+// read saved dismissed notifications
 function readVersionMap(key) {
   try {
     const raw = window.localStorage.getItem(key);
@@ -19,12 +16,12 @@ function readVersionMap(key) {
   }
 }
 
+// save dismissed notifications
 function writeVersionMap(key, versionMap) {
   try {
     window.localStorage.setItem(key, JSON.stringify(versionMap));
   } catch {
-    // localStorage can be unavailable (private browsing) - dismissals just
-    // won't persist across reloads, which is a harmless degradation.
+    // ignore - storage may be unavailable
   }
 }
 
@@ -55,11 +52,7 @@ function Navbar() {
   const lastSeenKey = user ? `brilliant_notif_last_seen_${user.id}` : null;
   const dismissedKey = user ? `brilliant_notif_dismissed_${user.id}` : null;
 
-  // Two different sources feed the same bell: broadcast Announcements
-  // (everyone in an audience/grade) and personal notifications from
-  // notification_log (a fee-due/low-attendance reminder Admin sent to
-  // this specific person) - without this second fetch, a reminder the
-  // Admin "sends" would never actually show up anywhere for the student.
+  // load bell notifications (announcements + personal reminders)
   const loadNotifications = useCallback(async () => {
     try {
       const [announcementData, personalData] = await Promise.all([
@@ -69,8 +62,7 @@ function Navbar() {
       setAnnouncements(announcementData);
       setPersonalNotifications(personalData);
     } catch {
-      // Notifications are a convenience, not critical - fail silently
-      // rather than showing an alert over the whole page.
+      // fail silently, not critical
     }
   }, []);
 
@@ -99,9 +91,7 @@ function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Announcements and personal reminders are two different tables with
-  // their own id sequences - prefix each so they can share one dismissal
-  // map and one sorted feed without ever colliding.
+  // combine announcements + personal reminders into one list
   const feedItems = [
     ...announcements.map((item) => ({
       feedId: `ann:${item.id}`,
@@ -125,12 +115,10 @@ function Navbar() {
     })),
   ].sort((a, b) => new Date(b.effectiveDate) - new Date(a.effectiveDate));
 
-  // A dismissed notice only stays hidden while it's still the same version -
-  // an Admin's later edit bumps the version, so it reappears as new.
+  // hide dismissed notifications
   const visibleItems = feedItems.filter((item) => (dismissedVersions[item.feedId] ?? 0) < item.version);
 
-  // The later of created/updated is what actually matters for "is this
-  // new to me" - an edited notice should re-trigger the unread badge too.
+  // count unread for the bell badge
   const unreadCount = lastSeenAt
     ? visibleItems.filter((item) => new Date(item.effectiveDate) > new Date(lastSeenAt)).length
     : visibleItems.length;
@@ -145,8 +133,7 @@ function Navbar() {
         try {
           window.localStorage.setItem(lastSeenKey, now);
         } catch {
-          // localStorage can be unavailable (private browsing); the
-          // unread badge just won't persist across reloads, which is fine.
+          // ignore - storage may be unavailable
         }
         setLastSeenAt(now);
       }

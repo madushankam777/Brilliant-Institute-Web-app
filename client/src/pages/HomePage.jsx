@@ -41,13 +41,13 @@ const TESTIMONIALS = [
   {
     quote:
       'Creating my account took less than a minute, and everything - my classes, attendance and fees - lives in one place now.',
-    name: 'Amit Patel',
+    name: 'Dinuka Rathnayake',
     role: 'Grade 11 Mathematics Student',
   },
   {
     quote:
       'The real-time notification engine has saved countless frantic calls. When a tutor is sick, parents get notified instantly.',
-    name: 'Evelyn Wong',
+    name: 'Kamala Sivakumar',
     role: 'Parent',
   },
 ];

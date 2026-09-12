@@ -1,6 +1,4 @@
-// Registration page for new Student/Parent accounts.
-// Note: this form's checks are just for a nicer experience - the server
-// always re-checks everything too, since client-side checks can be bypassed.
+// register page
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerAccount } from '../../api/authApi';
@@ -99,7 +97,7 @@ function RegisterPage() {
     <AuthLayout
       quote={{
         text: 'Brilliant Institute organizes our schedules beautifully. Every student now has a clean path to progress.',
-        author: 'Dr. Robert Chen',
+        author: 'Dr. Priyantha Gunawardena',
         role: 'Senior Chemistry Head',
       }}
     >

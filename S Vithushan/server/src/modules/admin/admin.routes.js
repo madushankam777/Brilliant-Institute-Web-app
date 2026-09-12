@@ -69,6 +69,12 @@ router.patch(
   validateRequest,
   controller.revokeTutorKey
 );
+router.delete(
+  '/admin/tutor-keys/:keyId',
+  keyIdParamRules,
+  validateRequest,
+  controller.deleteTutorKey
+);
 router.get(
   '/admin/tutor-keys/:keyId/documents/:type',
   keyDocumentParamRules,

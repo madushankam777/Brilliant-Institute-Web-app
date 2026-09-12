@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import Avatar from './Avatar';
 
-// Search-by-name or just scroll the list - used anywhere someone has to
-// pick one Tutor out of every active Tutor account (Admin assigning a
-// class, a student addressing a Feedback ticket to a specific Tutor).
+// tutor picker list - search by name
 function TutorPicker({ tutors, value, onChange, emptyMessage = 'No tutors found.' }) {
   const [search, setSearch] = useState('');
 

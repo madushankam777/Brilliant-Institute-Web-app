@@ -96,7 +96,7 @@ function RegisterPage() {
     <AuthLayout
       quote={{
         text: 'Brilliant Institute organizes our schedules beautifully. Every student now has a clean path to progress.',
-        author: 'Dr. Robert Chen',
+        author: 'Dr. Priyantha Gunawardena',
         role: 'Senior Chemistry Head',
       }}
     >

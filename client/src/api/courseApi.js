@@ -20,8 +20,7 @@ export async function fetchTutorProfile(tutorId) {
   return response.data.data;
 }
 
-// Every active Tutor - used by Admin's "assign a tutor" picker and
-// Feedback's "message a tutor" picker.
+// tutor picker list
 export async function fetchAllTutors() {
   const response = await httpClient.get('/courses/tutors');
   return response.data.data.tutors;
@@ -58,4 +57,11 @@ export async function fetchMyCourses() {
 
 export async function dropCourse(enrollmentId) {
   await httpClient.delete(`/courses/my-courses/${enrollmentId}`);
+}
+
+// delete btn
+export async function deleteEnrollmentRecord(enrollmentId) {
+  await httpClient.delete(`/courses/my-courses/${enrollmentId}/permanent`, {
+    data: { confirmText: 'DELETE' },
+  });
 }

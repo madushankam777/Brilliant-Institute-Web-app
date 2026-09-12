@@ -36,9 +36,7 @@ router.get(
 
 router.get('/:ticketId', ticketIdParamRules, validateRequest, controller.getTicketDetails);
 
-// Open to any authenticated role - the service layer enforces that only
-// the ticket's own submitter or the staff it's addressed to can actually
-// post (see feedback.service.js's replyToTicket).
+// send reply btn - service layer checks sender is allowed
 router.post('/:ticketId/reply', replyRules, validateRequest, controller.replyToTicket);
 
 router.patch(

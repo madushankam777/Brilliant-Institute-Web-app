@@ -147,9 +147,7 @@ function AnnouncementsPage() {
     }
   }
 
-  // Loads who a reminder batch would reach *before* sending anything, so
-  // the Admin can pick specific students instead of blindly blasting
-  // everyone who matches.
+  // load who a reminder would reach
   async function handleOpenReminderType(type) {
     setReminderType(type);
     setReminderStatus('');

@@ -1,10 +1,7 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 
-// KPI tile used on dashboard-style pages ("Attendance Rate", "Pending
-// Fees", ...). `tone` colours the icon box (default/warning/success/danger).
-// Pass `to` to make the whole tile a link to the page it summarises (e.g.
-// "Total Users" -> Manage Users) - omit it for a plain, non-clickable tile.
+// dashboard stat card - pass "to" to make it a link
 function StatCard({ icon, label, value, sub, tone = 'default', to }) {
   const iconClass = tone === 'default' ? 'stat-icon-box' : `stat-icon-box ${tone}`;
   const content = (

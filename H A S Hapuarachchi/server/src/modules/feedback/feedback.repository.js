@@ -58,9 +58,7 @@ async function listTicketsBySubmitter(userId) {
   return rows;
 }
 
-// An Admin sees every ticket addressed to Admin (alone or alongside a
-// Tutor); a Tutor only ever sees tickets addressed to them specifically -
-// never another Tutor's, and never an Admin-only ticket.
+// staff ticket list - admin sees all, tutor sees only their own
 async function listTicketsForStaff({ role, userId, status }) {
   const clauses = [];
   const params = [];

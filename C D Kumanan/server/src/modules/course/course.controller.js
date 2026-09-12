@@ -71,6 +71,13 @@ const dropClass = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'You have dropped this class.' });
 });
 
+const deleteEnrollmentRecord = asyncHandler(async (req, res) => {
+  const enrollmentId = Number(req.params.enrollmentId);
+  const { confirmText } = req.body;
+  await service.deleteEnrollmentRecord(req.user, enrollmentId, confirmText);
+  res.status(200).json({ success: true, message: 'Removed from your course history.' });
+});
+
 const listMyCourses = asyncHandler(async (req, res) => {
   const courses = await service.listMyCourses(req.user);
   res.status(200).json({ success: true, data: { courses } });
@@ -87,5 +94,6 @@ module.exports = {
   listMyTaughtClasses,
   enrollInClass,
   dropClass,
+  deleteEnrollmentRecord,
   listMyCourses,
 };

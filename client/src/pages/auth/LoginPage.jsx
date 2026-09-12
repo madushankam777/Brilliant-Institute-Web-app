@@ -58,7 +58,7 @@ function LoginPage() {
     <AuthLayout
       quote={{
         text: 'We can view classes, get assignments, and check fee status instantly. It has completely transformed our learning.',
-        author: 'Amit Patel',
+        author: 'Nimal Perera',
         role: 'Grade 11 Mathematics Student',
       }}
     >

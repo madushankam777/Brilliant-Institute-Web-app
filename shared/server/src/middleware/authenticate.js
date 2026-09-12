@@ -22,9 +22,7 @@ async function authenticate(req, res, next) {
   }
 
   try {
-    // The token itself only proves who they were at login time - an Admin
-    // suspending someone has to take effect immediately, not just once
-    // their (up to 30-minute) token happens to expire on its own.
+    // check user is still active (not suspended)
     const [rows] = await pool.execute('SELECT status FROM users WHERE id = ? LIMIT 1', [
       payload.sub,
     ]);

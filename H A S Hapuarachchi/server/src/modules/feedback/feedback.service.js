@@ -10,10 +10,7 @@ function isStaff(user) {
   return user.role === ROLES.TUTOR || user.role === ROLES.ADMIN;
 }
 
-// Who is allowed to see/reply to a given ticket, based purely on its
-// recipient_type/recipient_tutor_id - the whole point of routing a ticket
-// is that only the addressed staff (and the student who opened it) can
-// see it, not every Tutor and every Admin like before.
+// check if ticket is addressed to this staff member
 function isAddressedTo(ticket, user) {
   if (user.role === ROLES.ADMIN) {
     return ticket.recipient_type === 'ADMIN' || ticket.recipient_type === 'ADMIN_TUTOR';
@@ -89,9 +86,7 @@ async function getTicketDetails(user, ticketId) {
   return toSafeFeedback(ticket);
 }
 
-// A real back-and-forth conversation, not just a one-shot ticket: the
-// student who opened it can keep replying on their own ticket, and
-// whichever staff it's addressed to (Admin/Tutor/both) can reply too.
+// reply to ticket btn
 async function replyToTicket(user, ticketId, message) {
   const ticket = await repository.findTicketById(ticketId);
   if (!ticket) {
@@ -102,8 +97,7 @@ async function replyToTicket(user, ticketId, message) {
     throw ApiError.forbidden('This ticket is not addressed to you.');
   }
 
-  // req.user (from the JWT) only carries id/role/email - look up the real
-  // display name so the reply thread shows a proper name, not an email.
+  // look up real name for the reply thread
   const authorName = (await repository.findUserFullName(user.id)) || user.email;
   const responseEntry = {
     authorId: user.id,
@@ -113,8 +107,7 @@ async function replyToTicket(user, ticketId, message) {
     createdAt: new Date().toISOString(),
   };
 
-  // The submitter replying doesn't change the triage status; only a
-  // staff reply moves a fresh ticket from PENDING to IN_PROGRESS.
+  // staff reply moves ticket from PENDING to IN_PROGRESS
   const nextStatus = !isOwner && ticket.status === STATUSES.PENDING ? STATUSES.IN_PROGRESS : ticket.status;
   await repository.appendResponse(ticketId, responseEntry, nextStatus);
 

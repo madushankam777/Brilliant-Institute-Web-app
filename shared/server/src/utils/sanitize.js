@@ -57,8 +57,7 @@ function toSafePayment(row) {
   };
 }
 
-// Admin's "Manage Users" list needs a bit more than the self-service
-// profile view (status/lockout state), but still never the password hash.
+// user data for admin's manage users list
 function toSafeUserForAdmin(userRow) {
   if (!userRow) return null;
   return {
@@ -137,8 +136,7 @@ function toSafeAnnouncement(row) {
     updatedBy: row.updated_by,
     updatedByName: row.updated_by_name,
     version: row.version,
-    // Anyone who already saw v1 needs to be able to tell this is a
-    // re-edited notice, not a brand new one.
+    // "Updated" badge
     isUpdated: Number(row.version) > 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -175,10 +173,7 @@ const NOTIFICATION_TYPE_LABELS = {
   ANNOUNCEMENT: 'Announcement',
 };
 
-// A row from notification_log - a reminder actually addressed to one
-// person, as opposed to a broadcast Announcement. Shown in the same
-// notification bell so a targeted fee-due/low-attendance reminder is
-// something the recipient can actually see, not just a server-side log.
+// notification bell - personal reminder
 function toSafeNotification(row) {
   if (!row) return null;
   return {

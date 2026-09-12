@@ -19,8 +19,7 @@ export async function createUser(payload) {
   return response.data.data.user;
 }
 
-// `confirmName` must be the target's full name, typed in CAPITAL LETTERS -
-// the server re-checks this itself, this isn't just a client-side gate.
+// suspend btn - must type name to confirm
 export async function suspendUser(userId, confirmName) {
   const response = await httpClient.patch(`/admin/users/${userId}/suspend`, { confirmName });
   return response.data.data.user;
@@ -31,7 +30,7 @@ export async function activateUser(userId) {
   return response.data.data.user;
 }
 
-// Tutor's own roster - every Student/Parent enrolled in one of their classes.
+// tutor's student list
 export async function fetchMyStudents() {
   const response = await httpClient.get('/students/mine');
   return response.data.data.students;
@@ -59,19 +58,23 @@ export async function revokeTutorKey(keyId) {
   await httpClient.patch(`/admin/tutor-keys/${keyId}/revoke`);
 }
 
+// delete btn - tutor enrollment key
+export async function deleteTutorKey(keyId) {
+  await httpClient.delete(`/admin/tutor-keys/${keyId}`);
+}
+
 export function getTutorKeyDocumentUrl(keyId, type) {
   const base = (httpClient.defaults.baseURL || '').replace(/\/$/, '');
   return `${base}/admin/tutor-keys/${keyId}/documents/${type}`;
 }
 
+// notification bell - announcements
 export async function fetchMyAnnouncements() {
   const response = await httpClient.get('/announcements');
   return response.data.data.announcements;
 }
 
-// Reminders addressed specifically to the logged-in user (fee-due,
-// low-attendance, ...) - distinct from broadcast Announcements above, but
-// shown together in the same notification bell.
+// notification bell - personal reminders
 export async function fetchMyNotifications() {
   const response = await httpClient.get('/notifications/mine');
   return response.data.data.notifications;
@@ -96,16 +99,13 @@ export async function deleteAnnouncement(announcementId) {
   await httpClient.delete(`/admin/announcements/${announcementId}`);
 }
 
-// Who a reminder batch would actually reach, before sending anything -
-// one row per Student, grouped from every overdue/low-attendance class
-// they have.
+// who a reminder would reach
 export async function fetchReminderCandidates(type) {
   const response = await httpClient.get('/admin/reminders/candidates', { params: { type } });
   return response.data.data.candidates;
 }
 
-// `studentIds` narrows the send to just those Students; omit it (or pass
-// an empty array) to send to everyone the candidate list matched.
+// send reminders btn
 export async function sendReminders({ type, studentIds }) {
   const response = await httpClient.post('/admin/reminders/send', { type, studentIds });
   return response.data.data.result;

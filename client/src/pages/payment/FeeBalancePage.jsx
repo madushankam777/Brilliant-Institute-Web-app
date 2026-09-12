@@ -22,8 +22,7 @@ const PAYMENT_METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
-// Placeholder institute bank account - swap for the real one before going
-// live; students transfer here, then upload the receipt for verification.
+// dummy bank details for bank transfer
 const BANK_DETAILS = {
   bankName: "People's Bank",
   accountName: 'Brilliant Institute (Pvt) Ltd',
@@ -32,16 +31,14 @@ const BANK_DETAILS = {
   swiftCode: 'PSBKLKLX',
 };
 
-// Sri Lankan mobile number - what eZ Cash / mCash payments are actually
-// tied to (07XXXXXXXX, or the same number as +947XXXXXXXX).
+// wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
-// Standard card-number checksum - catches typos/fake numbers before they
-// ever get near a submit, same as any real checkout form.
+// check card number is valid
 function luhnCheck(digits) {
   if (digits.length < 13 || digits.length > 19) return false;
   let sum = 0;
@@ -66,10 +63,7 @@ function detectCardBrand(digits) {
   return 'Card';
 }
 
-// Auto-inserts the "/" after the month is typed (MM/YY), the way every
-// real checkout form does - `previousFormatted` lets it tell typing
-// forward apart from backspacing, so deleting the "/" also removes the
-// month digit right before it instead of getting stuck re-inserting it.
+// auto-add "/" in expiry date input (MM/YY)
 function formatExpiryInput(rawValue, previousFormatted) {
   const isDeleting = rawValue.length < previousFormatted.length;
   let digits = rawValue.replace(/\D/g, '').slice(0, 4);
@@ -130,8 +124,7 @@ function FeeBalancePage() {
         setBankTransferClosedMessage(message || '');
       })
       .catch(() => {
-        // If this check itself fails, fail open on the UI - the server
-        // still enforces the real cutoff when the form is submitted.
+        // ignore - server still checks this on submit
       });
   }, [loadBalances]);
 
@@ -148,9 +141,7 @@ function FeeBalancePage() {
     setOutcome(null);
   }
 
-  // Arriving here right after clicking "Enrol Now" on a class (see
-  // ClassDetailsPage.jsx) - jump straight into checkout for that specific
-  // enrollment instead of making them find it in the list themselves.
+  // auto-open payment for the class just enrolled in
   useEffect(() => {
     const targetEnrollmentId = location.state && location.state.enrollmentId;
     if (!targetEnrollmentId || autoStartedRef.current || balances.length === 0) return;
@@ -269,8 +260,7 @@ function FeeBalancePage() {
       if (error.details) {
         const mapped = {};
         error.details.forEach((detail) => {
-          // Server field paths look like "paymentDetails.cardNumber" -
-          // map them to this form's own field names.
+          // match server field name to form field name
           const key = detail.field.split('.').pop();
           mapped[key] = detail.message;
         });

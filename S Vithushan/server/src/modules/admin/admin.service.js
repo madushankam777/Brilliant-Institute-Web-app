@@ -1,5 +1,4 @@
-// Admin dashboard, user management, announcements, and reminder-sending
-// business logic (ADM-01..ADM-04).
+// Admin module - business logic
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const config = require('../../../../../shared/server/src/config/env');
@@ -37,9 +36,8 @@ async function createUser(adminUser, { fullName, email, password, role }) {
   return toSafeUserForAdmin(created);
 }
 
+// make a tutor enrollment key code
 function generateKeyCode() {
-  // e.g. "TUT-3F2A-9B10-CE44" - readable enough to read aloud over the
-  // phone or copy into an email, random enough not to be guessable.
   const raw = crypto.randomBytes(6).toString('hex').toUpperCase();
   return `TUT-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
 }
@@ -112,13 +110,27 @@ async function revokeTutorKey(adminUser, keyId) {
   });
 }
 
+// delete btn - permanently remove key record
+async function deleteTutorKey(adminUser, keyId) {
+  const key = await repository.findTutorKeyById(keyId);
+  if (!key) {
+    throw ApiError.notFound('Enrollment key not found.');
+  }
+
+  await repository.deleteTutorKey(keyId);
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'TUTOR_KEY_DELETED',
+    entityType: 'tutor_enrollment_key',
+    entityId: keyId,
+  });
+}
+
 async function getDashboardStats() {
   const [counts, revenueTrend, recentActivity] = await Promise.all([
     repository.getCoreCounts(),
     repository.getRevenueTrend(),
-    // The panel only shows ~10 rows at a time and scrolls for the rest, so
-    // fetch a bigger batch than that up front rather than a whole extra
-    // round trip every time the admin scrolls.
+    // fetch enough rows for the scrollable activity panel
     repository.listRecentActivity(50),
   ]);
 
@@ -217,8 +229,7 @@ async function activateUser(actingUser, userId) {
   return toSafeUserForAdmin(updated);
 }
 
-// A Tutor's own roster: every Student/Parent currently enrolled in one of
-// their classes, so they know exactly who they're allowed to suspend.
+// tutor's student list
 async function listMyStudents(tutorUser) {
   const rows = await repository.listStudentsForTutor(tutorUser.id);
   return rows.map((row) => ({
@@ -306,10 +317,8 @@ async function listAllAnnouncements() {
   return rows.map(toSafeAnnouncement);
 }
 
+// notification bell - announcements for this user
 async function listAnnouncementsForUser(user) {
-  // req.user only carries {id, role, email} from the JWT - grade lives on
-  // the DB row, so it has to be looked up fresh rather than trusted from
-  // the token (which would otherwise always filter as "no grade").
   const fullUser = await repository.findUserById(user.id);
   const rows = await repository.listAnnouncementsForAudience(user.role, fullUser ? fullUser.grade : null);
   return rows.map(toSafeAnnouncement);
@@ -321,9 +330,7 @@ async function findReminderRows(type) {
     : repository.findStudentsWithLowAttendance(config.business.lowAttendanceThresholdPercent);
 }
 
-// Lets the Admin see who a reminder batch would actually reach before
-// sending anything - one row per Student, even if they have several
-// overdue classes / low-attendance classes underneath it.
+// list students a reminder would reach
 async function getReminderCandidates(type) {
   const rows = await findReminderRows(type);
 
@@ -348,11 +355,7 @@ async function getReminderCandidates(type) {
   return Array.from(byStudent.values());
 }
 
-// Finds everyone matching the reminder type, optionally narrowed down to
-// just the Student ids the Admin picked, and "sends" (mock) one
-// notification each - logging every send both to the audit trail and to
-// notification_log, which is what actually lets that Student see it in
-// their own notification bell.
+// send reminders btn - to selected students, or everyone that matches
 async function sendReminders(adminUser, { type, studentIds }) {
   const allRows = await findReminderRows(type);
   const recipients =
@@ -390,6 +393,7 @@ async function sendReminders(adminUser, { type, studentIds }) {
   return { type, recipientCount: recipients.length, sentCount };
 }
 
+// notification bell - personal reminders for this user
 async function listMyNotifications(user) {
   const rows = await repository.listNotificationsForUser(user.id, 30);
   return rows.map(toSafeNotification);
@@ -403,6 +407,7 @@ module.exports = {
   getTutorKeyDocumentPath,
   listTutorKeys,
   revokeTutorKey,
+  deleteTutorKey,
   suspendUser,
   activateUser,
   listMyStudents,

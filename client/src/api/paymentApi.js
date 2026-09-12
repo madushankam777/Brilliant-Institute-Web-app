@@ -25,16 +25,13 @@ export async function fetchMyPaymentHistory() {
   return response.data.data.payments;
 }
 
-// Bank transfer closes on the last day of every month (an Admin needs at
-// least a day to verify it before the new month starts) - this lets the
-// checkout form disable the tab before the student fills anything in.
+// check if bank transfer is open this month
 export async function fetchBankTransferAvailability() {
   const response = await httpClient.get('/payments/bank-transfer/availability');
   return response.data.data;
 }
 
-// Bank transfer never goes through the instant gateway - it's a receipt
-// upload that sits PENDING until an Admin reviews and approves it.
+// bank transfer form - upload receipt
 export async function payByBankTransfer({ enrollmentId, amount, bankReference, receiptFile }) {
   const formData = new FormData();
   formData.append('enrollmentId', enrollmentId);
@@ -48,8 +45,7 @@ export async function payByBankTransfer({ enrollmentId, amount, bankReference, r
   return response.data.data.payment;
 }
 
-// Returns a plain URL (not an axios call) for <a target="_blank"> - the
-// session cookie still goes with it since the API origin is same-site.
+// view receipt image link
 export function getReceiptImageUrl(paymentId) {
   const base = (httpClient.defaults.baseURL || '').replace(/\/$/, '');
   return `${base}/payments/${paymentId}/receipt-image`;
@@ -70,8 +66,7 @@ export async function rejectBankTransfer(paymentId) {
   return response.data.data.payment;
 }
 
-// --- Admin: pay Tutors (a manual payout ledger, not automatic payroll) ---
-
+// pay tutor btn
 export async function fetchTutorPayouts() {
   const response = await httpClient.get('/payments/admin/tutor-payouts');
   return response.data.data;

@@ -29,10 +29,7 @@ async function listSessionsForClass(classId) {
   return rows;
 }
 
-// Only a student who has actually paid at least once shows up here - an
-// enrollment that's never had a successful payment stays payment_status
-// 'UNPAID' (see payment.repository.js's updateEnrollmentBalance), and
-// never appears on a Tutor's attendance sheet.
+// only paid students show up on attendance sheet
 async function listActiveStudentsForClass(classId) {
   const [rows] = await pool.execute(
     `SELECT u.id AS student_id, u.full_name AS student_name, u.student_code,

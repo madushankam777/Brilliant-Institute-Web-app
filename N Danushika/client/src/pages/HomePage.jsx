@@ -30,13 +30,13 @@ const TESTIMONIALS = [
   {
     quote:
       'Creating my account took less than a minute, and I never have to remember which portal to log into - one login for everything.',
-    name: 'Amit Patel',
+    name: 'Dinuka Rathnayake',
     role: 'Grade 11 Mathematics Student',
   },
   {
     quote:
       "Password resets used to mean emailing the office. Now it's self-service, and my son's account has never been more secure.",
-    name: 'Evelyn Wong',
+    name: 'Kamala Sivakumar',
     role: 'Parent',
   },
 ];

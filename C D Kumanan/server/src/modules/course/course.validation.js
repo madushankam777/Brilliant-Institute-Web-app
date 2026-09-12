@@ -11,6 +11,12 @@ const enrollmentIdParamRules = [
   param('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
 ];
 
+// delete btn - must type DELETE to confirm
+const deleteEnrollmentRecordRules = [
+  ...enrollmentIdParamRules,
+  body('confirmText').equals('DELETE').withMessage('Please type DELETE in capital letters to confirm.'),
+];
+
 const tutorIdParamRules = [param('tutorId').isInt({ min: 1 }).withMessage('Invalid tutor id.')];
 
 const browseQueryRules = [
@@ -44,6 +50,7 @@ const updateClassRules = [...classIdParamRules, ...classBodyRules];
 module.exports = {
   classIdParamRules,
   enrollmentIdParamRules,
+  deleteEnrollmentRecordRules,
   tutorIdParamRules,
   browseQueryRules,
   createClassRules,

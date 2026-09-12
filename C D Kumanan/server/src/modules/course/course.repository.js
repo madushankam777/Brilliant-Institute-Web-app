@@ -1,5 +1,4 @@
-// All the SQL for the Course Management module lives here, and nowhere
-// else. Every query uses "?" placeholders - never string concatenation.
+// Course module - all database queries
 const { pool } = require('../../../../../shared/server/src/config/db');
 
 const ACTIVE_CLASS_WITH_TUTOR_SELECT = `
@@ -47,8 +46,7 @@ async function findTutorProfile(tutorId) {
   return rows[0] || null;
 }
 
-// Every active Tutor, for Admin's "assign a tutor to this class" picker -
-// search-by-name or just scroll the list.
+// list tutors for the tutor picker
 async function listAllTutors() {
   const [rows] = await pool.execute(
     `SELECT id, full_name, email, profile_picture_path
@@ -95,9 +93,7 @@ async function listClassesByTutor(tutorId) {
   return rows;
 }
 
-// Admin's "Manage Classes" view - every class regardless of which Tutor it
-// belongs to, since an Admin doesn't teach and so is never `tutor_id` on
-// any row itself.
+// list every class, for admin
 async function listAllClasses() {
   const [rows] = await pool.execute(
     `${ACTIVE_CLASS_WITH_TUTOR_SELECT} WHERE c.status != 'CANCELLED' ORDER BY c.created_at DESC`
@@ -156,8 +152,7 @@ async function cancelClass(classId) {
   ]);
 }
 
-// CRS-05 hard block: another ACTIVE class already booked at the same
-// venue, on the same day, with an overlapping time range.
+// check venue/time clash
 async function findConflictingVenueClass({ venue, dayOfWeek, startTime, endTime, excludeClassId }) {
   const [rows] = await pool.execute(
     `SELECT id, subject, start_time, end_time FROM classes
@@ -199,9 +194,11 @@ async function createEnrollment(studentId, classId, balance) {
   return result.insertId;
 }
 
+// re-add a dropped class (reset balance and payment status)
 async function reactivateEnrollment(enrollmentId, balance) {
   await pool.execute(
-    `UPDATE enrollments SET status = 'ACTIVE', balance = ?, enrolled_at = NOW(), drop_date = NULL
+    `UPDATE enrollments
+     SET status = 'ACTIVE', balance = ?, payment_status = 'UNPAID', enrolled_at = NOW(), drop_date = NULL
      WHERE id = ?`,
     [balance, enrollmentId]
   );
@@ -212,6 +209,11 @@ async function dropEnrollment(enrollmentId) {
     `UPDATE enrollments SET status = 'DROPPED', drop_date = NOW() WHERE id = ?`,
     [enrollmentId]
   );
+}
+
+// delete btn - just hide it, keep payment history safe
+async function removeEnrollmentRecord(enrollmentId) {
+  await pool.execute(`UPDATE enrollments SET status = 'REMOVED' WHERE id = ?`, [enrollmentId]);
 }
 
 async function countActiveEnrollments(classId) {
@@ -230,7 +232,7 @@ async function listMyEnrollments(studentId) {
      FROM enrollments e
      JOIN classes c ON c.id = e.class_id
      JOIN users t ON t.id = c.tutor_id
-     WHERE e.student_id = ?
+     WHERE e.student_id = ? AND e.status != 'REMOVED'
      ORDER BY e.enrolled_at DESC`,
     [studentId]
   );
@@ -256,6 +258,7 @@ module.exports = {
   createEnrollment,
   reactivateEnrollment,
   dropEnrollment,
+  removeEnrollmentRecord,
   countActiveEnrollments,
   listMyEnrollments,
 };

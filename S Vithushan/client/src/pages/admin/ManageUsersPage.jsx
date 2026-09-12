@@ -9,6 +9,7 @@ import {
   generateTutorKey,
   fetchTutorKeys,
   revokeTutorKey,
+  deleteTutorKey,
   getTutorKeyDocumentUrl,
 } from '../../api/adminApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
@@ -145,11 +146,15 @@ function ManageUsersPage() {
     try {
       if (confirmTarget.action === 'suspend') {
         await suspendUser(confirmTarget.user.id, confirmNameInput);
-      } else {
+        await load();
+      } else if (confirmTarget.action === 'activate') {
         await activateUser(confirmTarget.user.id);
+        await load();
+      } else if (confirmTarget.action === 'deleteKey') {
+        await deleteTutorKey(confirmTarget.key.id);
+        await loadTutorKeys();
       }
       closeConfirmModal();
-      await load();
     } catch (error) {
       setConfirmError(error.message);
     } finally {
@@ -448,16 +453,29 @@ function ManageUsersPage() {
                       <td>{key.usedByName || '-'}</td>
                       <td>{key.createdAt}</td>
                       <td>
-                        {key.status === 'UNUSED' && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {key.status === 'UNUSED' && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={revokingKeyId === key.id}
+                              onClick={() => handleRevokeKey(key.id)}
+                            >
+                              {revokingKeyId === key.id ? 'Revoking...' : 'Revoke'}
+                            </button>
+                          )}
                           <button
                             type="button"
-                            className="btn btn-secondary btn-sm"
-                            disabled={revokingKeyId === key.id}
-                            onClick={() => handleRevokeKey(key.id)}
+                            className="btn btn-danger btn-sm"
+                            onClick={() => {
+                              setConfirmTarget({ key, action: 'deleteKey' });
+                              setConfirmNameInput('');
+                              setConfirmError('');
+                            }}
                           >
-                            {revokingKeyId === key.id ? 'Revoking...' : 'Revoke'}
+                            Delete
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -471,11 +489,34 @@ function ManageUsersPage() {
       {confirmTarget && (
         <div className="modal-overlay" onClick={() => !isConfirming && closeConfirmModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <h2>{confirmTarget.action === 'suspend' ? 'Confirm Suspension' : 'Confirm Reactivation'}</h2>
+            <h2>
+              {confirmTarget.action === 'suspend'
+                ? 'Confirm Suspension'
+                : confirmTarget.action === 'activate'
+                ? 'Confirm Reactivation'
+                : 'Confirm Deletion'}
+            </h2>
             <p className="muted">
-              Are you sure you want to {confirmTarget.action} <strong>{confirmTarget.user.fullName}</strong>?
-              {confirmTarget.action === 'suspend' &&
-                ' They will lose access to all classes, dashboards, and portal features instantly.'}
+              {confirmTarget.action === 'deleteKey' ? (
+                <>
+                  Are you sure you want to permanently delete this enrollment key
+                  {confirmTarget.key.intendedFor ? (
+                    <>
+                      {' '}
+                      for <strong>{confirmTarget.key.intendedFor}</strong>
+                    </>
+                  ) : (
+                    ''
+                  )}
+                  ? This cannot be undone.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to {confirmTarget.action} <strong>{confirmTarget.user.fullName}</strong>?
+                  {confirmTarget.action === 'suspend' &&
+                    ' They will lose access to all classes, dashboards, and portal features instantly.'}
+                </>
+              )}
             </p>
 
             <Alert type="error" message={confirmError} />
@@ -502,7 +543,11 @@ function ManageUsersPage() {
               </button>
               <button
                 type="button"
-                className={confirmTarget.action === 'suspend' ? 'btn btn-danger' : 'btn btn-primary'}
+                className={
+                  confirmTarget.action === 'suspend' || confirmTarget.action === 'deleteKey'
+                    ? 'btn btn-danger'
+                    : 'btn btn-primary'
+                }
                 disabled={
                   isConfirming ||
                   (confirmTarget.action === 'suspend' &&
@@ -510,7 +555,13 @@ function ManageUsersPage() {
                 }
                 onClick={handleConfirm}
               >
-                {isConfirming ? 'Please wait...' : confirmTarget.action === 'suspend' ? 'Confirm Suspend' : 'Confirm Reactivate'}
+                {isConfirming
+                  ? 'Please wait...'
+                  : confirmTarget.action === 'suspend'
+                  ? 'Confirm Suspend'
+                  : confirmTarget.action === 'activate'
+                  ? 'Confirm Reactivate'
+                  : 'Confirm Delete'}
               </button>
             </div>
           </div>
