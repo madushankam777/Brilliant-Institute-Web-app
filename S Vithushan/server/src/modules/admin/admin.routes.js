@@ -54,6 +54,12 @@ router.get('/admin/dashboard', controller.getDashboardStats);
 
 router.get('/admin/users', listUsersQueryRules, validateRequest, controller.listUsers);
 router.post('/admin/users', createUserRules, validateRequest, controller.createUser);
+router.get(
+  '/admin/users/:userId',
+  userIdParamRules,
+  validateRequest,
+  controller.getUserProfile
+);
 
 router.post(
   '/admin/tutor-keys',

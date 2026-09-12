@@ -154,6 +154,15 @@ async function listUsers(filters) {
   return rows.map(toSafeUserForAdmin);
 }
 
+// view profile btn
+async function getUserProfile(userId) {
+  const user = await repository.findUserById(userId);
+  if (!user || user.status === 'DELETED') {
+    throw ApiError.notFound('User not found.');
+  }
+  return toSafeUserForAdmin(user);
+}
+
 async function assertCanActOnUser(actingUser, targetUser) {
   if (actingUser.role === ROLES.ADMIN) {
     return;
@@ -403,6 +412,7 @@ module.exports = {
   getDashboardStats,
   listUsers,
   createUser,
+  getUserProfile,
   generateTutorKey,
   getTutorKeyDocumentPath,
   listTutorKeys,

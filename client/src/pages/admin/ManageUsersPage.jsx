@@ -1,6 +1,7 @@
 // Admin: list/filter/create/suspend/reactivate user accounts (ADM-02),
 // plus generating the enrollment keys that let a Tutor self-register.
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   fetchUsers,
   createUser,
@@ -279,31 +280,39 @@ function ManageUsersPage() {
                       </td>
                       <td>{user.createdAt}</td>
                       <td>
-                        {user.status === 'ACTIVE' ? (
-                          <button
-                            type="button"
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <Link
+                            to={user.role === 'TUTOR' ? `/courses/tutors/${user.id}` : `/admin/users/${user.id}`}
                             className="btn btn-secondary btn-sm"
-                            onClick={() => {
-                              setConfirmTarget({ user, action: 'suspend' });
-                              setConfirmNameInput('');
-                              setConfirmError('');
-                            }}
                           >
-                            Suspend
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => {
-                              setConfirmTarget({ user, action: 'activate' });
-                              setConfirmNameInput('');
-                              setConfirmError('');
-                            }}
-                          >
-                            Reactivate
-                          </button>
-                        )}
+                            View
+                          </Link>
+                          {user.status === 'ACTIVE' ? (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setConfirmTarget({ user, action: 'suspend' });
+                                setConfirmNameInput('');
+                                setConfirmError('');
+                              }}
+                            >
+                              Suspend
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setConfirmTarget({ user, action: 'activate' });
+                                setConfirmNameInput('');
+                                setConfirmError('');
+                              }}
+                            >
+                              Reactivate
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

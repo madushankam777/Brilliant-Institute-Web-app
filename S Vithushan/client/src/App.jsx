@@ -10,6 +10,7 @@ import PlaceholderLoginPage from './pages/PlaceholderLoginPage';
 
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import ManageUsersPage from './pages/admin/ManageUsersPage';
+import UserProfilePage from './pages/admin/UserProfilePage';
 import AnnouncementsPage from './pages/admin/AnnouncementsPage';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/users" element={<ManageUsersPage />} />
+            <Route path="/admin/users/:userId" element={<UserProfilePage />} />
             <Route path="/admin/announcements" element={<AnnouncementsPage />} />
           </Route>
 

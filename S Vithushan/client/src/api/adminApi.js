@@ -19,6 +19,12 @@ export async function createUser(payload) {
   return response.data.data.user;
 }
 
+// view profile btn
+export async function fetchUserProfile(userId) {
+  const response = await httpClient.get(`/admin/users/${userId}`);
+  return response.data.data.user;
+}
+
 // suspend btn - must type name to confirm
 export async function suspendUser(userId, confirmName) {
   const response = await httpClient.patch(`/admin/users/${userId}/suspend`, { confirmName });

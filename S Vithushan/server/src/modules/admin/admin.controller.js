@@ -20,6 +20,12 @@ const createUser = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, message: 'Account created successfully.', data: { user } });
 });
 
+const getUserProfile = asyncHandler(async (req, res) => {
+  const userId = Number(req.params.userId);
+  const user = await service.getUserProfile(userId);
+  res.status(200).json({ success: true, data: { user } });
+});
+
 const generateTutorKey = asyncHandler(async (req, res) => {
   const { intendedFor, idNumber } = req.body;
   const files = req.files || {};
@@ -156,6 +162,7 @@ module.exports = {
   getDashboardStats,
   listUsers,
   createUser,
+  getUserProfile,
   generateTutorKey,
   listTutorKeys,
   revokeTutorKey,
