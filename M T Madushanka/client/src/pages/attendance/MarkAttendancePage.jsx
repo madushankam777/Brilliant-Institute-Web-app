@@ -2,12 +2,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchAttendanceSheet, saveAttendance, startSelfCheckIn } from '../../api/attendanceApi';
-import LoadingSpinner from '../../../shared/client/src/components/common/LoadingSpinner';
-import Alert from '../../../shared/client/src/components/common/Alert';
-import Icon from '../../../shared/client/src/components/common/Icon';
-import Avatar from '../../../shared/client/src/components/common/Avatar';
-import PortalShell from '../../../shared/client/src/components/layout/PortalShell';
-import { getNavItems } from '../../../shared/client/src/components/layout/navItems';
+import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
+import Alert from '../../../../../shared/client/src/components/common/Alert';
+import Icon from '../../../../../shared/client/src/components/common/Icon';
+import Avatar from '../../../../../shared/client/src/components/common/Avatar';
+import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
+import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
 const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
