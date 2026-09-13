@@ -260,6 +260,15 @@ function Navbar() {
         <NavLink to="/" end onClick={() => setMenuOpen(false)}>
           Home
         </NavLink>
+        <a href="/#about" onClick={() => setMenuOpen(false)}>
+          About
+        </a>
+        <NavLink to="/courses/classes" onClick={() => setMenuOpen(false)}>
+          Classes
+        </NavLink>
+        <a href="/#contact" onClick={() => setMenuOpen(false)}>
+          Contact
+        </a>
       </nav>
 
       <div className="navbar-actions">

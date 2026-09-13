@@ -2109,3 +2109,33 @@ button, input, select, textarea {
   line-height: 1.5;
   color: #e2e8f0;
 }
+
+.cookie-consent-banner a {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.cookie-consent-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .cookie-consent-banner {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cookie-consent-actions {
+    margin-left: 0;
+  }
+
+  .cookie-consent-actions .btn {
+    flex: 1 1 0;
+  }
+}

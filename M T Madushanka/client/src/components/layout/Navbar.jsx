@@ -59,6 +59,12 @@ function Navbar() {
         <NavLink to="/" end onClick={() => setMenuOpen(false)}>
           Home
         </NavLink>
+        <a href="/#about" onClick={() => setMenuOpen(false)}>
+          About
+        </a>
+        <a href="/#contact" onClick={() => setMenuOpen(false)}>
+          Contact
+        </a>
       </nav>
 
       <div className="navbar-actions">

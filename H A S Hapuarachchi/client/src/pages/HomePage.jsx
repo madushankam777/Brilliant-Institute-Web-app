@@ -53,7 +53,7 @@ function HomePage() {
           </div>
         </section>
 
-        <section className="section section-bg-soft">
+        <section id="about" className="section section-bg-soft">
           <div className="container">
             <div className="section-heading">
               <span className="eyebrow">Feedback & Complaint</span>

@@ -37,7 +37,7 @@ function CookieConsentBanner() {
         for details.
       </p>
       <div className="cookie-consent-actions">
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => recordChoice('declined')}>
+        <button type="button" className="btn btn-on-dark btn-sm" onClick={() => recordChoice('declined')}>
           Decline
         </button>
         <button type="button" className="btn btn-primary btn-sm" onClick={() => recordChoice('accepted')}>

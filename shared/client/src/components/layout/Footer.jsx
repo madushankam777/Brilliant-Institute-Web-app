@@ -3,7 +3,7 @@ import Logo from '../common/Logo';
 
 function Footer({ linkGroups = [] }) {
   return (
-    <footer className="site-footer">
+    <footer id="contact" className="site-footer">
       <div className="container">
         <div className="footer-grid">
           <div className="footer-brand">

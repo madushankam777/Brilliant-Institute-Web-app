@@ -31,7 +31,7 @@ function PlaceholderLoginPage() {
     <AuthLayout
       quote={{
         text: 'Having a real ticket number and a place to check back means nothing gets lost anymore.',
-        author: 'Sarah Patel',
+        author: 'Sanduni Fernando',
         role: 'Grade 4 Student',
       }}
     >

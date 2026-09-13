@@ -30,12 +30,13 @@ function issueSessionCookie(res, user) {
 }
 
 
-// register btn - Student/Parent only, tutors need an Admin-issued key
+// register btn - Student/Parent, or Tutor with an Admin-issued enrollment key
 router.post(
   '/register',
   authLimiter,
   asyncHandler(async (req, res) => {
-    const { fullName, email, phone, password, grade } = req.body;
+    const { fullName, email, phone, password, grade, role, enrollmentKey } = req.body;
+    const targetRole = role === 'TUTOR' ? 'TUTOR' : 'STUDENT_PARENT';
 
     if (!fullName || String(fullName).trim().length < 2) {
       throw ApiError.badRequest('Please enter your full name.');
@@ -46,8 +47,29 @@ router.post(
     if (!isStrongPassword(password)) {
       throw ApiError.badRequest(PASSWORD_RULE_MESSAGE);
     }
-    if (!grade || !GRADES.includes(grade)) {
+    if (targetRole === 'STUDENT_PARENT' && (!grade || !GRADES.includes(grade))) {
       throw ApiError.badRequest('Please select your grade.');
+    }
+
+    // tutor sign-up needs a one-time key an Admin generated for them
+    let tutorKey = null;
+    if (targetRole === 'TUTOR') {
+      const normalizedKey = String(enrollmentKey || '').trim().toUpperCase();
+      if (!normalizedKey) {
+        throw ApiError.badRequest(
+          'A tutor enrollment key from an Administrator is required to register as a Tutor.'
+        );
+      }
+      const [keyRows] = await pool.execute(
+        `SELECT * FROM tutor_enrollment_keys WHERE key_code = ? AND status = 'UNUSED' LIMIT 1`,
+        [normalizedKey]
+      );
+      tutorKey = keyRows[0] || null;
+      if (!tutorKey) {
+        throw ApiError.badRequest(
+          'This enrollment key is invalid, already used, or has been revoked. Please contact the office.'
+        );
+      }
     }
 
     const [existingRows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
@@ -58,12 +80,29 @@ router.post(
     const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password_hash, phone, role, grade, status, created_at)
-       VALUES (?, ?, ?, ?, 'STUDENT_PARENT', ?, 'ACTIVE', NOW())`,
-      [fullName, email, passwordHash, phone || null, grade]
+       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', NOW())`,
+      [fullName, email, passwordHash, phone || null, targetRole, targetRole === 'STUDENT_PARENT' ? grade : null]
     );
     const userId = result.insertId;
-    const studentCode = `ST${String(userId).padStart(7, '0')}`;
-    await pool.execute('UPDATE users SET student_code = ? WHERE id = ?', [studentCode, userId]);
+
+    if (targetRole === 'STUDENT_PARENT') {
+      const studentCode = `ST${String(userId).padStart(7, '0')}`;
+      await pool.execute('UPDATE users SET student_code = ? WHERE id = ?', [studentCode, userId]);
+    }
+
+    if (tutorKey) {
+      await pool.execute(
+        `UPDATE tutor_enrollment_keys SET status = 'USED', used_by = ?, used_at = NOW() WHERE id = ?`,
+        [userId, tutorKey.id]
+      );
+    }
+
+    await recordAuditEvent({
+      actorId: userId,
+      action: targetRole === 'TUTOR' ? 'TUTOR_REGISTERED' : 'USER_REGISTERED',
+      entityType: 'user',
+      entityId: userId,
+    });
 
     const [rows] = await pool.execute(
       'SELECT id, full_name, email, role FROM users WHERE id = ?',

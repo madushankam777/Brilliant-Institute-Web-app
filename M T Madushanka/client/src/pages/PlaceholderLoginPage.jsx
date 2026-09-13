@@ -31,7 +31,7 @@ function PlaceholderLoginPage() {
     <AuthLayout
       quote={{
         text: 'The real-time notification engine has saved countless frantic calls. When a tutor is sick, parents get notified with a rescheduled date in under 30 seconds.',
-        author: 'Len Fernando',
+        author: 'Ranjith Wickramasinghe',
         role: 'Co-Director',
       }}
     >

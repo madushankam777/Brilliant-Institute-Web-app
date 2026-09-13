@@ -31,8 +31,8 @@ function PlaceholderLoginPage() {
     <AuthLayout
       quote={{
         text: 'Pathway transitioned our chaotic paper-based workflow into a structured database. Our administrative workload decreased by more than 40% in our first semester.',
-        author: 'Gorden Paviyan',
-        role: 'Director, GFEC',
+        author: 'Sunil Jayawardena',
+        role: 'Director of Studies',
       }}
     >
       <h1>Welcome Back</h1>

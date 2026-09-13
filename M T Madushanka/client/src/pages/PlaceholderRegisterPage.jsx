@@ -6,10 +6,20 @@ import FormField from '../../../../shared/client/src/components/common/FormField
 import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
 
+const initialForm = {
+  fullName: '',
+  email: '',
+  phone: '',
+  password: '',
+  grade: '',
+  role: 'STUDENT_PARENT',
+  enrollmentKey: '',
+};
+
 function PlaceholderRegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', grade: '' });
+  const [form, setForm] = useState(initialForm);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,6 +52,26 @@ function PlaceholderRegisterPage() {
       <h1>Create Your Account</h1>
       <p className="muted">Gain access to class schedules, attendance, and fees</p>
 
+      <label style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '6px', display: 'block' }}>
+        I am registering as a:
+      </label>
+      <div className="segmented">
+        <button
+          type="button"
+          className={form.role === 'STUDENT_PARENT' ? 'active' : ''}
+          onClick={() => updateField('role', 'STUDENT_PARENT')}
+        >
+          Student / Parent
+        </button>
+        <button
+          type="button"
+          className={form.role === 'TUTOR' ? 'active' : ''}
+          onClick={() => updateField('role', 'TUTOR')}
+        >
+          Tutor / Instructor
+        </button>
+      </div>
+
       {error && <Alert type="error" message={error} />}
 
       <form onSubmit={handleSubmit} noValidate>
@@ -73,24 +103,48 @@ function PlaceholderRegisterPage() {
           value={form.phone}
           onChange={(e) => updateField('phone', e.target.value)}
         />
-        <div className="form-field">
-          <label htmlFor="grade">Grade</label>
-          <select
-            id="grade"
-            value={form.grade}
-            onChange={(e) => updateField('grade', e.target.value)}
-            required
-          >
-            <option value="" disabled>
-              Select your grade
-            </option>
-            {GRADES.map((grade) => (
-              <option key={grade} value={grade}>
-                {grade}
+
+        {form.role === 'STUDENT_PARENT' && (
+          <div className="form-field">
+            <label htmlFor="grade">Grade</label>
+            <select
+              id="grade"
+              value={form.grade}
+              onChange={(e) => updateField('grade', e.target.value)}
+              required
+            >
+              <option value="" disabled>
+                Select your grade
               </option>
-            ))}
-          </select>
-        </div>
+              {GRADES.map((grade) => (
+                <option key={grade} value={grade}>
+                  {grade}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {form.role === 'TUTOR' && (
+          <>
+            <FormField
+              id="enrollmentKey"
+              label="Enrollment Key"
+              icon="lock"
+              placeholder="TUT-XXXX-XXXX-XXXX"
+              value={form.enrollmentKey}
+              onChange={(e) => updateField('enrollmentKey', e.target.value)}
+              required
+            />
+            <div className="callout">
+              <span>
+                <strong>Need a key?</strong> Contact the office first - an Administrator will verify
+                you and generate a one-time enrollment key for you to use here.
+              </span>
+            </div>
+          </>
+        )}
+
         <FormField
           id="password"
           label="Password"
@@ -101,12 +155,6 @@ function PlaceholderRegisterPage() {
           onChange={(e) => updateField('password', e.target.value)}
           required
         />
-        <div className="callout">
-          <span>
-            <strong>Registering as a Tutor?</strong> Contact the office first - an Administrator will
-            verify you and generate a one-time enrollment key for you to use.
-          </span>
-        </div>
 
         <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
           {isSubmitting ? 'Creating account...' : 'Create Account'}

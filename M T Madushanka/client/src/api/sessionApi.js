@@ -1,13 +1,15 @@
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
-// register btn - Student/Parent only in this module
-export async function register({ fullName, email, phone, password, grade }) {
+// register btn - Student/Parent, or Tutor with an enrollment key
+export async function register({ fullName, email, phone, password, grade, role, enrollmentKey }) {
   const response = await httpClient.post('/session/register', {
     fullName,
     email,
     phone,
     password,
     grade,
+    role,
+    enrollmentKey,
   });
   return response.data.data;
 }
