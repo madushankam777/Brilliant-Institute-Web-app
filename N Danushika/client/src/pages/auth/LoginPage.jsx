@@ -57,6 +57,7 @@ function LoginPage() {
 
   return (
     <AuthLayout
+      imageSrc="/login-art.jpg"
       quote={{
         text: 'We can view classes, get assignments, and check fee status instantly. It has completely transformed our learning.',
         author: 'Nimal Perera',

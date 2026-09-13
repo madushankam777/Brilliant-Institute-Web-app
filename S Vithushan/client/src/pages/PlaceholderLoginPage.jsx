@@ -29,6 +29,7 @@ function PlaceholderLoginPage() {
 
   return (
     <AuthLayout
+      imageSrc="/login-art.jpg"
       quote={{
         text: 'Having every user, class, and complaint in one dashboard has cut our admin workload dramatically.',
         author: 'Admin Vance',

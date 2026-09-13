@@ -66,6 +66,11 @@ router.post(
   profilePictureUpload,
   controller.uploadProfilePicture
 );
+router.delete(
+  '/profile/picture',
+  authenticate,
+  controller.removeProfilePicture
+);
 router.put(
   '/password',
   authenticate,

@@ -3,7 +3,7 @@ import Icon from '../common/Icon';
 import Logo from '../common/Logo';
 import authArtImg from '../../assets/auth-panel-art.png';
 
-function AuthLayout({ children, quote, backTo = '/', backLabel = 'Back to Home' }) {
+function AuthLayout({ children, quote, backTo = '/', backLabel = 'Back to Home', imageSrc }) {
   return (
     <div className="auth-shell">
       <div className="auth-shell-form">
@@ -18,7 +18,7 @@ function AuthLayout({ children, quote, backTo = '/', backLabel = 'Back to Home' 
 
       <div className="auth-shell-panel">
         <div className="auth-shell-panel-art">
-          <img src={authArtImg} alt="" aria-hidden="true" />
+          <img src={imageSrc || authArtImg} alt="" aria-hidden="true" />
         </div>
         {quote && (
           <div className="auth-shell-quote">

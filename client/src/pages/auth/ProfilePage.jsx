@@ -2,7 +2,12 @@
 // change your password.
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { updateMyProfile, uploadMyProfilePicture, changeMyPassword } from '../../api/authApi';
+import {
+  updateMyProfile,
+  uploadMyProfilePicture,
+  removeMyProfilePicture,
+  changeMyPassword,
+} from '../../api/authApi';
 import { fetchMyBankDetails, updateMyBankDetails } from '../../api/paymentApi';
 import FormField from '../../../../shared/client/src/components/common/FormField';
 import Alert from '../../../../shared/client/src/components/common/Alert';
@@ -37,6 +42,21 @@ function ProfilePage() {
   const pictureInputRef = useRef(null);
   const [pictureError, setPictureError] = useState('');
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const [isRemovingPicture, setIsRemovingPicture] = useState(false);
+
+  // delete btn - remove the current photo, back to the initials avatar
+  async function handleRemovePicture() {
+    setPictureError('');
+    setIsRemovingPicture(true);
+    try {
+      await removeMyProfilePicture();
+      await refreshProfile();
+    } catch (error) {
+      setPictureError(error.message);
+    } finally {
+      setIsRemovingPicture(false);
+    }
+  }
 
   async function handlePictureSelected(event) {
     const file = event.target.files && event.target.files[0];
@@ -196,14 +216,30 @@ function ProfilePage() {
                 style={{ display: 'none' }}
                 onChange={handlePictureSelected}
               />
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={isUploadingPicture}
-                onClick={() => pictureInputRef.current && pictureInputRef.current.click()}
-              >
-                {isUploadingPicture ? 'Uploading...' : 'Change photo'}
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={isUploadingPicture || isRemovingPicture}
+                  onClick={() => pictureInputRef.current && pictureInputRef.current.click()}
+                >
+                  {isUploadingPicture
+                    ? 'Uploading...'
+                    : user.profilePictureUrl
+                    ? 'Edit photo'
+                    : 'Change photo'}
+                </button>
+                {user.profilePictureUrl && (
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    disabled={isUploadingPicture || isRemovingPicture}
+                    onClick={handleRemovePicture}
+                  >
+                    {isRemovingPicture ? 'Removing...' : 'Delete photo'}
+                  </button>
+                )}
+              </div>
               <p className="field-help" style={{ marginTop: '8px' }}>
                 JPG, PNG, or WEBP, up to 3MB. Shown next to your name across the site.
               </p>

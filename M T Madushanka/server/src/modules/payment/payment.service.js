@@ -275,6 +275,20 @@ async function submitBankTransferPayment(
     entityId: paymentId,
   });
 
+  // let Admin know there's something to review, instead of them having to
+  // remember to check Payment Verification on their own
+  const adminIds = await repository.findActiveAdminIds();
+  await Promise.all(
+    adminIds.map((adminId) =>
+      repository.createNotification({
+        recipientId: adminId,
+        type: 'PAYMENT_SUBMITTED',
+        message: `${studentUser.email} submitted a bank transfer of LKR ${Number(amount).toFixed(2)} - awaiting your verification.`,
+        sentBy: studentUser.id,
+      })
+    )
+  );
+
   const payment = await repository.findPaymentById(paymentId);
   return { pending: true, payment: toSafePayment(payment) };
 }
@@ -378,6 +392,16 @@ async function approveBankTransferPayment(adminUser, paymentId) {
   });
 
   const payment = await repository.findPaymentById(paymentId);
+
+  // the student isn't watching the admin's screen for this - they only
+  // find out their balance moved if we tell them
+  await repository.createNotification({
+    recipientId: payment.student_id,
+    type: 'PAYMENT_APPROVED',
+    message: `Your bank transfer of LKR ${Number(payment.amount).toFixed(2)} for ${outcome.subject} was approved. Receipt: ${outcome.receiptNumber}.`,
+    sentBy: adminUser.id,
+  });
+
   return toSafePayment({
     ...payment,
     subject: outcome.subject,
@@ -387,7 +411,7 @@ async function approveBankTransferPayment(adminUser, paymentId) {
 }
 
 async function rejectBankTransferPayment(adminUser, paymentId) {
-  await findPendingBankTransferOrThrow(paymentId);
+  const pendingPayment = await findPendingBankTransferOrThrow(paymentId);
   await repository.markPaymentFailed(paymentId, { gatewayTransactionId: null });
 
   await recordAuditEvent({
@@ -395,6 +419,14 @@ async function rejectBankTransferPayment(adminUser, paymentId) {
     action: 'BANK_TRANSFER_REJECTED',
     entityType: 'payment',
     entityId: paymentId,
+  });
+
+  const enrollment = await repository.findEnrollmentById(pendingPayment.enrollment_id);
+  await repository.createNotification({
+    recipientId: pendingPayment.student_id,
+    type: 'PAYMENT_REJECTED',
+    message: `Your bank transfer of LKR ${Number(pendingPayment.amount).toFixed(2)} for ${enrollment ? enrollment.subject : 'your class'} was rejected. Please check your reference and receipt, then resubmit.`,
+    sentBy: adminUser.id,
   });
 
   const payment = await repository.findPaymentById(paymentId);
@@ -418,6 +450,22 @@ async function getReceiptImagePath(requestingUser, paymentId) {
     throw ApiError.notFound('Receipt image not found.');
   }
   return details.receiptImagePath;
+}
+
+// admin dashboard - a real ledger of individual payments (any method,
+// any status), not just the lump revenue total
+async function listRecentPayments() {
+  const rows = await repository.listRecentPayments(20);
+  return rows.map((row) => ({
+    id: row.id,
+    studentName: row.student_name,
+    subject: row.subject,
+    amount: Number(row.amount),
+    status: row.status,
+    paymentMethod: row.payment_method,
+    createdAt: row.created_at,
+    paidAt: row.paid_at,
+  }));
 }
 
 async function getMyPaymentHistory(studentUser) {
@@ -525,6 +573,13 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
     details: { tutorId, amount },
   });
 
+  await repository.createNotification({
+    recipientId: tutorId,
+    type: 'PAYOUT_RECORDED',
+    message: `A payout of LKR ${Number(amount).toFixed(2)} has been recorded for you${periodLabel ? ` (${periodLabel})` : ''}.`,
+    sentBy: adminUser.id,
+  });
+
   return { id: payoutId, tutorId, tutorName: tutor.full_name, amount, note, periodLabel };
 }
 
@@ -567,6 +622,7 @@ module.exports = {
   rejectBankTransferPayment,
   getReceiptImagePath,
   getMyPaymentHistory,
+  listRecentPayments,
   listActiveTutors,
   getMyBankDetails,
   updateMyBankDetails,

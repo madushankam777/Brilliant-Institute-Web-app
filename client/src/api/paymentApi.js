@@ -68,6 +68,12 @@ export async function fetchPendingBankTransfers() {
   return response.data.data.payments;
 }
 
+// admin dashboard - a real ledger of individual payments, any method/status
+export async function fetchRecentPayments() {
+  const response = await httpClient.get('/payments/admin/recent-payments');
+  return response.data.data.payments;
+}
+
 export async function approveBankTransfer(paymentId) {
   const response = await httpClient.patch(`/payments/admin/${paymentId}/approve`);
   return response.data.data.payment;

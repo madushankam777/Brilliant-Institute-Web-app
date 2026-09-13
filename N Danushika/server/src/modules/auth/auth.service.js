@@ -208,6 +208,31 @@ async function updateProfilePicture(userId, publicPath) {
   return toSafeUser(user);
 }
 
+// delete btn - remove the current photo, going back to the initials avatar
+async function removeProfilePicture(userId) {
+  const existing = await repository.findUserById(userId);
+  if (!existing || !existing.profile_picture_path) {
+    throw ApiError.badRequest('You do not have a profile picture to remove.');
+  }
+
+  const user = await repository.updateProfilePicture(userId, null);
+
+  const oldAbsolutePath = path.join(
+    UPLOADS_ROOT_DIR,
+    existing.profile_picture_path.replace(/^\/uploads\//, '')
+  );
+  fs.unlink(oldAbsolutePath, () => {});
+
+  await recordAuditEvent({
+    actorId: userId,
+    action: 'PROFILE_PICTURE_REMOVED',
+    entityType: 'user',
+    entityId: userId,
+  });
+
+  return toSafeUser(user);
+}
+
 // Change the logged-in user's own password (must know the current one).
 async function changePassword(userId, { currentPassword, newPassword }) {
   const user = await repository.findUserById(userId);
@@ -292,6 +317,7 @@ module.exports = {
   getProfile,
   updateProfile,
   updateProfilePicture,
+  removeProfilePicture,
   changePassword,
   requestPasswordReset,
   resetPasswordWithToken,

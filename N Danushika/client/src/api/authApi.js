@@ -63,6 +63,12 @@ export async function uploadMyProfilePicture(file) {
   return response.data.data.user;
 }
 
+// Remove the logged-in user's own profile picture.
+export async function removeMyProfilePicture() {
+  const response = await httpClient.delete('/auth/profile/picture');
+  return response.data.data.user;
+}
+
 // Change the logged-in user's own password.
 export async function changeMyPassword({ currentPassword, newPassword }) {
   const response = await httpClient.put('/auth/password', { currentPassword, newPassword });

@@ -147,6 +147,41 @@ async function listPaymentHistoryForStudent(studentId, executor = pool) {
   return rows;
 }
 
+// admin dashboard - every payment (any method/status), newest first, so
+// Admin can actually see the individual transactions behind the revenue
+// number instead of just a lump sum
+async function listRecentPayments(limit) {
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 20;
+  const [rows] = await pool.query(
+    `SELECT p.id, p.amount, p.status, p.payment_method, p.created_at, p.paid_at,
+            u.full_name AS student_name, c.subject
+     FROM payments p
+     JOIN enrollments e ON e.id = p.enrollment_id
+     JOIN classes c ON c.id = e.class_id
+     JOIN users u ON u.id = p.student_id
+     ORDER BY p.created_at DESC
+     LIMIT ${safeLimit}`
+  );
+  return rows;
+}
+
+// notify everyone who needs to react to a payment event - approve/reject
+// goes to the student, a new bank transfer submission goes to Admin, a
+// payout goes to the Tutor. Reuses the same notification_log table the
+// reminder system already writes to, so it shows up in the same bell.
+async function createNotification({ recipientId, type, message, sentBy }) {
+  await pool.execute(
+    `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
+     VALUES (?, 'EMAIL', ?, ?, ?, NOW())`,
+    [recipientId, type, message, sentBy || null]
+  );
+}
+
+async function findActiveAdminIds() {
+  const [rows] = await pool.execute(`SELECT id FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'`);
+  return rows.map((row) => row.id);
+}
+
 // --- Tutor payouts (Admin paying a Tutor their share/salary) ---
 
 // tutor picker list - bank fields included so Admin's Pay Tutors page can
@@ -272,6 +307,9 @@ module.exports = {
   findPaymentByIdForUpdate,
   listPendingBankTransfers,
   listPaymentHistoryForStudent,
+  listRecentPayments,
+  createNotification,
+  findActiveAdminIds,
   listActiveTutors,
   findBankDetails,
   updateBankDetails,

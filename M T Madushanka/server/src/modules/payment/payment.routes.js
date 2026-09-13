@@ -77,6 +77,11 @@ router.get(
   authorize(ROLES.ADMIN),
   controller.listPendingBankTransfers
 );
+router.get(
+  '/admin/recent-payments',
+  authorize(ROLES.ADMIN),
+  controller.listRecentPayments
+);
 router.patch(
   '/admin/:paymentId/approve',
   authorize(ROLES.ADMIN),

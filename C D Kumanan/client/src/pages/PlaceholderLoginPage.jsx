@@ -29,6 +29,7 @@ function PlaceholderLoginPage() {
 
   return (
     <AuthLayout
+      imageSrc="/login-art.jpg"
       quote={{
         text: 'Pathway transitioned our chaotic paper-based workflow into a structured database. Our administrative workload decreased by more than 40% in our first semester.',
         author: 'Sunil Jayawardena',

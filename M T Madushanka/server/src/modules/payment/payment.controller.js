@@ -109,6 +109,12 @@ const listPendingBankTransfers = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { payments } });
 });
 
+// admin dashboard - a real ledger of individual payments, any method/status
+const listRecentPayments = asyncHandler(async (req, res) => {
+  const payments = await service.listRecentPayments();
+  res.status(200).json({ success: true, data: { payments } });
+});
+
 const approveBankTransferPayment = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const payment = await service.approveBankTransferPayment(req.user, paymentId);
@@ -200,6 +206,7 @@ module.exports = {
   submitBankTransferPayment,
   editBankTransferPayment,
   listPendingBankTransfers,
+  listRecentPayments,
   approveBankTransferPayment,
   rejectBankTransferPayment,
   getReceiptImage,

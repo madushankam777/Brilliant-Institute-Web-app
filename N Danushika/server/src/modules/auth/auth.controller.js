@@ -70,6 +70,16 @@ const uploadProfilePicture = asyncHandler(async (req, res) => {
   });
 });
 
+// delete btn - remove the current photo, going back to the initials avatar
+const removeProfilePicture = asyncHandler(async (req, res) => {
+  const user = await authService.removeProfilePicture(req.user.id);
+  res.status(200).json({
+    success: true,
+    message: 'Profile picture removed.',
+    data: { user },
+  });
+});
+
 // PUT /api/auth/password - change the logged-in user's own password.
 const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
@@ -113,6 +123,7 @@ module.exports = {
   getProfile,
   updateProfile,
   uploadProfilePicture,
+  removeProfilePicture,
   changePassword,
   getSession,
   forgotPassword,

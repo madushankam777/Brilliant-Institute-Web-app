@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchDashboardStats } from '../../api/adminApi';
+import { fetchRecentPayments } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../../shared/client/src/components/common/Icon';
@@ -73,10 +74,27 @@ function activityLabel(entry) {
   return map[entry.action] || entry.action;
 }
 
+const PAYMENT_STATUS_BADGE = {
+  SUCCESSFUL: 'badge-success',
+  PENDING: 'badge-warning',
+  FAILED: 'badge-danger',
+};
+
+const PAYMENT_METHOD_LABEL = {
+  CARD: 'Card',
+  EZ_CASH: 'eZ Cash',
+  MCASH: 'mCash',
+  BANK_TRANSFER: 'Bank Transfer',
+};
+
 function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const [recentPayments, setRecentPayments] = useState([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(true);
+  const [paymentsError, setPaymentsError] = useState('');
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -94,6 +112,23 @@ function AdminDashboardPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchRecentPayments()
+      .then((data) => {
+        if (isMounted) setRecentPayments(data);
+      })
+      .catch((error) => {
+        if (isMounted) setPaymentsError(error.message);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingPayments(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <PortalShell navItems={NAV_ITEMS}>
@@ -171,6 +206,56 @@ function AdminDashboardPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="card">
+              <div className="flex-between">
+                <h2>Recent Payments</h2>
+                <Link to="/admin/payments/verify" className="btn btn-secondary btn-sm">
+                  Review Pending Bank Transfers
+                </Link>
+              </div>
+              <p className="muted" style={{ marginTop: '-8px', fontSize: '0.85rem' }}>
+                Every payment behind the Monthly Revenue figure above - card, eZ Cash, mCash, and bank
+                transfer, whatever its outcome.
+              </p>
+              <Alert type="error" message={paymentsError} />
+              {isLoadingPayments ? (
+                <LoadingSpinner label="Loading recent payments..." />
+              ) : recentPayments.length === 0 ? (
+                <p className="muted">No payments recorded yet.</p>
+              ) : (
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Class</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentPayments.map((payment) => (
+                        <tr key={payment.id}>
+                          <td>{payment.studentName}</td>
+                          <td>{payment.subject}</td>
+                          <td>{formatCurrency(payment.amount)}</td>
+                          <td>{PAYMENT_METHOD_LABEL[payment.paymentMethod] || payment.paymentMethod}</td>
+                          <td>
+                            <span className={`badge ${PAYMENT_STATUS_BADGE[payment.status] || 'badge-neutral'}`}>
+                              {payment.status}
+                            </span>
+                          </td>
+                          <td>{payment.paidAt || payment.createdAt}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </>
         )}
