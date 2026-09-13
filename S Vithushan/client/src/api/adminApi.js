@@ -36,6 +36,11 @@ export async function activateUser(userId) {
   return response.data.data.user;
 }
 
+// delete btn - only available once a user is already suspended
+export async function deleteUser(userId) {
+  await httpClient.delete(`/admin/users/${userId}`);
+}
+
 // tutor's student list
 export async function fetchMyStudents() {
   const response = await httpClient.get('/students/mine');

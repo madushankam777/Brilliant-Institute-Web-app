@@ -6,6 +6,7 @@ export function getNavItems(role) {
       { to: '/courses/manage', label: 'Manage Classes', icon: 'book' },
       { to: '/admin/payments/verify', label: 'Payment Verification', icon: 'wallet' },
       { to: '/admin/payments/tutors', label: 'Pay Tutors', icon: 'card' },
+      { to: '/admin/payments/settings', label: 'Payment Settings', icon: 'edit' },
       { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
       { to: '/admin/feedback', label: 'Feedback', icon: 'chat' },
       { to: '/profile', label: 'My Profile', icon: 'user' },

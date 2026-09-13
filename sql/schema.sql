@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS users (
   bio                   TEXT NULL,
   grade                 VARCHAR(10) NULL,
   profile_picture_path  VARCHAR(255) NULL,
+  bank_name             VARCHAR(100) NULL,
+  bank_account_holder   VARCHAR(150) NULL,
+  bank_account_number   VARCHAR(34) NULL,
+  bank_branch           VARCHAR(100) NULL,
   failed_login_attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   locked_until          DATETIME NULL,
   last_login_at         DATETIME NULL,
@@ -218,6 +222,23 @@ CREATE TABLE IF NOT EXISTS tutor_payouts (
   KEY idx_tutor_payouts_tutor (tutor_id),
   CONSTRAINT fk_tutor_payouts_tutor FOREIGN KEY (tutor_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_tutor_payouts_paid_by FOREIGN KEY (paid_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Singleton row (id always 1) - the institute's own receiving details,
+-- shown to students during checkout. Editable by Admin only.
+CREATE TABLE IF NOT EXISTS payment_settings (
+  id                  TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+  bank_name           VARCHAR(100) NULL,
+  bank_account_name   VARCHAR(150) NULL,
+  bank_account_number VARCHAR(34) NULL,
+  bank_branch         VARCHAR(100) NULL,
+  bank_swift          VARCHAR(20) NULL,
+  ez_cash_number      VARCHAR(20) NULL,
+  mcash_number        VARCHAR(20) NULL,
+  updated_by          INT UNSIGNED NULL,
+  updated_at          DATETIME NULL,
+  CONSTRAINT chk_payment_settings_singleton CHECK (id = 1),
+  CONSTRAINT fk_payment_settings_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS notification_log (

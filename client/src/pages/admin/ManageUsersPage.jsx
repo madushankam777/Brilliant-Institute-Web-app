@@ -7,6 +7,7 @@ import {
   createUser,
   suspendUser,
   activateUser,
+  deleteUser,
   generateTutorKey,
   fetchTutorKeys,
   revokeTutorKey,
@@ -150,6 +151,9 @@ function ManageUsersPage() {
         await load();
       } else if (confirmTarget.action === 'activate') {
         await activateUser(confirmTarget.user.id);
+        await load();
+      } else if (confirmTarget.action === 'deleteUser') {
+        await deleteUser(confirmTarget.user.id);
         await load();
       } else if (confirmTarget.action === 'deleteKey') {
         await deleteTutorKey(confirmTarget.key.id);
@@ -300,17 +304,30 @@ function ManageUsersPage() {
                               Suspend
                             </button>
                           ) : (
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => {
-                                setConfirmTarget({ user, action: 'activate' });
-                                setConfirmNameInput('');
-                                setConfirmError('');
-                              }}
-                            >
-                              Reactivate
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => {
+                                  setConfirmTarget({ user, action: 'activate' });
+                                  setConfirmNameInput('');
+                                  setConfirmError('');
+                                }}
+                              >
+                                Reactivate
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                onClick={() => {
+                                  setConfirmTarget({ user, action: 'deleteUser' });
+                                  setConfirmNameInput('');
+                                  setConfirmError('');
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -519,6 +536,12 @@ function ManageUsersPage() {
                   )}
                   ? This cannot be undone.
                 </>
+              ) : confirmTarget.action === 'deleteUser' ? (
+                <>
+                  Are you sure you want to permanently delete <strong>{confirmTarget.user.fullName}</strong>&apos;s
+                  account? Their history (classes, payments, attendance) is kept for records, but they will
+                  disappear from every list here and can never log in again. This cannot be undone.
+                </>
               ) : (
                 <>
                   Are you sure you want to {confirmTarget.action} <strong>{confirmTarget.user.fullName}</strong>?
@@ -553,7 +576,9 @@ function ManageUsersPage() {
               <button
                 type="button"
                 className={
-                  confirmTarget.action === 'suspend' || confirmTarget.action === 'deleteKey'
+                  confirmTarget.action === 'suspend' ||
+                  confirmTarget.action === 'deleteKey' ||
+                  confirmTarget.action === 'deleteUser'
                     ? 'btn btn-danger'
                     : 'btn btn-primary'
                 }

@@ -425,6 +425,42 @@ async function getMyPaymentHistory(studentUser) {
   return rows.map(toSafePayment);
 }
 
+// Never send a Tutor's real account number to anyone but themselves - Admin
+// only needs enough to confirm it's the right account, not the full number.
+function maskAccountNumber(accountNumber) {
+  const digits = String(accountNumber || '').trim();
+  if (!digits) return null;
+  if (digits.length <= 4) return digits;
+  return `•••• ${digits.slice(-4)}`;
+}
+
+// checkout tabs - the institute's own receiving details (Bank Transfer callout,
+// and where eZ Cash/mCash payments should be confirmed to). Any logged-in
+// role can read this; only Admin can change it.
+async function getPaymentSettings() {
+  const row = await repository.getPaymentSettings();
+  return {
+    bankName: row ? row.bank_name : null,
+    bankAccountName: row ? row.bank_account_name : null,
+    bankAccountNumber: row ? row.bank_account_number : null,
+    bankBranch: row ? row.bank_branch : null,
+    bankSwift: row ? row.bank_swift : null,
+    ezCashNumber: row ? row.ez_cash_number : null,
+    mcashNumber: row ? row.mcash_number : null,
+  };
+}
+
+async function updatePaymentSettings(adminUser, settings) {
+  await repository.upsertPaymentSettings(settings, adminUser.id);
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'PAYMENT_SETTINGS_UPDATED',
+    entityType: 'payment_settings',
+    entityId: 1,
+  });
+  return getPaymentSettings();
+}
+
 // tutor picker list
 async function listActiveTutors() {
   const rows = await repository.listActiveTutors();
@@ -433,7 +469,34 @@ async function listActiveTutors() {
     fullName: row.full_name,
     email: row.email,
     profilePictureUrl: row.profile_picture_path,
+    bankName: row.bank_name,
+    bankAccountHolder: row.bank_account_holder,
+    bankBranch: row.bank_branch,
+    maskedAccountNumber: maskAccountNumber(row.bank_account_number),
+    hasBankDetails: Boolean(row.bank_name || row.bank_account_number),
   }));
+}
+
+// tutor's own profile - the real, unmasked details, so they can verify what's on file
+async function getMyBankDetails(tutorUser) {
+  const row = await repository.findBankDetails(tutorUser.id);
+  return {
+    bankName: row ? row.bank_name : null,
+    accountHolder: row ? row.bank_account_holder : null,
+    accountNumber: row ? row.bank_account_number : null,
+    branch: row ? row.bank_branch : null,
+  };
+}
+
+async function updateMyBankDetails(tutorUser, { bankName, accountHolder, accountNumber, branch }) {
+  await repository.updateBankDetails(tutorUser.id, { bankName, accountHolder, accountNumber, branch });
+  await recordAuditEvent({
+    actorId: tutorUser.id,
+    action: 'TUTOR_BANK_DETAILS_UPDATED',
+    entityType: 'user',
+    entityId: tutorUser.id,
+  });
+  return getMyBankDetails(tutorUser);
 }
 
 // pay tutor btn
@@ -505,6 +568,10 @@ module.exports = {
   getReceiptImagePath,
   getMyPaymentHistory,
   listActiveTutors,
+  getMyBankDetails,
+  updateMyBankDetails,
+  getPaymentSettings,
+  updatePaymentSettings,
   payTutor,
   listTutorPayouts,
 };

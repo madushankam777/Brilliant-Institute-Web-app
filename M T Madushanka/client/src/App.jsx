@@ -19,6 +19,7 @@ import FeeBalancePage from './pages/payment/FeeBalancePage';
 import PaymentHistoryPage from './pages/payment/PaymentHistoryPage';
 import PaymentVerificationPage from './pages/payment/PaymentVerificationPage';
 import PayTutorsPage from './pages/payment/PayTutorsPage';
+import PaymentSettingsPage from './pages/payment/PaymentSettingsPage';
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/payments/verify" element={<PaymentVerificationPage />} />
             <Route path="/admin/payments/tutors" element={<PayTutorsPage />} />
+            <Route path="/admin/payments/settings" element={<PaymentSettingsPage />} />
           </Route>
 
           {/* Catch-all */}

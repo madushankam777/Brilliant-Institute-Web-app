@@ -93,3 +93,15 @@ export async function payTutor({ tutorId, amount, note, periodLabel }) {
   });
   return response.data.data.payout;
 }
+
+// checkout - the institute's own receiving details (any logged-in role can read)
+export async function fetchPaymentSettings() {
+  const response = await httpClient.get('/payments/settings');
+  return response.data.data.settings;
+}
+
+// admin only - edit the institute's receiving details
+export async function updatePaymentSettings(payload) {
+  const response = await httpClient.put('/payments/admin/settings', payload);
+  return response.data.data.settings;
+}

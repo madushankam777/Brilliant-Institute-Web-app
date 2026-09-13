@@ -11,11 +11,34 @@ const {
   editBankTransferRules,
   paymentIdParamRules,
   payTutorRules,
+  bankDetailsRules,
+  paymentSettingsRules,
 } = require('./payment.validation');
 
 const router = express.Router();
 
 router.use(authenticate);
+
+// --- Tutor: manage their own payout bank details ---
+router.get('/me/bank-details', authorize(ROLES.TUTOR), controller.getMyBankDetails);
+router.put(
+  '/me/bank-details',
+  authorize(ROLES.TUTOR),
+  bankDetailsRules,
+  validateRequest,
+  controller.updateMyBankDetails
+);
+
+// --- Checkout: the institute's own receiving details - any logged-in role
+// can read them (shown at checkout), only Admin can change them ---
+router.get('/settings', controller.getPaymentSettings);
+router.put(
+  '/admin/settings',
+  authorize(ROLES.ADMIN),
+  paymentSettingsRules,
+  validateRequest,
+  controller.updatePaymentSettings
+);
 
 router.get('/balance', authorize(ROLES.STUDENT_PARENT), controller.getMyBalances);
 router.get('/history', authorize(ROLES.STUDENT_PARENT), controller.getMyPaymentHistory);

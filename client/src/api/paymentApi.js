@@ -78,6 +78,14 @@ export async function rejectBankTransfer(paymentId) {
   return response.data.data.payment;
 }
 
+// tutor picker list - the payment module's own list (not Course Management's
+// public /courses/tutors), so bank payout details can safely ride along for
+// Admin only instead of being exposed on a route any logged-in role can hit
+export async function fetchAllTutors() {
+  const response = await httpClient.get('/payments/admin/tutors');
+  return response.data.data.tutors;
+}
+
 // pay tutor btn
 export async function fetchTutorPayouts() {
   const response = await httpClient.get('/payments/admin/tutor-payouts');
@@ -92,4 +100,32 @@ export async function payTutor({ tutorId, amount, note, periodLabel }) {
     periodLabel,
   });
   return response.data.data.payout;
+}
+
+// tutor's own profile - payout bank details
+export async function fetchMyBankDetails() {
+  const response = await httpClient.get('/payments/me/bank-details');
+  return response.data.data.bankDetails;
+}
+
+export async function updateMyBankDetails({ bankName, accountHolder, accountNumber, branch }) {
+  const response = await httpClient.put('/payments/me/bank-details', {
+    bankName,
+    accountHolder,
+    accountNumber,
+    branch,
+  });
+  return response.data.data.bankDetails;
+}
+
+// checkout - the institute's own receiving details (any logged-in role can read)
+export async function fetchPaymentSettings() {
+  const response = await httpClient.get('/payments/settings');
+  return response.data.data.settings;
+}
+
+// admin only - edit the institute's receiving details
+export async function updatePaymentSettings(payload) {
+  const response = await httpClient.put('/payments/admin/settings', payload);
+  return response.data.data.settings;
 }

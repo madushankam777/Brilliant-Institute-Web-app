@@ -149,15 +149,36 @@ async function listPaymentHistoryForStudent(studentId, executor = pool) {
 
 // --- Tutor payouts (Admin paying a Tutor their share/salary) ---
 
-// tutor picker list
+// tutor picker list - bank fields included so Admin's Pay Tutors page can
+// show them without a second round trip per tutor
 async function listActiveTutors() {
   const [rows] = await pool.execute(
-    `SELECT id, full_name, email, profile_picture_path
+    `SELECT id, full_name, email, profile_picture_path,
+            bank_name, bank_account_holder, bank_account_number, bank_branch
      FROM users
      WHERE role = 'TUTOR' AND status = 'ACTIVE'
      ORDER BY full_name ASC`
   );
   return rows;
+}
+
+// tutor's own bank details - the full, unmasked record
+async function findBankDetails(tutorId) {
+  const [rows] = await pool.execute(
+    `SELECT bank_name, bank_account_holder, bank_account_number, bank_branch
+     FROM users WHERE id = ? AND role = 'TUTOR' LIMIT 1`,
+    [tutorId]
+  );
+  return rows[0] || null;
+}
+
+async function updateBankDetails(tutorId, { bankName, accountHolder, accountNumber, branch }) {
+  await pool.execute(
+    `UPDATE users
+     SET bank_name = ?, bank_account_holder = ?, bank_account_number = ?, bank_branch = ?, updated_at = NOW()
+     WHERE id = ? AND role = 'TUTOR'`,
+    [bankName || null, accountHolder || null, accountNumber || null, branch || null, tutorId]
+  );
 }
 
 async function findActiveTutorById(tutorId) {
@@ -198,6 +219,45 @@ async function sumPayoutsByTutor() {
   return rows;
 }
 
+// --- Institute payment settings (Admin-editable, shown to students at checkout) ---
+
+async function getPaymentSettings() {
+  const [rows] = await pool.execute(`SELECT * FROM payment_settings WHERE id = 1 LIMIT 1`);
+  return rows[0] || null;
+}
+
+async function upsertPaymentSettings(
+  { bankName, bankAccountName, bankAccountNumber, bankBranch, bankSwift, ezCashNumber, mcashNumber },
+  updatedBy
+) {
+  await pool.execute(
+    `INSERT INTO payment_settings
+       (id, bank_name, bank_account_name, bank_account_number, bank_branch, bank_swift,
+        ez_cash_number, mcash_number, updated_by, updated_at)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE
+       bank_name = VALUES(bank_name),
+       bank_account_name = VALUES(bank_account_name),
+       bank_account_number = VALUES(bank_account_number),
+       bank_branch = VALUES(bank_branch),
+       bank_swift = VALUES(bank_swift),
+       ez_cash_number = VALUES(ez_cash_number),
+       mcash_number = VALUES(mcash_number),
+       updated_by = VALUES(updated_by),
+       updated_at = NOW()`,
+    [
+      bankName || null,
+      bankAccountName || null,
+      bankAccountNumber || null,
+      bankBranch || null,
+      bankSwift || null,
+      ezCashNumber || null,
+      mcashNumber || null,
+      updatedBy,
+    ]
+  );
+}
+
 module.exports = {
   findEnrollmentById,
   findEnrollmentByIdForUpdate,
@@ -213,6 +273,10 @@ module.exports = {
   listPendingBankTransfers,
   listPaymentHistoryForStudent,
   listActiveTutors,
+  findBankDetails,
+  updateBankDetails,
+  getPaymentSettings,
+  upsertPaymentSettings,
   findActiveTutorById,
   createTutorPayout,
   listTutorPayouts,

@@ -128,10 +128,52 @@ const getReceiptImage = asyncHandler(async (req, res) => {
   res.sendFile(absolutePath);
 });
 
+// checkout tabs - institute's own receiving details
+const getPaymentSettings = asyncHandler(async (req, res) => {
+  const settings = await service.getPaymentSettings();
+  res.status(200).json({ success: true, data: { settings } });
+});
+
+const updatePaymentSettings = asyncHandler(async (req, res) => {
+  const { bankName, bankAccountName, bankAccountNumber, bankBranch, bankSwift, ezCashNumber, mcashNumber } =
+    req.body;
+  const settings = await service.updatePaymentSettings(req.user, {
+    bankName,
+    bankAccountName,
+    bankAccountNumber,
+    bankBranch,
+    bankSwift,
+    ezCashNumber,
+    mcashNumber,
+  });
+  res.status(200).json({ success: true, message: 'Payment settings saved.', data: { settings } });
+});
+
 // tutor picker list
 const listActiveTutors = asyncHandler(async (req, res) => {
   const tutors = await service.listActiveTutors();
   res.status(200).json({ success: true, data: { tutors } });
+});
+
+// tutor's own profile - view/edit their payout bank details
+const getMyBankDetails = asyncHandler(async (req, res) => {
+  const bankDetails = await service.getMyBankDetails(req.user);
+  res.status(200).json({ success: true, data: { bankDetails } });
+});
+
+const updateMyBankDetails = asyncHandler(async (req, res) => {
+  const { bankName, accountHolder, accountNumber, branch } = req.body;
+  const bankDetails = await service.updateMyBankDetails(req.user, {
+    bankName,
+    accountHolder,
+    accountNumber,
+    branch,
+  });
+  res.status(200).json({
+    success: true,
+    message: 'Banking information saved.',
+    data: { bankDetails },
+  });
 });
 
 const payTutor = asyncHandler(async (req, res) => {
@@ -162,6 +204,10 @@ module.exports = {
   rejectBankTransferPayment,
   getReceiptImage,
   listActiveTutors,
+  getMyBankDetails,
+  updateMyBankDetails,
+  getPaymentSettings,
+  updatePaymentSettings,
   payTutor,
   listTutorPayouts,
 };

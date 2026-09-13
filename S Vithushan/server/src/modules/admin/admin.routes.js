@@ -43,6 +43,14 @@ router.patch(
   validateRequest,
   controller.activateUser
 );
+// only an Admin may delete - and only once the account is already suspended
+router.delete(
+  '/admin/users/:userId',
+  authorize(ROLES.ADMIN),
+  userIdParamRules,
+  validateRequest,
+  controller.deleteUser
+);
 
 // --- Tutor only: their own student roster ---
 router.get('/students/mine', authorize(ROLES.TUTOR), controller.listMyStudents);

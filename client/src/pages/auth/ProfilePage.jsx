@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMyProfile, uploadMyProfilePicture, changeMyPassword } from '../../api/authApi';
+import { fetchMyBankDetails, updateMyBankDetails } from '../../api/paymentApi';
 import FormField from '../../../../shared/client/src/components/common/FormField';
 import Alert from '../../../../shared/client/src/components/common/Alert';
+import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PasswordStrength from '../../../../shared/client/src/components/common/PasswordStrength';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
@@ -89,6 +91,53 @@ function ProfilePage() {
       setProfileError(error.message);
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  const isTutor = user.role === 'TUTOR';
+  const [bankForm, setBankForm] = useState({ bankName: '', accountHolder: '', accountNumber: '', branch: '' });
+  const [isLoadingBank, setIsLoadingBank] = useState(isTutor);
+  const [bankMessage, setBankMessage] = useState('');
+  const [bankError, setBankError] = useState('');
+  const [isSavingBank, setIsSavingBank] = useState(false);
+
+  useEffect(() => {
+    if (!isTutor) return;
+    let isMounted = true;
+    fetchMyBankDetails()
+      .then((details) => {
+        if (!isMounted) return;
+        setBankForm({
+          bankName: details.bankName || '',
+          accountHolder: details.accountHolder || '',
+          accountNumber: details.accountNumber || '',
+          branch: details.branch || '',
+        });
+      })
+      .catch((error) => {
+        if (isMounted) setBankError(error.message);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingBank(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleBankSubmit(event) {
+    event.preventDefault();
+    setBankError('');
+    setBankMessage('');
+    setIsSavingBank(true);
+    try {
+      await updateMyBankDetails(bankForm);
+      setBankMessage('Banking information saved.');
+    } catch (error) {
+      setBankError(error.message);
+    } finally {
+      setIsSavingBank(false);
     }
   }
 
@@ -210,6 +259,57 @@ function ProfilePage() {
             </button>
           </form>
         </div>
+
+        {isTutor && (
+          <div className="card">
+            <h2>Banking information</h2>
+            <p className="muted" style={{ marginTop: '-8px' }}>
+              Used by Admin to send your payouts. Your account number is never shown in full to
+              anyone but you - Admin only sees the last 4 digits, to confirm it&apos;s the right account.
+            </p>
+            <Alert type="success" message={bankMessage} />
+            <Alert type="error" message={bankError} />
+
+            {isLoadingBank ? (
+              <LoadingSpinner label="Loading your banking details..." />
+            ) : (
+              <form onSubmit={handleBankSubmit} noValidate>
+                <FormField
+                  id="bankName"
+                  label="Bank name"
+                  placeholder="e.g. People's Bank"
+                  value={bankForm.bankName}
+                  onChange={(e) => setBankForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                />
+                <FormField
+                  id="accountHolder"
+                  label="Account holder name"
+                  placeholder="Name exactly as it appears on the account"
+                  value={bankForm.accountHolder}
+                  onChange={(e) => setBankForm((prev) => ({ ...prev, accountHolder: e.target.value }))}
+                />
+                <FormField
+                  id="accountNumber"
+                  label="Account number"
+                  placeholder="e.g. 8001234567"
+                  value={bankForm.accountNumber}
+                  onChange={(e) => setBankForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
+                />
+                <FormField
+                  id="branch"
+                  label="Branch"
+                  placeholder="e.g. Colombo 07"
+                  value={bankForm.branch}
+                  onChange={(e) => setBankForm((prev) => ({ ...prev, branch: e.target.value }))}
+                />
+
+                <button type="submit" className="btn btn-primary" disabled={isSavingBank}>
+                  {isSavingBank ? 'Saving...' : 'Save banking information'}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
 
         <div className="card">
           <h2>Change password</h2>

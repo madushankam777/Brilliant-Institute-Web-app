@@ -18,6 +18,7 @@ const ADMIN_NAV = [
   { to: '/attendance/classes', label: 'Mark Attendance', icon: 'calendar' },
   { to: '/admin/payments/verify', label: 'Payment Verification', icon: 'wallet' },
   { to: '/admin/payments/tutors', label: 'Pay Tutors', icon: 'card' },
+  { to: '/admin/payments/settings', label: 'Payment Settings', icon: 'edit' },
 ];
 
 export function getNavItems(role) {

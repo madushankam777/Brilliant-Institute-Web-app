@@ -101,6 +101,15 @@ async function updateUserStatus(userId, status) {
   ]);
 }
 
+// delete btn - soft delete only: history (classes taught, payments, audit log
+// entries) references this row, so it stays and just drops out of every
+// active listing instead of being physically removed.
+async function softDeleteUser(userId) {
+  await pool.execute(`UPDATE users SET status = 'DELETED', updated_at = NOW() WHERE id = ?`, [
+    userId,
+  ]);
+}
+
 async function isStudentEnrolledWithTutor(studentId, tutorId) {
   const [rows] = await pool.execute(
     `SELECT 1 FROM enrollments e
@@ -306,6 +315,7 @@ module.exports = {
   findUserByEmail,
   findUserById,
   updateUserStatus,
+  softDeleteUser,
   isStudentEnrolledWithTutor,
   listStudentsForTutor,
   createTutorKey,

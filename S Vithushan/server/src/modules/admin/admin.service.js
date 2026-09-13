@@ -238,6 +238,29 @@ async function activateUser(actingUser, userId) {
   return toSafeUserForAdmin(updated);
 }
 
+// delete btn - only a suspended account can be deleted, so nobody's access
+// gets pulled by this call alone (suspend is the actual access-revoking step)
+async function deleteUser(actingUser, userId) {
+  if (userId === actingUser.id) {
+    throw ApiError.badRequest('You cannot delete your own account.');
+  }
+  const targetUser = await repository.findUserById(userId);
+  if (!targetUser || targetUser.status === USER_STATUS.DELETED) {
+    throw ApiError.notFound('User not found.');
+  }
+  if (targetUser.status !== USER_STATUS.SUSPENDED) {
+    throw ApiError.badRequest('Suspend this account first, then delete it.');
+  }
+
+  await repository.softDeleteUser(userId);
+  await recordAuditEvent({
+    actorId: actingUser.id,
+    action: 'USER_DELETED',
+    entityType: 'user',
+    entityId: userId,
+  });
+}
+
 // tutor's student list
 async function listMyStudents(tutorUser) {
   const rows = await repository.listStudentsForTutor(tutorUser.id);
@@ -420,6 +443,7 @@ module.exports = {
   deleteTutorKey,
   suspendUser,
   activateUser,
+  deleteUser,
   listMyStudents,
   createAnnouncement,
   updateAnnouncement,

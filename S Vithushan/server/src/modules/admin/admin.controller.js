@@ -87,6 +87,12 @@ const activateUser = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'User reactivated.', data: { user } });
 });
 
+const deleteUser = asyncHandler(async (req, res) => {
+  const userId = Number(req.params.userId);
+  await service.deleteUser(req.user, userId);
+  res.status(200).json({ success: true, message: 'User deleted.' });
+});
+
 const listMyStudents = asyncHandler(async (req, res) => {
   const students = await service.listMyStudents(req.user);
   res.status(200).json({ success: true, data: { students } });
@@ -170,6 +176,7 @@ module.exports = {
   downloadTutorKeyDocument,
   suspendUser,
   activateUser,
+  deleteUser,
   listMyStudents,
   createAnnouncement,
   updateAnnouncement,

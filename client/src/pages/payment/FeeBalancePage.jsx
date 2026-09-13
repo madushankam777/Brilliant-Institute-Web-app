@@ -6,6 +6,7 @@ import {
   makePayment,
   payByBankTransfer,
   fetchBankTransferAvailability,
+  fetchPaymentSettings,
 } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
@@ -21,15 +22,6 @@ const PAYMENT_METHODS = [
   { value: 'MCASH', label: 'mCash' },
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
-
-// dummy bank details for bank transfer
-const BANK_DETAILS = {
-  bankName: "People's Bank",
-  accountName: 'Brilliant Institute (Pvt) Ltd',
-  accountNumber: '100-2-001-5-0123456',
-  branch: 'Colombo 07',
-  swiftCode: 'PSBKLKLX',
-};
 
 // wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
@@ -102,6 +94,7 @@ function FeeBalancePage() {
 
   const [bankTransferAvailable, setBankTransferAvailable] = useState(true);
   const [bankTransferClosedMessage, setBankTransferClosedMessage] = useState('');
+  const [paymentSettings, setPaymentSettings] = useState(null);
 
   const loadBalances = useCallback(async () => {
     setIsLoading(true);
@@ -125,6 +118,11 @@ function FeeBalancePage() {
       })
       .catch(() => {
         // ignore - server still checks this on submit
+      });
+    fetchPaymentSettings()
+      .then(setPaymentSettings)
+      .catch(() => {
+        // checkout still works without this - the callouts just stay hidden
       });
   }, [loadBalances]);
 
@@ -588,26 +586,36 @@ function FeeBalancePage() {
                     )}
 
                     {(paymentMethod === 'EZ_CASH' || paymentMethod === 'MCASH') && (
-                      <div className="form-field">
-                        <label htmlFor="walletPhone">
-                          {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} Mobile Number
-                        </label>
-                        <input
-                          id="walletPhone"
-                          type="tel"
-                          placeholder="07XXXXXXXX"
-                          value={walletPhone}
-                          onChange={(e) => setWalletPhone(e.target.value)}
-                          className={fieldErrors.walletPhone ? 'input-error' : ''}
-                        />
-                        {fieldErrors.walletPhone ? (
-                          <p className="field-error">{fieldErrors.walletPhone}</p>
-                        ) : (
-                          <p className="field-help">
-                            You&apos;ll get a {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} confirmation prompt on this number.
-                          </p>
+                      <>
+                        {(paymentMethod === 'EZ_CASH' ? paymentSettings?.ezCashNumber : paymentSettings?.mcashNumber) && (
+                          <div className="callout" style={{ marginBottom: '16px' }}>
+                            <span>
+                              <strong>Send to our {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} number:</strong>{' '}
+                              {paymentMethod === 'EZ_CASH' ? paymentSettings.ezCashNumber : paymentSettings.mcashNumber}
+                            </span>
+                          </div>
                         )}
-                      </div>
+                        <div className="form-field">
+                          <label htmlFor="walletPhone">
+                            {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} Mobile Number
+                          </label>
+                          <input
+                            id="walletPhone"
+                            type="tel"
+                            placeholder="07XXXXXXXX"
+                            value={walletPhone}
+                            onChange={(e) => setWalletPhone(e.target.value)}
+                            className={fieldErrors.walletPhone ? 'input-error' : ''}
+                          />
+                          {fieldErrors.walletPhone ? (
+                            <p className="field-error">{fieldErrors.walletPhone}</p>
+                          ) : (
+                            <p className="field-help">
+                              You&apos;ll get a {PAYMENT_METHODS.find((m) => m.value === paymentMethod).label} confirmation prompt on this number.
+                            </p>
+                          )}
+                        </div>
+                      </>
                     )}
 
                     {paymentMethod === 'BANK_TRANSFER' && (
@@ -616,13 +624,14 @@ function FeeBalancePage() {
                           <span>
                             <strong>Transfer to this account, then fill in the details below:</strong>
                             <br />
-                            Bank: {BANK_DETAILS.bankName}
+                            Bank: {paymentSettings?.bankName || '-'}
                             <br />
-                            Account Name: {BANK_DETAILS.accountName}
+                            Account Name: {paymentSettings?.bankAccountName || '-'}
                             <br />
-                            Account Number: <strong>{BANK_DETAILS.accountNumber}</strong>
+                            Account Number: <strong>{paymentSettings?.bankAccountNumber || '-'}</strong>
                             <br />
-                            Branch: {BANK_DETAILS.branch} &middot; SWIFT: {BANK_DETAILS.swiftCode}
+                            Branch: {paymentSettings?.bankBranch || '-'}
+                            {paymentSettings?.bankSwift && <> &middot; SWIFT: {paymentSettings.bankSwift}</>}
                           </span>
                         </div>
                         <div className="form-field">

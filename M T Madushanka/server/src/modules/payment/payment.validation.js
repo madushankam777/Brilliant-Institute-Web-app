@@ -79,11 +79,57 @@ const payTutorRules = [
     .withMessage('Period label is too long.'),
 ];
 
+// tutor's own payout bank details - every field optional so a tutor can
+// save them one at a time, but whatever is sent must look like real data
+const bankDetailsRules = [
+  body('bankName').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bank name is too long.'),
+  body('accountHolder')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 150 })
+    .withMessage('Account holder name is too long.'),
+  body('accountNumber')
+    .optional({ checkFalsy: true })
+    .trim()
+    .matches(/^[0-9 -]{4,34}$/)
+    .withMessage('Enter a valid account number (digits, spaces, and dashes only).'),
+  body('branch').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Branch is too long.'),
+];
+
+// Admin-only: the institute's own receiving details shown to students
+const paymentSettingsRules = [
+  body('bankName').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bank name is too long.'),
+  body('bankAccountName')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 150 })
+    .withMessage('Account name is too long.'),
+  body('bankAccountNumber')
+    .optional({ checkFalsy: true })
+    .trim()
+    .matches(/^[0-9 -]{4,34}$/)
+    .withMessage('Enter a valid account number (digits, spaces, and dashes only).'),
+  body('bankBranch').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Branch is too long.'),
+  body('bankSwift').optional({ checkFalsy: true }).trim().isLength({ max: 20 }).withMessage('SWIFT code is too long.'),
+  body('ezCashNumber')
+    .optional({ checkFalsy: true })
+    .trim()
+    .matches(WALLET_PHONE_REGEX)
+    .withMessage('Enter a valid eZ Cash mobile number (e.g. 0771234567).'),
+  body('mcashNumber')
+    .optional({ checkFalsy: true })
+    .trim()
+    .matches(WALLET_PHONE_REGEX)
+    .withMessage('Enter a valid mCash mobile number (e.g. 0771234567).'),
+];
+
 module.exports = {
   makePaymentRules,
   bankTransferRules,
   editBankTransferRules,
   paymentIdParamRules,
   payTutorRules,
+  bankDetailsRules,
+  paymentSettingsRules,
   WALLET_PHONE_REGEX,
 };

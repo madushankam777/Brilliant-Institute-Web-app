@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 
 const config = require('../../../shared/server/src/config/env');
+const { isTrustedDevOrigin } = require('../../../shared/server/src/utils/isTrustedDevOrigin');
 const { apiLimiter } = require('../../../shared/server/src/middleware/rateLimiters');
 const csrfGuard = require('../../../shared/server/src/middleware/csrfGuard');
 const { notFoundHandler, errorHandler } = require('../../../shared/server/src/middleware/errorHandler');
@@ -23,7 +24,11 @@ app.use(
     // e.g. localhost plus a LAN IP for testing from other devices. Still an
     // explicit whitelist check, never "*", per OWASP CORS guidance.
     origin(origin, callback) {
-      if (!origin || config.clientOrigins.includes(origin)) {
+      if (
+        !origin ||
+        config.clientOrigins.includes(origin) ||
+        isTrustedDevOrigin(origin, config.isProduction)
+      ) {
         return callback(null, true);
       }
       return callback(new Error('Not allowed by CORS'));
