@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { selfCheckIn } from '../../api/attendanceApi';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
-import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
+import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
 function SelfCheckInPage() {

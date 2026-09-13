@@ -6,7 +6,7 @@ import LoadingSpinner from '../../../../../shared/client/src/components/common/L
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import StatCard from '../../../../../shared/client/src/components/common/StatCard';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
-import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
+import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
 function statusBadgeClass(status) {

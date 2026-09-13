@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
+const { toSafeClass } = require('../../../../../shared/server/src/utils/sanitize');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const { CHECKIN_CODE_VALID_MINUTES } = require('./attendance.constants');
 const repository = require('./attendance.repository');
@@ -15,6 +16,15 @@ async function assertTutorOwnsClass(tutorUser, classRow) {
   if (classRow.tutor_id !== tutorUser.id) {
     throw ApiError.forbidden('You can only manage attendance for your own classes.');
   }
+}
+
+// class picker list - own classes for a tutor, every class for admin
+async function getMyTaughtClasses(user) {
+  const rows =
+    user.role === ROLES.ADMIN
+      ? await repository.listAllClassesWithTutor()
+      : await repository.listClassesByTutor(user.id);
+  return rows.map(toSafeClass);
 }
 
 async function listClassSessions(tutorUser, classId) {
@@ -280,6 +290,7 @@ async function getStudentAttendanceHistoryForTutor(tutorUser, studentId, classId
 }
 
 module.exports = {
+  getMyTaughtClasses,
   listClassSessions,
   getOrCreateTodaySession,
   getAttendanceSheet,

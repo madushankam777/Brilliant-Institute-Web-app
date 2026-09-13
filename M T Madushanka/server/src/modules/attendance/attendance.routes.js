@@ -20,6 +20,12 @@ router.use(authenticate);
 
 // --- Tutor/Admin: manage attendance for their own classes ---
 router.get(
+  '/my-classes',
+  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  controller.getMyTaughtClasses
+);
+
+router.get(
   '/classes/:classId/sessions',
   authorize(ROLES.TUTOR, ROLES.ADMIN),
   classIdParamRules,

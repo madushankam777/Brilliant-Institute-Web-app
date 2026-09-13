@@ -2,6 +2,12 @@
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
 const service = require('./attendance.service');
 
+// class picker list
+const getMyTaughtClasses = asyncHandler(async (req, res) => {
+  const classes = await service.getMyTaughtClasses(req.user);
+  res.status(200).json({ success: true, data: { classes } });
+});
+
 const listClassSessions = asyncHandler(async (req, res) => {
   const classId = Number(req.params.classId);
   const data = await service.listClassSessions(req.user, classId);
@@ -64,6 +70,7 @@ const selfCheckIn = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  getMyTaughtClasses,
   listClassSessions,
   getOrCreateTodaySession,
   getAttendanceSheet,

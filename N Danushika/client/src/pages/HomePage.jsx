@@ -151,10 +151,6 @@ function HomePage() {
               { label: 'Forgot password', to: '/forgot-password' },
             ],
           },
-          {
-            heading: 'Institute',
-            links: [{ label: 'Attendance & Fees module', to: null }],
-          },
         ]}
       />
     </>

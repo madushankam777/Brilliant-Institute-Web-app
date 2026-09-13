@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/layout/Navbar';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import NotFoundPage from '../../shared/client/src/pages/NotFoundPage';
+import CookieConsentBanner from '../../shared/client/src/components/common/CookieConsentBanner';
 
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
@@ -42,6 +43,7 @@ function App() {
   return (
     <AuthProvider>
       <Navbar />
+      <CookieConsentBanner />
       <main className="app-content">
         <Routes>
           {/* Public routes */}

@@ -36,9 +36,7 @@ function PlaceholderLoginPage() {
       }}
     >
       <h1>Welcome Back</h1>
-      <p className="muted">
-        Placeholder sign-in for this module - use a demo account created by <code>npm run db:seed</code>.
-      </p>
+      <p className="muted">Please enter your credentials to access your tuition dashboard</p>
 
       {error && <Alert type="error" message={error} />}
 
@@ -48,6 +46,7 @@ function PlaceholderLoginPage() {
           label="Email"
           type="email"
           icon="mail"
+          placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -57,6 +56,7 @@ function PlaceholderLoginPage() {
           label="Password"
           type="password"
           icon="lock"
+          placeholder="Enter your password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required

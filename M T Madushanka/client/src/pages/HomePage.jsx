@@ -7,6 +7,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import StatCard from '../../../../shared/client/src/components/common/StatCard';
 import Footer from '../../../../shared/client/src/components/layout/Footer';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
+import { getNavItems } from '../components/layout/navItems';
 import heroMediaImg from '../../../../shared/client/src/assets/hero-media.png';
 
 const FEATURES = [
@@ -28,18 +29,6 @@ const FEATURES = [
     description:
       'Keep parents and students aligned. Instantly broadcast timetable revisions, mock exam results, and security alerts.',
   },
-];
-
-const STUDENT_NAV = [
-  { to: '/', label: 'Dashboard', icon: 'home', end: true },
-  { to: '/attendance/history', label: 'Attendance', icon: 'calendar' },
-  { to: '/payments', label: 'Fees', icon: 'card' },
-  { to: '/payments/history', label: 'History', icon: 'receipt' },
-];
-
-const TUTOR_NAV = [
-  { to: '/', label: 'Dashboard', icon: 'home', end: true },
-  { to: '/attendance/classes', label: 'Mark Attendance', icon: 'calendar' },
 ];
 
 function formatCurrency(amount) {
@@ -109,6 +98,13 @@ function StudentDashboard({ user }) {
           <h2>My Attendance</h2>
           <p className="muted">Check your attendance history and rate by class.</p>
         </Link>
+        <Link to="/attendance/checkin" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="checkCircle" size={22} />
+          </div>
+          <h2>Mark My Attendance</h2>
+          <p className="muted">Enter today&apos;s class code to self check-in.</p>
+        </Link>
         <Link to="/payments" className="card link-card">
           <div className="feature-icon-box">
             <Icon name="wallet" size={22} />
@@ -129,11 +125,16 @@ function StudentDashboard({ user }) {
 }
 
 function TutorDashboard({ user }) {
+  const isAdmin = user.role === 'ADMIN';
   return (
     <div className="page">
       <div className="page-header">
         <h1>Good day, {user.fullName.split(' ')[0]}!</h1>
-        <p className="muted">Open a class to take attendance for today&apos;s session.</p>
+        <p className="muted">
+          {isAdmin
+            ? 'Open a class to take attendance, or review payments.'
+            : "Open a class to take attendance for today's session."}
+        </p>
       </div>
 
       <div className="summary-grid">
@@ -144,6 +145,24 @@ function TutorDashboard({ user }) {
           <h2>Mark Attendance</h2>
           <p className="muted">Open a class session and record who attended.</p>
         </Link>
+        {isAdmin && (
+          <>
+            <Link to="/admin/payments/verify" className="card link-card">
+              <div className="feature-icon-box">
+                <Icon name="wallet" size={22} />
+              </div>
+              <h2>Payment Verification</h2>
+              <p className="muted">Review bank transfer receipts awaiting approval.</p>
+            </Link>
+            <Link to="/admin/payments/tutors" className="card link-card">
+              <div className="feature-icon-box">
+                <Icon name="card" size={22} />
+              </div>
+              <h2>Pay Tutors</h2>
+              <p className="muted">Record a payout to a Tutor.</p>
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );
@@ -168,7 +187,10 @@ function HomePage() {
               real-time communication bridges between tutors, students, and admins.
             </p>
             <div className="hero-actions">
-              <Link to="/login" className="btn btn-primary">
+              <Link to="/register" className="btn btn-primary">
+                Register
+              </Link>
+              <Link to="/login" className="btn btn-secondary">
                 Log in to Portal
               </Link>
             </div>
@@ -201,15 +223,18 @@ function HomePage() {
         <Footer
           linkGroups={[
             {
+              heading: 'Account',
+              links: [
+                { label: 'Log in', to: '/login' },
+                { label: 'Register', to: '/register' },
+              ],
+            },
+            {
               heading: 'Platform',
               links: [
                 { label: 'Attendance', to: '/login' },
                 { label: 'Fee Tracking', to: '/login' },
               ],
-            },
-            {
-              heading: 'Institute',
-              links: [{ label: 'Registration & Login module', to: null }],
             },
           ]}
         />
@@ -220,7 +245,7 @@ function HomePage() {
   const isTutorOrAdmin = user.role === 'TUTOR' || user.role === 'ADMIN';
 
   return (
-    <PortalShell navItems={isTutorOrAdmin ? TUTOR_NAV : STUDENT_NAV}>
+    <PortalShell navItems={getNavItems(user.role)}>
       {isTutorOrAdmin ? <TutorDashboard user={user} /> : <StudentDashboard user={user} />}
     </PortalShell>
   );

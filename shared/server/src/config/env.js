@@ -54,6 +54,9 @@ const config = {
   isProduction: process.env.NODE_ENV === 'production',
   port: toInt(process.env.PORT, 5000),
   clientOrigin: process.env.CLIENT_ORIGIN,
+  // Only trust X-Forwarded-For when we're actually behind a real reverse
+  // proxy - otherwise a client could spoof it and dodge IP rate limits.
+  trustProxy: process.env.TRUST_PROXY === 'true',
 
   db: {
     host: process.env.DB_HOST,

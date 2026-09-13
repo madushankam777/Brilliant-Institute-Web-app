@@ -79,10 +79,6 @@ function HomePage() {
               heading: 'Platform',
               links: [{ label: 'Submit feedback', to: '/login' }],
             },
-            {
-              heading: 'Institute',
-              links: [{ label: 'Feedback & Complaint module', to: null }],
-            },
           ]}
         />
       </>

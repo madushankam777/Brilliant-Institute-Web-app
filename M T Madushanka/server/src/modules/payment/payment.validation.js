@@ -58,6 +58,16 @@ const paymentIdParamRules = [
   param('paymentId').isInt({ min: 1 }).withMessage('Invalid payment id.'),
 ];
 
+// edit btn - bankReference is optional here since a student may only replace the receipt image
+const editBankTransferRules = [
+  ...paymentIdParamRules,
+  body('bankReference')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ min: 4, max: 40 })
+    .withMessage('Enter your bank account number or transfer reference.'),
+];
+
 const payTutorRules = [
   body('tutorId').isInt({ min: 1 }).withMessage('Please select a Tutor.'),
   body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number.'),
@@ -72,6 +82,7 @@ const payTutorRules = [
 module.exports = {
   makePaymentRules,
   bankTransferRules,
+  editBankTransferRules,
   paymentIdParamRules,
   payTutorRules,
   WALLET_PHONE_REGEX,

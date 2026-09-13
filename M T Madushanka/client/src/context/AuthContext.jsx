@@ -38,6 +38,12 @@ export function AuthProvider({ children }) {
     return loggedInUser;
   }, []);
 
+  const register = useCallback(async (details) => {
+    const newUser = await sessionApi.register(details);
+    setUser(newUser);
+    return newUser;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await sessionApi.logout();
@@ -47,8 +53,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoggedIn: Boolean(user), isCheckingSession, login, logout }),
-    [user, isCheckingSession, login, logout]
+    () => ({ user, isLoggedIn: Boolean(user), isCheckingSession, login, register, logout }),
+    [user, isCheckingSession, login, register, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -13,7 +13,7 @@ const PASSWORD_RULE_MESSAGE =
   'a lowercase letter, and a number.';
 
 function isStrongPassword(password) {
-  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(password);
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
 const initialFormState = {

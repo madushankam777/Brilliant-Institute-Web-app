@@ -11,7 +11,7 @@ import LoadingSpinner from '../../../../../shared/client/src/components/common/L
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
-import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
+import { getNavItems } from '../../components/layout/navItems';
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
@@ -670,6 +670,7 @@ function FeeBalancePage() {
                         min="1"
                         max={activeEnrollment.balance}
                         step="0.01"
+                        placeholder="0.00"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
                         required

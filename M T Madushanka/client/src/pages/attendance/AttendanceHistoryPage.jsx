@@ -5,13 +5,9 @@ import LoadingSpinner from '../../../../../shared/client/src/components/common/L
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import StatCard from '../../../../../shared/client/src/components/common/StatCard';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
+import { getNavItems } from '../../components/layout/navItems';
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: 'home', end: true },
-  { to: '/attendance/history', label: 'Attendance', icon: 'calendar' },
-  { to: '/payments', label: 'Fees', icon: 'card' },
-  { to: '/payments/history', label: 'History', icon: 'receipt' },
-];
+const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
 function statusBadgeClass(status) {
   if (status === 'PRESENT') return 'badge badge-success';

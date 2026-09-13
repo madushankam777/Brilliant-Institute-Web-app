@@ -45,6 +45,18 @@ export async function payByBankTransfer({ enrollmentId, amount, bankReference, r
   return response.data.data.payment;
 }
 
+// edit btn - correct reference/receipt on a pending bank transfer
+export async function editBankTransferPayment(paymentId, { bankReference, receiptFile }) {
+  const formData = new FormData();
+  if (bankReference) formData.append('bankReference', bankReference);
+  if (receiptFile) formData.append('receiptImage', receiptFile);
+
+  const response = await httpClient.patch(`/payments/${paymentId}/bank-transfer`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data.data.payment;
+}
+
 // view receipt image link
 export function getReceiptImageUrl(paymentId) {
   const base = (httpClient.defaults.baseURL || '').replace(/\/$/, '');

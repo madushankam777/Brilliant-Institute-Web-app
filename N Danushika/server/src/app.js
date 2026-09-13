@@ -15,7 +15,7 @@ const app = express();
 
 // We run behind a proxy in production, so this lets Express read the
 // real client IP/HTTPS status correctly (needed for rate limiting + cookies).
-app.set('trust proxy', 1);
+app.set('trust proxy', config.trustProxy);
 
 // Adds standard security headers to every response.
 app.use(helmet());

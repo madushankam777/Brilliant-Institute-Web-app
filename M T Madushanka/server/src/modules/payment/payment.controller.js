@@ -88,6 +88,22 @@ const submitBankTransferPayment = asyncHandler(async (req, res) => {
   });
 });
 
+// edit btn - correct reference/receipt on a pending bank transfer
+const editBankTransferPayment = asyncHandler(async (req, res) => {
+  const paymentId = Number(req.params.paymentId);
+  const { bankReference } = req.body;
+  const receiptImagePath = req.file ? toPublicUploadPath(req.file.path) : undefined;
+  const payment = await service.editBankTransferPayment(req.user, paymentId, {
+    bankReference,
+    receiptImagePath,
+  });
+  res.status(200).json({
+    success: true,
+    message: 'Your bank transfer submission has been updated.',
+    data: { payment },
+  });
+});
+
 const listPendingBankTransfers = asyncHandler(async (req, res) => {
   const payments = await service.listPendingBankTransfers();
   res.status(200).json({ success: true, data: { payments } });
@@ -112,6 +128,12 @@ const getReceiptImage = asyncHandler(async (req, res) => {
   res.sendFile(absolutePath);
 });
 
+// tutor picker list
+const listActiveTutors = asyncHandler(async (req, res) => {
+  const tutors = await service.listActiveTutors();
+  res.status(200).json({ success: true, data: { tutors } });
+});
+
 const payTutor = asyncHandler(async (req, res) => {
   const { tutorId, amount, note, periodLabel } = req.body;
   const payout = await service.payTutor(req.user, { tutorId, amount, note, periodLabel });
@@ -134,10 +156,12 @@ module.exports = {
   getMyPaymentHistory,
   getBankTransferAvailability,
   submitBankTransferPayment,
+  editBankTransferPayment,
   listPendingBankTransfers,
   approveBankTransferPayment,
   rejectBankTransferPayment,
   getReceiptImage,
+  listActiveTutors,
   payTutor,
   listTutorPayouts,
 };

@@ -3,10 +3,12 @@ import { Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/layout/Navbar';
 import ProtectedRoute from './components/layout/ProtectedRoute';
+import CookieConsentBanner from '../../../shared/client/src/components/common/CookieConsentBanner';
 
 import HomePage from './pages/HomePage';
 import NotFoundPage from '../../../shared/client/src/pages/NotFoundPage';
 import PlaceholderLoginPage from './pages/PlaceholderLoginPage';
+import PlaceholderRegisterPage from './pages/PlaceholderRegisterPage';
 
 import ClassSessionsPage from './pages/attendance/ClassSessionsPage';
 import MarkAttendancePage from './pages/attendance/MarkAttendancePage';
@@ -23,11 +25,13 @@ function App() {
   return (
     <AuthProvider>
       <Navbar />
+      <CookieConsentBanner />
       <main className="app-content">
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<PlaceholderLoginPage />} />
+          <Route path="/register" element={<PlaceholderRegisterPage />} />
 
           {/* Tutor / Admin only - Attendance marking */}
           <Route element={<ProtectedRoute allowedRoles={['TUTOR', 'ADMIN']} />}>

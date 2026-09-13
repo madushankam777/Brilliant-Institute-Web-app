@@ -279,6 +279,43 @@ async function submitBankTransferPayment(
   return { pending: true, payment: toSafePayment(payment) };
 }
 
+// edit btn - correct a pending bank transfer's reference/receipt before review
+async function editBankTransferPayment(studentUser, paymentId, { bankReference, receiptImagePath }) {
+  const payment = await repository.findPaymentById(paymentId);
+  if (!payment || payment.payment_method !== 'BANK_TRANSFER') {
+    throw ApiError.notFound('Bank transfer payment not found.');
+  }
+  if (payment.student_id !== studentUser.id) {
+    throw ApiError.forbidden('You can only edit your own bank transfer submissions.');
+  }
+  if (payment.status !== PAYMENT_STATUS.PENDING) {
+    throw ApiError.badRequest('This payment has already been reviewed and can no longer be edited.');
+  }
+
+  const existingDetails =
+    typeof payment.payment_details === 'string'
+      ? JSON.parse(payment.payment_details)
+      : payment.payment_details || {};
+
+  const updatedDetails = {
+    method: 'BANK_TRANSFER',
+    bankReference: bankReference ? String(bankReference).slice(0, 40) : existingDetails.bankReference,
+    receiptImagePath: receiptImagePath || existingDetails.receiptImagePath,
+  };
+
+  await repository.updatePaymentDetails(paymentId, updatedDetails);
+
+  await recordAuditEvent({
+    actorId: studentUser.id,
+    action: 'BANK_TRANSFER_EDITED',
+    entityType: 'payment',
+    entityId: paymentId,
+  });
+
+  const updated = await repository.findPaymentById(paymentId);
+  return toSafePayment(updated);
+}
+
 async function listPendingBankTransfers() {
   const rows = await repository.listPendingBankTransfers();
   return rows.map((row) => {
@@ -388,6 +425,17 @@ async function getMyPaymentHistory(studentUser) {
   return rows.map(toSafePayment);
 }
 
+// tutor picker list
+async function listActiveTutors() {
+  const rows = await repository.listActiveTutors();
+  return rows.map((row) => ({
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    profilePictureUrl: row.profile_picture_path,
+  }));
+}
+
 // pay tutor btn
 async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
   if (!(amount > 0)) {
@@ -450,11 +498,13 @@ module.exports = {
   retryPendingPayment,
   getBankTransferAvailability,
   submitBankTransferPayment,
+  editBankTransferPayment,
   listPendingBankTransfers,
   approveBankTransferPayment,
   rejectBankTransferPayment,
   getReceiptImagePath,
   getMyPaymentHistory,
+  listActiveTutors,
   payTutor,
   listTutorPayouts,
 };

@@ -82,10 +82,6 @@ function HomePage() {
                 { label: 'My courses', to: '/login' },
               ],
             },
-            {
-              heading: 'Institute',
-              links: [{ label: 'Course Management module', to: null }],
-            },
           ]}
         />
       </>

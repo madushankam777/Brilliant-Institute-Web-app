@@ -20,7 +20,7 @@ const adminRoutes = require('../../S Vithushan/server/src/modules/admin/admin.ro
 
 const app = express();
 
-app.set('trust proxy', 1);
+app.set('trust proxy', config.trustProxy);
 
 app.use(helmet());
 

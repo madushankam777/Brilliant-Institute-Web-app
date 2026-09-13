@@ -30,15 +30,6 @@ function Navbar() {
         </div>
 
         <div className="navbar-actions">
-          <button
-            type="button"
-            className="topbar-icon-btn"
-            aria-label="Notifications - available on the combined site"
-            title="Notifications are available when this module runs as part of the combined site"
-            disabled
-          >
-            <Icon name="bell" size={18} />
-          </button>
           <span className="avatar-chip">
             <Avatar name={user.fullName} pictureUrl={user.profilePictureUrl} size={36} />
             <span className="avatar-chip-text">

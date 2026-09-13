@@ -1,8 +1,31 @@
 const { pool } = require('../../../../../shared/server/src/config/db');
 
+const CLASS_WITH_TUTOR_SELECT = `
+  SELECT c.*, t.full_name AS tutor_name, t.profile_picture_path AS tutor_profile_picture
+  FROM classes c
+  JOIN users t ON t.id = c.tutor_id
+`;
+
 async function findClassById(classId) {
   const [rows] = await pool.execute(`SELECT * FROM classes WHERE id = ? LIMIT 1`, [classId]);
   return rows[0] || null;
+}
+
+// class picker list - a tutor's own classes
+async function listClassesByTutor(tutorId) {
+  const [rows] = await pool.execute(
+    `${CLASS_WITH_TUTOR_SELECT} WHERE c.tutor_id = ? AND c.status != 'CANCELLED' ORDER BY c.created_at DESC`,
+    [tutorId]
+  );
+  return rows;
+}
+
+// class picker list - every class, for admin
+async function listAllClassesWithTutor() {
+  const [rows] = await pool.execute(
+    `${CLASS_WITH_TUTOR_SELECT} WHERE c.status != 'CANCELLED' ORDER BY c.created_at DESC`
+  );
+  return rows;
 }
 
 async function findSessionWithClass(sessionId) {
@@ -165,6 +188,8 @@ async function getAttendanceSummaryByClass(studentId) {
 
 module.exports = {
   findClassById,
+  listClassesByTutor,
+  listAllClassesWithTutor,
   findSessionWithClass,
   listSessionsForClass,
   findSessionByClassAndDate,

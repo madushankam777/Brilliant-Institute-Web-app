@@ -6,18 +6,15 @@ import { fetchMyTaughtClasses } from '../../api/courseApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
+import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
-
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: 'home', end: true },
-  { to: '/attendance/classes', label: 'Mark Attendance', icon: 'calendar' },
-];
 
 function ClassSessionsPage() {
   const { classId: classIdParam } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user.role === 'ADMIN';
+  const NAV_ITEMS = getNavItems(user.role);
 
   const [classes, setClasses] = useState([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);

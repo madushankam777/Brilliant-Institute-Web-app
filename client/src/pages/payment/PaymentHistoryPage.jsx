@@ -1,6 +1,11 @@
 // Student/Parent: payment history, retry pending
 import { useCallback, useEffect, useState } from 'react';
-import { fetchMyPaymentHistory, retryPayment, getReceiptImageUrl } from '../../api/paymentApi';
+import {
+  fetchMyPaymentHistory,
+  retryPayment,
+  getReceiptImageUrl,
+  editBankTransferPayment,
+} from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
@@ -54,6 +59,12 @@ function PaymentHistoryPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [retryingId, setRetryingId] = useState(null);
 
+  const [editTarget, setEditTarget] = useState(null);
+  const [editReference, setEditReference] = useState('');
+  const [editReceiptFile, setEditReceiptFile] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   const loadHistory = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -81,6 +92,45 @@ function PaymentHistoryPage() {
       setErrorMessage(error.message);
     } finally {
       setRetryingId(null);
+    }
+  }
+
+  // edit btn - open modal pre-filled with the current reference
+  function openEditModal(payment) {
+    setEditTarget(payment);
+    setEditReference((payment.paymentDetails && payment.paymentDetails.bankReference) || '');
+    setEditReceiptFile(null);
+    setEditError('');
+  }
+
+  function closeEditModal() {
+    setEditTarget(null);
+    setEditReference('');
+    setEditReceiptFile(null);
+    setEditError('');
+  }
+
+  async function handleSaveEdit(event) {
+    event.preventDefault();
+    setEditError('');
+
+    if (editReference.trim().length < 4) {
+      setEditError('Enter your bank account number or transfer reference.');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await editBankTransferPayment(editTarget.id, {
+        bankReference: editReference.trim(),
+        receiptFile: editReceiptFile,
+      });
+      closeEditModal();
+      await loadHistory();
+    } catch (error) {
+      setEditError(error.message);
+    } finally {
+      setIsSavingEdit(false);
     }
   }
 
@@ -126,14 +176,23 @@ function PaymentHistoryPage() {
                       <td>{payment.receiptNumber || '-'}</td>
                       <td>
                         {payment.status === 'PENDING' && payment.paymentMethod === 'BANK_TRANSFER' && (
-                          <a
-                            href={getReceiptImageUrl(payment.id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-secondary btn-sm"
-                          >
-                            View Receipt
-                          </a>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <a
+                              href={getReceiptImageUrl(payment.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-secondary btn-sm"
+                            >
+                              View Receipt
+                            </a>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => openEditModal(payment)}
+                            >
+                              Edit
+                            </button>
+                          </div>
                         )}
                         {payment.status === 'PENDING' && payment.paymentMethod !== 'BANK_TRANSFER' && (
                           <button
@@ -154,6 +213,52 @@ function PaymentHistoryPage() {
           </div>
         )}
       </div>
+
+      {editTarget && (
+        <div className="modal-overlay" onClick={() => !isSavingEdit && closeEditModal()}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <h2>Edit Bank Transfer Submission</h2>
+            <p className="muted">
+              Correct your reference number or replace the receipt image before an Administrator
+              reviews it. This is only available while your submission is still pending.
+            </p>
+
+            <Alert type="error" message={editError} />
+
+            <form onSubmit={handleSaveEdit} noValidate>
+              <div className="form-field">
+                <label htmlFor="editBankReference">Your Bank Account Number / Reference</label>
+                <input
+                  id="editBankReference"
+                  type="text"
+                  placeholder="e.g. 8001234567"
+                  value={editReference}
+                  onChange={(e) => setEditReference(e.target.value)}
+                />
+              </div>
+              <div className="form-field">
+                <label htmlFor="editReceiptFile">Replace Receipt (optional)</label>
+                <input
+                  id="editReceiptFile"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setEditReceiptFile(e.target.files[0] || null)}
+                />
+                <p className="field-help">Leave this empty to keep your current receipt image.</p>
+              </div>
+
+              <div className="flex-between" style={{ marginTop: '18px' }}>
+                <button type="button" className="btn btn-secondary" disabled={isSavingEdit} onClick={closeEditModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={isSavingEdit}>
+                  {isSavingEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </PortalShell>
   );
 }

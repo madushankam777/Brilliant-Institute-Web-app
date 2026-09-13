@@ -2,6 +2,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/layout/Navbar';
+import CookieConsentBanner from '../../../shared/client/src/components/common/CookieConsentBanner';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
 import HomePage from './pages/HomePage';
@@ -15,6 +16,7 @@ function App() {
   return (
     <AuthProvider>
       <Navbar />
+      <CookieConsentBanner />
       <main className="app-content">
         <Routes>
           <Route path="/" element={<HomePage />} />

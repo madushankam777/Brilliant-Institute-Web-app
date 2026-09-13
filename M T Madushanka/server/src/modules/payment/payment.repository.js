@@ -87,6 +87,14 @@ async function markPaymentFailed(paymentId, { gatewayTransactionId }, executor =
   );
 }
 
+// edit btn - update a pending bank transfer's reference/receipt
+async function updatePaymentDetails(paymentId, paymentDetails, executor = pool) {
+  await executor.execute(`UPDATE payments SET payment_details = ? WHERE id = ?`, [
+    JSON.stringify(paymentDetails),
+    paymentId,
+  ]);
+}
+
 async function createReceipt(paymentId, receiptNumber, executor = pool) {
   await executor.execute(
     `INSERT INTO receipts (payment_id, receipt_number, issued_at) VALUES (?, ?, NOW())`,
@@ -141,6 +149,17 @@ async function listPaymentHistoryForStudent(studentId, executor = pool) {
 
 // --- Tutor payouts (Admin paying a Tutor their share/salary) ---
 
+// tutor picker list
+async function listActiveTutors() {
+  const [rows] = await pool.execute(
+    `SELECT id, full_name, email, profile_picture_path
+     FROM users
+     WHERE role = 'TUTOR' AND status = 'ACTIVE'
+     ORDER BY full_name ASC`
+  );
+  return rows;
+}
+
 async function findActiveTutorById(tutorId) {
   const [rows] = await pool.execute(
     `SELECT id, full_name FROM users WHERE id = ? AND role = 'TUTOR' AND status = 'ACTIVE' LIMIT 1`,
@@ -187,11 +206,13 @@ module.exports = {
   createPendingPayment,
   markPaymentSuccessful,
   markPaymentFailed,
+  updatePaymentDetails,
   createReceipt,
   findPaymentById,
   findPaymentByIdForUpdate,
   listPendingBankTransfers,
   listPaymentHistoryForStudent,
+  listActiveTutors,
   findActiveTutorById,
   createTutorPayout,
   listTutorPayouts,

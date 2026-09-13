@@ -8,6 +8,7 @@ const controller = require('./payment.controller');
 const {
   makePaymentRules,
   bankTransferRules,
+  editBankTransferRules,
   paymentIdParamRules,
   payTutorRules,
 } = require('./payment.validation');
@@ -38,6 +39,14 @@ router.post(
   bankTransferRules,
   validateRequest,
   controller.submitBankTransferPayment
+);
+router.patch(
+  '/:paymentId/bank-transfer',
+  authorize(ROLES.STUDENT_PARENT),
+  paymentReceiptUpload,
+  editBankTransferRules,
+  validateRequest,
+  controller.editBankTransferPayment
 );
 
 router.get(
@@ -70,6 +79,7 @@ router.get(
   controller.getReceiptImage
 );
 
+router.get('/admin/tutors', authorize(ROLES.ADMIN), controller.listActiveTutors);
 router.get('/admin/tutor-payouts', authorize(ROLES.ADMIN), controller.listTutorPayouts);
 router.post(
   '/admin/tutor-payouts',

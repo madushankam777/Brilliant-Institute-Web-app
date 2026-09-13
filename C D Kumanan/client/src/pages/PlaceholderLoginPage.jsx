@@ -36,9 +36,7 @@ function PlaceholderLoginPage() {
       }}
     >
       <h1>Welcome Back</h1>
-      <p className="muted">
-        Placeholder sign-in for this module - use a demo account created by <code>npm run db:seed</code>.
-      </p>
+      <p className="muted">Please enter your credentials to access your tuition dashboard</p>
 
       {error && <Alert type="error" message={error} />}
 

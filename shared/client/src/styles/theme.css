@@ -2081,3 +2081,31 @@ button, input, select, textarea {
   margin-top: 4px;
   display: block;
 }
+
+/* cookie consent popup */
+.cookie-consent-banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1000;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--color-navy);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.cookie-consent-banner p {
+  flex: 1 1 260px;
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}

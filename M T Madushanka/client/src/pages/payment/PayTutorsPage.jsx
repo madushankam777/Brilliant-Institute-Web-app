@@ -5,7 +5,7 @@ import { fetchAllTutors } from '../../api/courseApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
-import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
+import { getNavItems } from '../../components/layout/navItems';
 import TutorPicker from '../../../../../shared/client/src/components/common/TutorPicker';
 
 const NAV_ITEMS = getNavItems('ADMIN');

@@ -79,10 +79,6 @@ function HomePage() {
               heading: 'Platform',
               links: [{ label: 'Admin dashboard', to: '/login' }],
             },
-            {
-              heading: 'Institute',
-              links: [{ label: 'Admin & Notifications module', to: null }],
-            },
           ]}
         />
       </>
