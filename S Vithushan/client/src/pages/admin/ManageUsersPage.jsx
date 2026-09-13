@@ -210,9 +210,20 @@ function ManageUsersPage() {
             <h1>Manage Users</h1>
             <p className="muted">Verify identities, grant permissions, and suspend profiles.</p>
           </div>
-          <button type="button" className="btn btn-primary" onClick={() => setShowAddUser(true)}>
-            <Icon name="plus" size={16} /> Add User
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() =>
+                document.getElementById('tutor-enrollment-keys')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            >
+              <Icon name="lock" size={16} /> Generate Tutor Key
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => setShowAddUser(true)}>
+              <Icon name="plus" size={16} /> Add User
+            </button>
+          </div>
         </div>
 
         <div className="card">
@@ -337,7 +348,7 @@ function ManageUsersPage() {
           </div>
         )}
 
-        <div className="card">
+        <div className="card" id="tutor-enrollment-keys">
           <h2>Tutor Enrollment Keys</h2>
           <p className="muted" style={{ fontSize: '0.88rem' }}>
             A tutor can only self-register after you verify them (phone/email/in person) and generate
