@@ -1,7 +1,7 @@
 // Tutor: mark/correct attendance for a session
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchAttendanceSheet, saveAttendance } from '../../api/attendanceApi';
+import { fetchAttendanceSheet, saveAttendance, startSelfCheckIn } from '../../api/attendanceApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../shared/client/src/components/common/Icon';
@@ -27,6 +27,12 @@ function MarkAttendancePage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
   const [search, setSearch] = useState('');
+
+  const [showCheckin, setShowCheckin] = useState(false);
+  const [checkinCode, setCheckinCode] = useState('');
+  const [checkinExpiresAt, setCheckinExpiresAt] = useState('');
+  const [isStartingCheckin, setIsStartingCheckin] = useState(false);
+  const [checkinError, setCheckinError] = useState('');
 
   const loadSheet = useCallback(async () => {
     setIsLoading(true);
@@ -57,6 +63,31 @@ function MarkAttendancePage() {
     setRows((previousRows) =>
       previousRows.map((row) => (row.studentId === studentId ? { ...row, [field]: value } : row))
     );
+  }
+
+  // quick action - set every visible student to the same status in one click
+  function markAllVisible(status) {
+    const visibleIds = new Set(filteredRows.map((row) => row.studentId));
+    setRows((previousRows) =>
+      previousRows.map((row) => (visibleIds.has(row.studentId) ? { ...row, status } : row))
+    );
+  }
+
+  // generate key btn - a fresh 6-digit key students can enter themselves to
+  // mark PRESENT, without waiting for the tutor to go through the roster
+  async function handleStartCheckin() {
+    setShowCheckin(true);
+    setIsStartingCheckin(true);
+    setCheckinError('');
+    try {
+      const data = await startSelfCheckIn(sessionId);
+      setCheckinCode(data.code);
+      setCheckinExpiresAt(data.expiresAt);
+    } catch (error) {
+      setCheckinError(error.message);
+    } finally {
+      setIsStartingCheckin(false);
+    }
   }
 
   async function handleSave(event) {
@@ -105,7 +136,46 @@ function MarkAttendancePage() {
               </p>
             )}
           </div>
+          <button type="button" className="btn btn-secondary" onClick={handleStartCheckin}>
+            <Icon name="lock" size={15} /> Generate Attendance Key
+          </button>
         </div>
+
+        {showCheckin && (
+          <div className="card" style={{ textAlign: 'center' }}>
+            <h3 style={{ marginTop: 0 }}>Attendance Key</h3>
+            <Alert type="error" message={checkinError} />
+            {isStartingCheckin ? (
+              <LoadingSpinner label="Generating key..." />
+            ) : (
+              checkinCode && (
+                <>
+                  <p style={{ fontSize: '2.4rem', fontWeight: 800, letterSpacing: '8px', margin: '10px 0' }}>
+                    {checkinCode}
+                  </p>
+                  <p className="muted" style={{ fontSize: '0.85rem' }}>
+                    Read this out to the class, or write it on the board. Students already enrolled
+                    in this class can enter it from their own device to mark themselves Present. It
+                    expires at {new Date(checkinExpiresAt).toLocaleTimeString()}.
+                  </p>
+                </>
+              )
+            )}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={isStartingCheckin}
+                onClick={handleStartCheckin}
+              >
+                New Key
+              </button>
+              <button type="button" className="btn btn-link" onClick={() => setShowCheckin(false)}>
+                Hide
+              </button>
+            </div>
+          </div>
+        )}
 
         {isLoading && <LoadingSpinner label="Loading attendance sheet..." />}
         {loadError && <Alert type="error" message={loadError} />}
@@ -120,17 +190,27 @@ function MarkAttendancePage() {
             ) : (
               <form onSubmit={handleSave}>
                 <div className="card">
-                  <div className="form-field has-icon" style={{ marginBottom: '14px', maxWidth: '320px' }}>
-                    <div className="input-shell">
-                      <span className="input-icon">
-                        <Icon name="search" size={16} />
-                      </span>
-                      <input
-                        type="search"
-                        placeholder="Search student by name..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
+                  <div className="flex-between" style={{ marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div className="form-field has-icon" style={{ margin: 0, maxWidth: '320px', flex: 1 }}>
+                      <div className="input-shell">
+                        <span className="input-icon">
+                          <Icon name="search" size={16} />
+                        </span>
+                        <input
+                          type="search"
+                          placeholder="Search student by name..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllVisible('PRESENT')}>
+                        Mark all Present
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllVisible('ABSENT')}>
+                        Mark all Absent
+                      </button>
                     </div>
                   </div>
 

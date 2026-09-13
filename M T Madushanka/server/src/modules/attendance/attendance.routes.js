@@ -3,6 +3,7 @@ const express = require('express');
 const authenticate = require('../../../../../shared/server/src/middleware/authenticate');
 const authorize = require('../../../../../shared/server/src/middleware/authorize');
 const validateRequest = require('../../../../../shared/server/src/middleware/validateRequest');
+const { checkinLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const controller = require('./attendance.controller');
 const {
@@ -10,6 +11,7 @@ const {
   sessionIdParamRules,
   markAttendanceRules,
   historyQueryRules,
+  selfCheckInRules,
 } = require('./attendance.validation');
 
 const router = express.Router();
@@ -63,13 +65,31 @@ router.get(
   controller.getStudentHistoryForTutor
 );
 
-// --- Student/Parent: view their own attendance history ---
+// generate key btn - tutor/admin makes a fresh attendance key for this session
+router.post(
+  '/sessions/:sessionId/checkin/start',
+  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  sessionIdParamRules,
+  validateRequest,
+  controller.startSelfCheckIn
+);
+
+// --- Student/Parent: view their own attendance history + self check-in ---
 router.get(
   '/me',
   authorize(ROLES.STUDENT_PARENT),
   historyQueryRules,
   validateRequest,
   controller.getMyHistory
+);
+
+router.post(
+  '/checkin',
+  authorize(ROLES.STUDENT_PARENT),
+  checkinLimiter,
+  selfCheckInRules,
+  validateRequest,
+  controller.selfCheckIn
 );
 
 module.exports = router;

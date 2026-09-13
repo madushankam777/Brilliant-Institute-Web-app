@@ -14,6 +14,7 @@ import ClassSessionsPage from './pages/attendance/ClassSessionsPage';
 import MarkAttendancePage from './pages/attendance/MarkAttendancePage';
 import AttendanceHistoryPage from './pages/attendance/AttendanceHistoryPage';
 import TutorStudentHistoryPage from './pages/attendance/TutorStudentHistoryPage';
+import SelfCheckInPage from './pages/attendance/SelfCheckInPage';
 
 import FeeBalancePage from './pages/payment/FeeBalancePage';
 import PaymentHistoryPage from './pages/payment/PaymentHistoryPage';
@@ -36,7 +37,6 @@ function App() {
           {/* Tutor / Admin only - Attendance marking */}
           <Route element={<ProtectedRoute allowedRoles={['TUTOR', 'ADMIN']} />}>
             <Route path="/attendance/classes" element={<ClassSessionsPage />} />
-            <Route path="/attendance/classes/:classId/sessions" element={<ClassSessionsPage />} />
             <Route path="/attendance/sessions/:sessionId" element={<MarkAttendancePage />} />
             <Route path="/attendance/students/:studentId" element={<TutorStudentHistoryPage />} />
           </Route>
@@ -44,6 +44,7 @@ function App() {
           {/* Student / Parent only - Attendance history + Payments */}
           <Route element={<ProtectedRoute allowedRoles={['STUDENT_PARENT']} />}>
             <Route path="/attendance/history" element={<AttendanceHistoryPage />} />
+            <Route path="/attendance/checkin" element={<SelfCheckInPage />} />
             <Route path="/payments" element={<FeeBalancePage />} />
             <Route path="/payments/history" element={<PaymentHistoryPage />} />
           </Route>

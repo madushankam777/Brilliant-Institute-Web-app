@@ -1,29 +1,27 @@
-// Tutor/Admin: pick a class (by name, not a raw id) to see its sessions and mark attendance.
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { fetchClassSessions } from '../../api/attendanceApi';
+// Tutor/Admin: one click, mark today's attendance - no digging through a
+// list of past sessions to find today's row.
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getOrCreateTodaySession } from '../../api/attendanceApi';
 import { fetchMyTaughtClasses } from '../../api/courseApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
+import Icon from '../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
 function ClassSessionsPage() {
-  const { classId: classIdParam } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
   const isAdmin = user.role === 'ADMIN';
 
   const [classes, setClasses] = useState([]);
-  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
-  const [classesError, setClassesError] = useState('');
-
-  const [classSubject, setClassSubject] = useState('');
-  const [sessions, setSessions] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [openingId, setOpeningId] = useState(null);
+  const [openError, setOpenError] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -32,44 +30,28 @@ function ClassSessionsPage() {
         if (isMounted) setClasses(data);
       })
       .catch((error) => {
-        if (isMounted) setClassesError(error.message);
+        if (isMounted) setLoadError(error.message);
       })
       .finally(() => {
-        if (isMounted) setIsLoadingClasses(false);
+        if (isMounted) setIsLoading(false);
       });
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const loadSessions = useCallback(async (classId) => {
-    setIsLoading(true);
-    setErrorMessage('');
+  // mark attendance btn - opens (or creates) today's session for this class
+  // and jumps straight to it, so this is the only click that's ever needed
+  async function handleMarkToday(classId) {
+    setOpenError('');
+    setOpeningId(classId);
     try {
-      const data = await fetchClassSessions(classId);
-      setClassSubject(data.classSubject);
-      setSessions(data.sessions);
+      const sessionId = await getOrCreateTodaySession(classId);
+      navigate(`/attendance/sessions/${sessionId}`);
     } catch (error) {
-      setErrorMessage(error.message);
-      setSessions([]);
-    } finally {
-      setIsLoading(false);
+      setOpenError(error.message);
+      setOpeningId(null);
     }
-  }, []);
-
-  useEffect(() => {
-    if (classIdParam) {
-      loadSessions(classIdParam);
-    }
-  }, [classIdParam, loadSessions]);
-
-  function handleSelectClass(event) {
-    const selectedId = event.target.value;
-    if (!selectedId) {
-      navigate('/attendance/classes');
-      return;
-    }
-    navigate(`/attendance/classes/${selectedId}/sessions`);
   }
 
   return (
@@ -79,72 +61,51 @@ function ClassSessionsPage() {
           <h1>Mark Attendance</h1>
           <p className="muted">
             {isAdmin
-              ? 'Pick a class to see its scheduled sessions.'
-              : 'Pick one of your classes to see its scheduled sessions.'}
+              ? "Pick a class to mark today's attendance."
+              : "Pick one of your classes to mark today's attendance."}
           </p>
         </div>
 
-        <div className="card">
-          <Alert type="error" message={classesError} />
-          {isLoadingClasses ? (
-            <LoadingSpinner label="Loading your classes..." />
-          ) : classes.length === 0 ? (
-            <p className="muted">
-              {isAdmin
-                ? 'No classes have been created yet.'
-                : 'You have not created any classes yet - head to My Classes to create one.'}
-            </p>
-          ) : (
-            <div className="form-field" style={{ maxWidth: '420px' }}>
-              <label htmlFor="classPicker">Class</label>
-              <select id="classPicker" value={classIdParam || ''} onChange={handleSelectClass}>
-                <option value="">Select a class...</option>
-                {classes.map((classItem) => (
-                  <option key={classItem.id} value={classItem.id}>
-                    {classItem.subject} &middot; {classItem.dayOfWeek} {classItem.startTime}-
-                    {classItem.endTime}
-                    {isAdmin ? ` (${classItem.tutorName})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
+        <Alert type="error" message={loadError} />
+        <Alert type="error" message={openError} />
 
-        <Alert type="error" message={errorMessage} />
-
-        {isLoading && <LoadingSpinner label="Loading sessions..." />}
-
-        {!isLoading && classIdParam && sessions.length === 0 && !errorMessage && (
-          <p className="muted">This class has no scheduled sessions yet.</p>
-        )}
-
-        {!isLoading && sessions.length > 0 && (
+        {isLoading ? (
+          <LoadingSpinner label="Loading your classes..." />
+        ) : classes.length === 0 ? (
+          <p className="muted">
+            {isAdmin
+              ? 'No classes have been created yet.'
+              : 'You have not been assigned any classes yet - head to My Classes to create one.'}
+          </p>
+        ) : (
           <div className="card">
-            <h2>{classSubject}</h2>
             <div className="table-scroll">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Time</th>
+                    <th>Class</th>
+                    <th>Schedule</th>
+                    {isAdmin && <th>Tutor</th>}
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sessions.map((session) => (
-                    <tr key={session.id}>
-                      <td>{session.session_date}</td>
+                  {classes.map((classItem) => (
+                    <tr key={classItem.id}>
+                      <td>{classItem.subject}</td>
                       <td>
-                        {session.start_time} - {session.end_time}
+                        {classItem.dayOfWeek} {classItem.startTime}-{classItem.endTime}
                       </td>
+                      {isAdmin && <td>{classItem.tutorName}</td>}
                       <td>
                         <button
                           type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => navigate(`/attendance/sessions/${session.id}`)}
+                          className="btn btn-primary btn-sm"
+                          disabled={openingId === classItem.id}
+                          onClick={() => handleMarkToday(classItem.id)}
                         >
-                          Open attendance sheet
+                          <Icon name="calendar" size={14} />{' '}
+                          {openingId === classItem.id ? 'Opening...' : "Mark Today's Attendance"}
                         </button>
                       </td>
                     </tr>

@@ -38,6 +38,26 @@ const markAttendance = asyncHandler(async (req, res) => {
   });
 });
 
+// generate key btn
+const startSelfCheckIn = asyncHandler(async (req, res) => {
+  const sessionId = Number(req.params.sessionId);
+  const data = await service.startSelfCheckIn(req.user, sessionId);
+  res.status(200).json({ success: true, data });
+});
+
+// student enters the key
+const selfCheckIn = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  const result = await service.selfCheckIn(req.user, code);
+  res.status(200).json({
+    success: true,
+    message: result.alreadyCheckedIn
+      ? `You were already checked in to ${result.subject}.`
+      : `Checked in to ${result.subject}. See you in class!`,
+    data: result,
+  });
+});
+
 const getMyHistory = asyncHandler(async (req, res) => {
   const classId = req.query.classId ? Number(req.query.classId) : undefined;
   const data = await service.getMyAttendanceHistory(req.user, classId);
@@ -57,6 +77,8 @@ module.exports = {
   getOrCreateTodaySession,
   getAttendanceSheet,
   markAttendance,
+  startSelfCheckIn,
+  selfCheckIn,
   getMyHistory,
   getStudentHistoryForTutor,
 };

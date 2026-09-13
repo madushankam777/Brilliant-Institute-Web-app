@@ -25,9 +25,15 @@ const historyQueryRules = [
   query('classId').optional().isInt({ min: 1 }).withMessage('Invalid class id.'),
 ];
 
+// attendance key - must be exactly 6 digits
+const selfCheckInRules = [
+  body('code').trim().matches(/^\d{6}$/).withMessage('Enter the 6-digit attendance key.'),
+];
+
 module.exports = {
   classIdParamRules,
   sessionIdParamRules,
   markAttendanceRules,
   historyQueryRules,
+  selfCheckInRules,
 };

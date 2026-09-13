@@ -2,12 +2,14 @@
 import axios from 'axios';
 
 // The only place the API base URL is read from - never hardcode it elsewhere.
-// If VITE_API_BASE_URL isn't set, fall back to whatever host served this
-// page (same hostname, API port) - this way the exact same build works
-// whether it's opened as localhost or from another device via a LAN IP,
-// with no per-environment config needed.
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:5000/api`;
+// A plain relative path by default: the dev server proxies /api to the
+// backend (see vite.config.js), so the browser only ever talks to the one
+// origin it loaded the page from. That makes the exact same build work
+// unchanged whether it's opened as localhost, a LAN IP, or a public tunnel
+// URL - and it's required for cookies to work at all through a tunnel,
+// since a separate backend origin would make every request cross-site.
+// Set VITE_API_BASE_URL only if the API is genuinely served elsewhere.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const httpClient = axios.create({
   baseURL: API_BASE_URL,

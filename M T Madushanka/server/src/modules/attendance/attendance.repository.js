@@ -31,12 +31,34 @@ async function listAllClassesWithTutor() {
 async function findSessionWithClass(sessionId) {
   const [rows] = await pool.execute(
     `SELECT cs.id, cs.class_id, cs.session_date, cs.start_time, cs.end_time,
+            cs.checkin_code, cs.checkin_code_expires_at,
             c.subject, c.tutor_id, c.level
      FROM class_sessions cs
      JOIN classes c ON c.id = cs.class_id
      WHERE cs.id = ?
      LIMIT 1`,
     [sessionId]
+  );
+  return rows[0] || null;
+}
+
+// attendance key - store the key the tutor just generated for this session
+async function setSessionCheckinCode(sessionId, code, expiresAt) {
+  await pool.execute(
+    `UPDATE class_sessions SET checkin_code = ?, checkin_code_expires_at = ? WHERE id = ?`,
+    [code, expiresAt, sessionId]
+  );
+}
+
+// attendance key - look up which session a key currently opens
+async function findSessionByActiveCheckinCode(code) {
+  const [rows] = await pool.execute(
+    `SELECT cs.id, cs.class_id, cs.session_date, c.subject, c.tutor_id, c.level
+     FROM class_sessions cs
+     JOIN classes c ON c.id = cs.class_id
+     WHERE cs.checkin_code = ? AND cs.checkin_code_expires_at > NOW()
+     LIMIT 1`,
+    [code]
   );
   return rows[0] || null;
 }
@@ -174,6 +196,8 @@ module.exports = {
   listSessionsForClass,
   findSessionByClassAndDate,
   createSession,
+  setSessionCheckinCode,
+  findSessionByActiveCheckinCode,
   listActiveStudentsForClass,
   listAttendanceForSession,
   findAttendanceRecord,
