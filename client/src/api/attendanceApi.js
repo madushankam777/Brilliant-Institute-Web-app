@@ -34,15 +34,3 @@ export async function fetchStudentAttendanceHistory(studentId, classId) {
   });
   return response.data.data;
 }
-
-// self check-in btn - tutor opens a class code, A/L only
-export async function startSelfCheckIn(sessionId) {
-  const response = await httpClient.post(`/attendance/sessions/${sessionId}/checkin/start`);
-  return response.data.data;
-}
-
-// self check-in btn - student types the code
-export async function selfCheckIn(code) {
-  const response = await httpClient.post('/attendance/checkin', { code });
-  return response.data;
-}

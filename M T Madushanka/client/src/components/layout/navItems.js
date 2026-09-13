@@ -4,7 +4,6 @@
 const STUDENT_NAV = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/attendance/history', label: 'Attendance', icon: 'calendar' },
-  { to: '/attendance/checkin', label: 'Mark Attendance', icon: 'checkCircle' },
   { to: '/payments', label: 'Fees', icon: 'card' },
   { to: '/payments/history', label: 'History', icon: 'receipt' },
 ];

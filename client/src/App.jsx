@@ -16,7 +16,6 @@ import ClassSessionsPage from './pages/attendance/ClassSessionsPage';
 import MarkAttendancePage from './pages/attendance/MarkAttendancePage';
 import AttendanceHistoryPage from './pages/attendance/AttendanceHistoryPage';
 import TutorStudentHistoryPage from './pages/attendance/TutorStudentHistoryPage';
-import SelfCheckInPage from './pages/attendance/SelfCheckInPage';
 
 import FeeBalancePage from './pages/payment/FeeBalancePage';
 import PaymentHistoryPage from './pages/payment/PaymentHistoryPage';
@@ -76,7 +75,6 @@ function App() {
           {/* Student / Parent only - Attendance history + Payments + My Courses */}
           <Route element={<ProtectedRoute allowedRoles={['STUDENT_PARENT']} />}>
             <Route path="/attendance/history" element={<AttendanceHistoryPage />} />
-            <Route path="/attendance/checkin" element={<SelfCheckInPage />} />
             <Route path="/payments" element={<FeeBalancePage />} />
             <Route path="/payments/history" element={<PaymentHistoryPage />} />
             <Route path="/courses/my-courses" element={<MyCoursesPage />} />

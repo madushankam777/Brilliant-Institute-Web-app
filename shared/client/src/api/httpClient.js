@@ -2,7 +2,12 @@
 import axios from 'axios';
 
 // The only place the API base URL is read from - never hardcode it elsewhere.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+// If VITE_API_BASE_URL isn't set, fall back to whatever host served this
+// page (same hostname, API port) - this way the exact same build works
+// whether it's opened as localhost or from another device via a LAN IP,
+// with no per-environment config needed.
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:5000/api`;
 
 const httpClient = axios.create({
   baseURL: API_BASE_URL,

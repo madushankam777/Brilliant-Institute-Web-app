@@ -1,7 +1,7 @@
 // Tutor: mark/correct attendance for a session
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchAttendanceSheet, saveAttendance, startSelfCheckIn } from '../../api/attendanceApi';
+import { fetchAttendanceSheet, saveAttendance } from '../../api/attendanceApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../../shared/client/src/components/common/Icon';
@@ -27,12 +27,6 @@ function MarkAttendancePage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [saveError, setSaveError] = useState('');
   const [search, setSearch] = useState('');
-
-  const [showCheckin, setShowCheckin] = useState(false);
-  const [checkinCode, setCheckinCode] = useState('');
-  const [checkinExpiresAt, setCheckinExpiresAt] = useState('');
-  const [isStartingCheckin, setIsStartingCheckin] = useState(false);
-  const [checkinError, setCheckinError] = useState('');
 
   const loadSheet = useCallback(async () => {
     setIsLoading(true);
@@ -88,21 +82,6 @@ function MarkAttendancePage() {
     }
   }
 
-  async function handleStartCheckin() {
-    setShowCheckin(true);
-    setIsStartingCheckin(true);
-    setCheckinError('');
-    try {
-      const data = await startSelfCheckIn(sessionId);
-      setCheckinCode(data.code);
-      setCheckinExpiresAt(data.expiresAt);
-    } catch (error) {
-      setCheckinError(error.message);
-    } finally {
-      setIsStartingCheckin(false);
-    }
-  }
-
   const filteredRows = rows.filter((row) =>
     row.studentName.toLowerCase().includes(search.trim().toLowerCase())
   );
@@ -126,47 +105,7 @@ function MarkAttendancePage() {
               </p>
             )}
           </div>
-          {sessionInfo && sessionInfo.isAdvancedLevel && sessionInfo.isToday && (
-            <button type="button" className="btn btn-secondary" onClick={handleStartCheckin}>
-              <Icon name="lock" size={15} /> Start Self Check-In
-            </button>
-          )}
         </div>
-
-        {showCheckin && (
-          <div className="card" style={{ textAlign: 'center' }}>
-            <h3 style={{ marginTop: 0 }}>Self Check-In Code</h3>
-            <Alert type="error" message={checkinError} />
-            {isStartingCheckin ? (
-              <LoadingSpinner label="Generating code..." />
-            ) : (
-              checkinCode && (
-                <>
-                  <p style={{ fontSize: '2.4rem', fontWeight: 800, letterSpacing: '8px', margin: '10px 0' }}>
-                    {checkinCode}
-                  </p>
-                  <p className="muted" style={{ fontSize: '0.85rem' }}>
-                    Read this code out to the class. It expires at{' '}
-                    {new Date(checkinExpiresAt).toLocaleTimeString()}.
-                  </p>
-                </>
-              )
-            )}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                disabled={isStartingCheckin}
-                onClick={handleStartCheckin}
-              >
-                New Code
-              </button>
-              <button type="button" className="btn btn-link" onClick={() => setShowCheckin(false)}>
-                Hide
-              </button>
-            </div>
-          </div>
-        )}
 
         {isLoading && <LoadingSpinner label="Loading attendance sheet..." />}
         {loadError && <Alert type="error" message={loadError} />}
@@ -177,10 +116,7 @@ function MarkAttendancePage() {
             <Alert type="error" message={saveError} />
 
             {rows.length === 0 ? (
-              <p className="muted">
-                No paid, enrolled students yet - a student has to enrol and complete at least one
-                payment before they appear here.
-              </p>
+              <p className="muted">No students are enrolled in this class yet.</p>
             ) : (
               <form onSubmit={handleSave}>
                 <div className="card">

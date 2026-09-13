@@ -1,11 +1,9 @@
 // Attendance business logic
-const crypto = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { toSafeClass } = require('../../../../../shared/server/src/utils/sanitize');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
-const { CHECKIN_CODE_VALID_MINUTES } = require('./attendance.constants');
 const repository = require('./attendance.repository');
 
 async function assertTutorOwnsClass(tutorUser, classRow) {
@@ -61,85 +59,6 @@ async function getOrCreateTodaySession(tutorUser, classId) {
   return { sessionId };
 }
 
-// make a random 6-digit code, e.g. "042371"
-function generateCheckinCode() {
-  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-}
-
-// self check-in btn - tutor opens a fresh code for today's session, A/L only
-async function startSelfCheckIn(tutorUser, sessionId) {
-  const session = await repository.findSessionWithClass(sessionId);
-  if (!session) {
-    throw ApiError.notFound('Class session not found.');
-  }
-  await assertTutorOwnsClass(tutorUser, { tutor_id: session.tutor_id });
-
-  if (session.level !== 'A/L') {
-    throw ApiError.badRequest('Self check-in is only available for A/L classes.');
-  }
-  if (session.session_date !== todayDateString()) {
-    throw ApiError.badRequest('Self check-in can only be opened for today’s session.');
-  }
-
-  // regenerate on the rare chance another live session already has this code
-  let code = generateCheckinCode();
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const clash = await repository.findSessionByActiveCheckinCode(code);
-    if (!clash) break;
-    code = generateCheckinCode();
-  }
-
-  const expiresAt = new Date(Date.now() + CHECKIN_CODE_VALID_MINUTES * 60 * 1000);
-  await repository.setSessionCheckinCode(sessionId, code, expiresAt);
-
-  await recordAuditEvent({
-    actorId: tutorUser.id,
-    action: 'ATTENDANCE_CHECKIN_OPENED',
-    entityType: 'class_session',
-    entityId: sessionId,
-  });
-
-  return { code, expiresAt: expiresAt.toISOString(), validMinutes: CHECKIN_CODE_VALID_MINUTES };
-}
-
-// self check-in btn - student types the code the tutor announced in class
-async function selfCheckIn(studentUser, code) {
-  const session = await repository.findSessionByActiveCheckinCode(code);
-  if (!session) {
-    throw ApiError.badRequest('That code is invalid or has expired. Ask your tutor for the current code.');
-  }
-
-  const enrolledStudents = await repository.listActiveStudentsForClass(session.class_id);
-  const isEnrolledAndPaid = enrolledStudents.some((student) => student.student_id === studentUser.id);
-  if (!isEnrolledAndPaid) {
-    throw ApiError.forbidden(
-      'You can only check in to a class you are enrolled and paid up in.'
-    );
-  }
-
-  const existing = await repository.findAttendanceRecord(session.id, studentUser.id);
-  if (existing) {
-    return { alreadyCheckedIn: true, subject: session.subject };
-  }
-
-  await repository.createAttendanceRecord({
-    sessionId: session.id,
-    studentId: studentUser.id,
-    status: 'PRESENT',
-    remarks: 'Self check-in via class code',
-    markedBy: studentUser.id,
-  });
-
-  await recordAuditEvent({
-    actorId: studentUser.id,
-    action: 'ATTENDANCE_CODE_CHECKIN',
-    entityType: 'class_session',
-    entityId: session.id,
-  });
-
-  return { alreadyCheckedIn: false, subject: session.subject };
-}
-
 async function getAttendanceSheet(tutorUser, sessionId) {
   const session = await repository.findSessionWithClass(sessionId);
   if (!session) {
@@ -174,7 +93,6 @@ async function getAttendanceSheet(tutorUser, sessionId) {
       classId: session.class_id,
       subject: session.subject,
       level: session.level,
-      isAdvancedLevel: session.level === 'A/L',
       isToday: session.session_date === todayDateString(),
       sessionDate: session.session_date,
       startTime: session.start_time,
@@ -295,8 +213,6 @@ module.exports = {
   getOrCreateTodaySession,
   getAttendanceSheet,
   markSessionAttendance,
-  startSelfCheckIn,
-  selfCheckIn,
   getMyAttendanceHistory,
   getStudentAttendanceHistoryForTutor,
 };

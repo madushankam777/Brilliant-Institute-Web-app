@@ -25,15 +25,9 @@ const historyQueryRules = [
   query('classId').optional().isInt({ min: 1 }).withMessage('Invalid class id.'),
 ];
 
-// self check-in code - must be exactly 6 digits
-const selfCheckInRules = [
-  body('code').trim().matches(/^\d{6}$/).withMessage('Enter the 6-digit class code.'),
-];
-
 module.exports = {
   classIdParamRules,
   sessionIdParamRules,
   markAttendanceRules,
   historyQueryRules,
-  selfCheckInRules,
 };

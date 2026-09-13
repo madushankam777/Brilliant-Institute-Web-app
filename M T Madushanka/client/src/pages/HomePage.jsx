@@ -98,13 +98,6 @@ function StudentDashboard({ user }) {
           <h2>My Attendance</h2>
           <p className="muted">Check your attendance history and rate by class.</p>
         </Link>
-        <Link to="/attendance/checkin" className="card link-card">
-          <div className="feature-icon-box">
-            <Icon name="checkCircle" size={22} />
-          </div>
-          <h2>Mark My Attendance</h2>
-          <p className="muted">Enter today&apos;s class code to self check-in.</p>
-        </Link>
         <Link to="/payments" className="card link-card">
           <div className="feature-icon-box">
             <Icon name="wallet" size={22} />

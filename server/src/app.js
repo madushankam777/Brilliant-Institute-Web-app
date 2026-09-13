@@ -26,7 +26,15 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: config.clientOrigin,
+    // CLIENT_ORIGIN can list more than one allowed origin (comma-separated) -
+    // e.g. localhost plus a LAN IP for testing from other devices. Still an
+    // explicit whitelist check, never "*", per OWASP CORS guidance.
+    origin(origin, callback) {
+      if (!origin || config.clientOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'X-Requested-With'],

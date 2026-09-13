@@ -54,6 +54,14 @@ const config = {
   isProduction: process.env.NODE_ENV === 'production',
   port: toInt(process.env.PORT, 5000),
   clientOrigin: process.env.CLIENT_ORIGIN,
+  // CLIENT_ORIGIN may be a comma-separated list (e.g. one entry for
+  // localhost and one for a LAN IP) so the same build can be reached from
+  // this machine and from other devices during local/LAN testing. CORS
+  // still only ever allows origins explicitly listed here - never "*".
+  clientOrigins: String(process.env.CLIENT_ORIGIN || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   // Only trust X-Forwarded-For when we're actually behind a real reverse
   // proxy - otherwise a client could spoof it and dodge IP rate limits.
   trustProxy: process.env.TRUST_PROXY === 'true',
