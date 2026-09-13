@@ -1,9 +1,10 @@
 // Attendance business logic
+const crypto = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
-const { generateQrCodeDataUrl } = require('../../../../../shared/server/src/utils/qrCode');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
+const { CHECKIN_CODE_VALID_MINUTES } = require('./attendance.constants');
 const repository = require('./attendance.repository');
 
 async function assertTutorOwnsClass(tutorUser, classRow) {
@@ -50,39 +51,52 @@ async function getOrCreateTodaySession(tutorUser, classId) {
   return { sessionId };
 }
 
-// QR code btn - A/L classes only
-async function getSessionQrCode(tutorUser, sessionId) {
+// make a random 6-digit code, e.g. "042371"
+function generateCheckinCode() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+}
+
+// self check-in btn - tutor opens a fresh code for today's session, A/L only
+async function startSelfCheckIn(tutorUser, sessionId) {
   const session = await repository.findSessionWithClass(sessionId);
   if (!session) {
     throw ApiError.notFound('Class session not found.');
   }
   await assertTutorOwnsClass(tutorUser, { tutor_id: session.tutor_id });
 
-  const classRow = await repository.findClassById(session.class_id);
-  if (!classRow || classRow.level !== 'A/L') {
-    throw ApiError.badRequest('QR self-check-in is only available for A/L classes.');
+  if (session.level !== 'A/L') {
+    throw ApiError.badRequest('Self check-in is only available for A/L classes.');
   }
   if (session.session_date !== todayDateString()) {
-    throw ApiError.badRequest('A QR code can only be generated for today’s session.');
+    throw ApiError.badRequest('Self check-in can only be opened for today’s session.');
   }
 
-  const checkInUrl = `${config.clientOrigin}/attendance/checkin/${sessionId}`;
-  const qrCodeDataUrl = await generateQrCodeDataUrl(checkInUrl);
-  return { qrCodeDataUrl, checkInUrl };
+  // regenerate on the rare chance another live session already has this code
+  let code = generateCheckinCode();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const clash = await repository.findSessionByActiveCheckinCode(code);
+    if (!clash) break;
+    code = generateCheckinCode();
+  }
+
+  const expiresAt = new Date(Date.now() + CHECKIN_CODE_VALID_MINUTES * 60 * 1000);
+  await repository.setSessionCheckinCode(sessionId, code, expiresAt);
+
+  await recordAuditEvent({
+    actorId: tutorUser.id,
+    action: 'ATTENDANCE_CHECKIN_OPENED',
+    entityType: 'class_session',
+    entityId: sessionId,
+  });
+
+  return { code, expiresAt: expiresAt.toISOString(), validMinutes: CHECKIN_CODE_VALID_MINUTES };
 }
 
-async function checkInWithQr(studentUser, sessionId) {
-  const session = await repository.findSessionWithClass(sessionId);
+// self check-in btn - student types the code the tutor announced in class
+async function selfCheckIn(studentUser, code) {
+  const session = await repository.findSessionByActiveCheckinCode(code);
   if (!session) {
-    throw ApiError.notFound('Class session not found.');
-  }
-
-  const classRow = await repository.findClassById(session.class_id);
-  if (!classRow || classRow.level !== 'A/L') {
-    throw ApiError.badRequest('QR self-check-in is only available for A/L classes.');
-  }
-  if (session.session_date !== todayDateString()) {
-    throw ApiError.badRequest('This QR code is for a different day and can no longer be used.');
+    throw ApiError.badRequest('That code is invalid or has expired. Ask your tutor for the current code.');
   }
 
   const enrolledStudents = await repository.listActiveStudentsForClass(session.class_id);
@@ -93,24 +107,24 @@ async function checkInWithQr(studentUser, sessionId) {
     );
   }
 
-  const existing = await repository.findAttendanceRecord(sessionId, studentUser.id);
+  const existing = await repository.findAttendanceRecord(session.id, studentUser.id);
   if (existing) {
     return { alreadyCheckedIn: true, subject: session.subject };
   }
 
   await repository.createAttendanceRecord({
-    sessionId,
+    sessionId: session.id,
     studentId: studentUser.id,
     status: 'PRESENT',
-    remarks: 'Self check-in via QR code',
+    remarks: 'Self check-in via class code',
     markedBy: studentUser.id,
   });
 
   await recordAuditEvent({
     actorId: studentUser.id,
-    action: 'ATTENDANCE_QR_CHECKIN',
+    action: 'ATTENDANCE_CODE_CHECKIN',
     entityType: 'class_session',
-    entityId: sessionId,
+    entityId: session.id,
   });
 
   return { alreadyCheckedIn: false, subject: session.subject };
@@ -270,8 +284,8 @@ module.exports = {
   getOrCreateTodaySession,
   getAttendanceSheet,
   markSessionAttendance,
-  getSessionQrCode,
-  checkInWithQr,
+  startSelfCheckIn,
+  selfCheckIn,
   getMyAttendanceHistory,
   getStudentAttendanceHistoryForTutor,
 };

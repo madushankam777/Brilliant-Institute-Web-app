@@ -3,6 +3,7 @@ const express = require('express');
 const authenticate = require('../../../../../shared/server/src/middleware/authenticate');
 const authorize = require('../../../../../shared/server/src/middleware/authorize');
 const validateRequest = require('../../../../../shared/server/src/middleware/validateRequest');
+const { checkinLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const controller = require('./attendance.controller');
 const {
@@ -10,6 +11,7 @@ const {
   sessionIdParamRules,
   markAttendanceRules,
   historyQueryRules,
+  selfCheckInRules,
 } = require('./attendance.validation');
 
 const router = express.Router();
@@ -49,20 +51,21 @@ router.post(
   controller.markAttendance
 );
 
-router.get(
-  '/sessions/:sessionId/qrcode',
+router.post(
+  '/sessions/:sessionId/checkin/start',
   authorize(ROLES.TUTOR, ROLES.ADMIN),
   sessionIdParamRules,
   validateRequest,
-  controller.getSessionQrCode
+  controller.startSelfCheckIn
 );
 
 router.post(
-  '/sessions/:sessionId/checkin',
+  '/checkin',
   authorize(ROLES.STUDENT_PARENT),
-  sessionIdParamRules,
+  checkinLimiter,
+  selfCheckInRules,
   validateRequest,
-  controller.checkInWithQr
+  controller.selfCheckIn
 );
 
 router.get(

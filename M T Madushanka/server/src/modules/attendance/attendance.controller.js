@@ -45,15 +45,15 @@ const getStudentHistoryForTutor = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
-const getSessionQrCode = asyncHandler(async (req, res) => {
+const startSelfCheckIn = asyncHandler(async (req, res) => {
   const sessionId = Number(req.params.sessionId);
-  const data = await service.getSessionQrCode(req.user, sessionId);
+  const data = await service.startSelfCheckIn(req.user, sessionId);
   res.status(200).json({ success: true, data });
 });
 
-const checkInWithQr = asyncHandler(async (req, res) => {
-  const sessionId = Number(req.params.sessionId);
-  const result = await service.checkInWithQr(req.user, sessionId);
+const selfCheckIn = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  const result = await service.selfCheckIn(req.user, code);
   res.status(200).json({
     success: true,
     message: result.alreadyCheckedIn
@@ -68,8 +68,8 @@ module.exports = {
   getOrCreateTodaySession,
   getAttendanceSheet,
   markAttendance,
-  getSessionQrCode,
-  checkInWithQr,
+  startSelfCheckIn,
+  selfCheckIn,
   getMyHistory,
   getStudentHistoryForTutor,
 };

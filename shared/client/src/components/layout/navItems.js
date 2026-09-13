@@ -26,6 +26,7 @@ export function getNavItems(role) {
     { to: '/courses/classes', label: 'Browse Classes', icon: 'search' },
     { to: '/courses/my-courses', label: 'My Courses', icon: 'book' },
     { to: '/attendance/history', label: 'Attendance', icon: 'calendar' },
+    { to: '/attendance/checkin', label: 'Mark Attendance', icon: 'checkCircle' },
     { to: '/payments', label: 'Fees', icon: 'card' },
     { to: '/payments/history', label: 'History', icon: 'receipt' },
     { to: '/feedback', label: 'Feedback', icon: 'chat' },

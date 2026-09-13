@@ -76,14 +76,17 @@ CREATE TABLE IF NOT EXISTS classes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS class_sessions (
-  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  class_id      INT UNSIGNED NOT NULL,
-  session_date  DATE         NOT NULL,
-  start_time    TIME         NULL,
-  end_time      TIME         NULL,
+  id                       INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  class_id                 INT UNSIGNED NOT NULL,
+  session_date             DATE         NOT NULL,
+  start_time               TIME         NULL,
+  end_time                 TIME         NULL,
+  checkin_code             CHAR(6)      NULL,
+  checkin_code_expires_at  DATETIME     NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_session_class_date (class_id, session_date),
   KEY idx_sessions_class (class_id),
+  KEY idx_sessions_checkin_code (checkin_code),
   CONSTRAINT fk_sessions_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

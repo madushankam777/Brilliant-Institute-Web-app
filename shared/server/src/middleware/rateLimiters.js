@@ -24,4 +24,16 @@ const apiLimiter = rateLimit({
   },
 });
 
-module.exports = { authLimiter, apiLimiter };
+// blocks guessing the attendance check-in code
+const checkinLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many attempts. Please wait a while and try again.',
+  },
+});
+
+module.exports = { authLimiter, apiLimiter, checkinLimiter };

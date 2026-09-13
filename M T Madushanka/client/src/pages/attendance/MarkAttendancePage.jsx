@@ -1,13 +1,13 @@
 // Tutor: mark/correct attendance for a session
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchAttendanceSheet, saveAttendance, fetchSessionQrCode } from '../../api/attendanceApi';
-import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
-import Alert from '../../../../../shared/client/src/components/common/Alert';
-import Icon from '../../../../../shared/client/src/components/common/Icon';
-import Avatar from '../../../../../shared/client/src/components/common/Avatar';
-import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
-import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
+import { fetchAttendanceSheet, saveAttendance, startSelfCheckIn } from '../../api/attendanceApi';
+import LoadingSpinner from '../../../shared/client/src/components/common/LoadingSpinner';
+import Alert from '../../../shared/client/src/components/common/Alert';
+import Icon from '../../../shared/client/src/components/common/Icon';
+import Avatar from '../../../shared/client/src/components/common/Avatar';
+import PortalShell from '../../../shared/client/src/components/layout/PortalShell';
+import { getNavItems } from '../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
 const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
@@ -28,10 +28,11 @@ function MarkAttendancePage() {
   const [saveError, setSaveError] = useState('');
   const [search, setSearch] = useState('');
 
-  const [showQr, setShowQr] = useState(false);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
-  const [isLoadingQr, setIsLoadingQr] = useState(false);
-  const [qrError, setQrError] = useState('');
+  const [showCheckin, setShowCheckin] = useState(false);
+  const [checkinCode, setCheckinCode] = useState('');
+  const [checkinExpiresAt, setCheckinExpiresAt] = useState('');
+  const [isStartingCheckin, setIsStartingCheckin] = useState(false);
+  const [checkinError, setCheckinError] = useState('');
 
   const loadSheet = useCallback(async () => {
     setIsLoading(true);
@@ -87,18 +88,18 @@ function MarkAttendancePage() {
     }
   }
 
-  async function handleShowQr() {
-    setShowQr(true);
-    if (qrCodeDataUrl) return;
-    setIsLoadingQr(true);
-    setQrError('');
+  async function handleStartCheckin() {
+    setShowCheckin(true);
+    setIsStartingCheckin(true);
+    setCheckinError('');
     try {
-      const data = await fetchSessionQrCode(sessionId);
-      setQrCodeDataUrl(data.qrCodeDataUrl);
+      const data = await startSelfCheckIn(sessionId);
+      setCheckinCode(data.code);
+      setCheckinExpiresAt(data.expiresAt);
     } catch (error) {
-      setQrError(error.message);
+      setCheckinError(error.message);
     } finally {
-      setIsLoadingQr(false);
+      setIsStartingCheckin(false);
     }
   }
 
@@ -126,23 +127,41 @@ function MarkAttendancePage() {
             )}
           </div>
           {sessionInfo && sessionInfo.isAdvancedLevel && sessionInfo.isToday && (
-            <button type="button" className="btn btn-secondary" onClick={handleShowQr}>
-              <Icon name="search" size={15} /> Show Self Check-In QR Code
+            <button type="button" className="btn btn-secondary" onClick={handleStartCheckin}>
+              <Icon name="lock" size={15} /> Start Self Check-In
             </button>
           )}
         </div>
 
-        {showQr && (
+        {showCheckin && (
           <div className="card" style={{ textAlign: 'center' }}>
-            <h3 style={{ marginTop: 0 }}>Self Check-In QR Code</h3>
-            <Alert type="error" message={qrError} />
-            {isLoadingQr ? (
-              <LoadingSpinner label="Generating QR code..." />
+            <h3 style={{ marginTop: 0 }}>Self Check-In Code</h3>
+            <Alert type="error" message={checkinError} />
+            {isStartingCheckin ? (
+              <LoadingSpinner label="Generating code..." />
             ) : (
-              qrCodeDataUrl && <img src={qrCodeDataUrl} alt="Attendance check-in QR code" style={{ maxWidth: '260px' }} />
+              checkinCode && (
+                <>
+                  <p style={{ fontSize: '2.4rem', fontWeight: 800, letterSpacing: '8px', margin: '10px 0' }}>
+                    {checkinCode}
+                  </p>
+                  <p className="muted" style={{ fontSize: '0.85rem' }}>
+                    Read this code out to the class. It expires at{' '}
+                    {new Date(checkinExpiresAt).toLocaleTimeString()}.
+                  </p>
+                </>
+              )
             )}
-            <div>
-              <button type="button" className="btn btn-link" onClick={() => setShowQr(false)}>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={isStartingCheckin}
+                onClick={handleStartCheckin}
+              >
+                New Code
+              </button>
+              <button type="button" className="btn btn-link" onClick={() => setShowCheckin(false)}>
                 Hide
               </button>
             </div>
