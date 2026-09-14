@@ -146,6 +146,26 @@ async function updateClass(classId, data) {
   );
 }
 
+// everyone who should be told when this class changes
+async function listActiveStudentIdsForClass(classId) {
+  const [rows] = await pool.execute(
+    `SELECT DISTINCT e.student_id
+     FROM enrollments e
+     JOIN users u ON u.id = e.student_id
+     WHERE e.class_id = ? AND e.status = 'ACTIVE' AND u.status = 'ACTIVE'`,
+    [classId]
+  );
+  return rows.map((row) => row.student_id);
+}
+
+async function createNotification({ recipientId, type, message, sentBy }) {
+  await pool.execute(
+    `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
+     VALUES (?, 'EMAIL', ?, ?, ?, NOW())`,
+    [recipientId, type, message, sentBy || null]
+  );
+}
+
 async function cancelClass(classId) {
   await pool.execute(`UPDATE classes SET status = 'CANCELLED', updated_at = NOW() WHERE id = ?`, [
     classId,
@@ -252,6 +272,8 @@ module.exports = {
   createClass,
   updateClass,
   cancelClass,
+  listActiveStudentIdsForClass,
+  createNotification,
   findConflictingVenueClass,
   findConflictingTutorClass,
   findEnrollment,

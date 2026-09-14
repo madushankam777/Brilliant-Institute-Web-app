@@ -75,7 +75,15 @@ const reminderCandidatesQueryRules = [
   query('type').isIn(REMINDER_TYPES).withMessage('Invalid reminder type.'),
 ];
 
+const tutorMessageRules = [
+  body('audience').isIn(['STUDENTS', 'ADMIN', 'BOTH']).withMessage('Please choose who this goes to.'),
+  body('classId').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Invalid class id.'),
+  body('subject').trim().isLength({ min: 3, max: 120 }).withMessage('Subject must be 3-120 characters.'),
+  body('message').trim().isLength({ min: 3, max: 350 }).withMessage('Please write your message (3-350 characters).'),
+];
+
 module.exports = {
+  tutorMessageRules,
   userIdParamRules,
   createUserRules,
   keyIdParamRules,

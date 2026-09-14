@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { fetchMyAnnouncements, fetchMyNotifications } from '../../api/adminApi';
+import { fetchMyAnnouncements, fetchMyNotifications, fetchUsers } from '../../api/adminApi';
+import { browseClasses } from '../../api/courseApi';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import Logo from '../../../../shared/client/src/components/common/Logo';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
@@ -161,6 +162,67 @@ function Navbar() {
     });
   }
 
+  // --- top bar search: classes for everyone, plus users for Admin ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState({ classes: [], users: [] });
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutsideSearch(event) {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutsideSearch);
+    return () => document.removeEventListener('mousedown', handleClickOutsideSearch);
+  }, []);
+
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (!isLoggedIn || term.length < 2) {
+      setSearchResults({ classes: [], users: [] });
+      setIsSearching(false);
+      return undefined;
+    }
+
+    let isCurrent = true;
+    setIsSearching(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const requests = [browseClasses({ search: term })];
+        if (user.role === 'ADMIN') requests.push(fetchUsers({ search: term }));
+        const [classes, users] = await Promise.all(requests);
+        if (!isCurrent) return;
+        setSearchResults({ classes: (classes || []).slice(0, 5), users: (users || []).slice(0, 5) });
+      } catch {
+        if (isCurrent) setSearchResults({ classes: [], users: [] });
+      } finally {
+        if (isCurrent) setIsSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timeoutId);
+    };
+  }, [searchTerm, isLoggedIn, user]);
+
+  function goToSearchResult(path) {
+    setIsSearchOpen(false);
+    setSearchTerm('');
+    navigate(path);
+  }
+
+  // Enter with no result picked: fall back to the full Browse Classes list
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+    const term = searchTerm.trim();
+    if (!term) return;
+    goToSearchResult(`/courses/classes?search=${encodeURIComponent(term)}`);
+  }
+
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
@@ -175,9 +237,78 @@ function Navbar() {
           </NavLink>
         </div>
 
-        <div className="topbar-search">
-          <Icon name="search" size={16} />
-          <input type="search" placeholder="Search classes, billing, portal..." aria-label="Search" />
+        <div className="topbar-search-wrap" ref={searchRef}>
+          <form className="topbar-search" onSubmit={handleSearchSubmit} role="search">
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              placeholder="Search classes, tutors, people..."
+              aria-label="Search"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setIsSearchOpen(true);
+              }}
+              onFocus={() => setIsSearchOpen(true)}
+            />
+          </form>
+
+          {isSearchOpen && searchTerm.trim().length >= 2 && (
+            <div className="search-panel">
+              {isSearching ? (
+                <p className="search-empty">Searching...</p>
+              ) : searchResults.classes.length === 0 && searchResults.users.length === 0 ? (
+                <p className="search-empty">No matches for &ldquo;{searchTerm.trim()}&rdquo;.</p>
+              ) : (
+                <>
+                  {searchResults.classes.length > 0 && (
+                    <div className="search-group">
+                      <p className="search-group-title">Classes</p>
+                      {searchResults.classes.map((classItem) => (
+                        <button
+                          key={classItem.id}
+                          type="button"
+                          className="search-item"
+                          onClick={() => goToSearchResult(`/courses/classes/${classItem.id}`)}
+                        >
+                          <Icon name="book" size={15} />
+                          <span>
+                            <span className="search-item-title">{classItem.subject}</span>
+                            <span className="search-item-sub">
+                              {classItem.tutorName}
+                              {classItem.level ? ` · ${classItem.level}` : ''}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {searchResults.users.length > 0 && (
+                    <div className="search-group">
+                      <p className="search-group-title">People</p>
+                      {searchResults.users.map((person) => (
+                        <button
+                          key={person.id}
+                          type="button"
+                          className="search-item"
+                          onClick={() => goToSearchResult(`/admin/users/${person.id}`)}
+                        >
+                          <Icon name="user" size={15} />
+                          <span>
+                            <span className="search-item-title">{person.fullName}</span>
+                            <span className="search-item-sub">
+                              {person.email} · {person.role.replace('_', ' / ')}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="navbar-actions">

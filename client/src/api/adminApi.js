@@ -79,6 +79,17 @@ export function getTutorKeyDocumentUrl(keyId, type) {
   return `${base}/admin/tutor-keys/${keyId}/documents/${type}`;
 }
 
+// tutor -> their own students and/or admin
+export async function fetchMyClassesForMessaging() {
+  const response = await httpClient.get('/tutor/my-classes');
+  return response.data.data.classes;
+}
+
+export async function sendTutorMessage(payload) {
+  const response = await httpClient.post('/tutor/messages', payload);
+  return response.data;
+}
+
 // notification bell - announcements
 export async function fetchMyAnnouncements() {
   const response = await httpClient.get('/announcements');

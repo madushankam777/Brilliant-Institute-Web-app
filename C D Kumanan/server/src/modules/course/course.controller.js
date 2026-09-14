@@ -36,18 +36,28 @@ const createClass = asyncHandler(async (req, res) => {
 
 const updateClass = asyncHandler(async (req, res) => {
   const classId = Number(req.params.classId);
-  const { classData, warnings } = await service.updateClass(req.user, classId, req.body);
+  const { classData, warnings, notifiedCount } = await service.updateClass(req.user, classId, req.body);
   res.status(200).json({
     success: true,
-    message: 'Class updated successfully.',
-    data: { classData, warnings },
+    message:
+      notifiedCount > 0
+        ? `Class updated - ${notifiedCount} enrolled student(s) notified of the change.`
+        : 'Class updated successfully.',
+    data: { classData, warnings, notifiedCount },
   });
 });
 
 const cancelClass = asyncHandler(async (req, res) => {
   const classId = Number(req.params.classId);
-  await service.cancelClass(req.user, classId);
-  res.status(200).json({ success: true, message: 'Class cancelled successfully.' });
+  const { notifiedCount } = await service.cancelClass(req.user, classId);
+  res.status(200).json({
+    success: true,
+    message:
+      notifiedCount > 0
+        ? `Class cancelled - ${notifiedCount} enrolled student(s) notified.`
+        : 'Class cancelled successfully.',
+    data: { notifiedCount },
+  });
 });
 
 const listMyTaughtClasses = asyncHandler(async (req, res) => {

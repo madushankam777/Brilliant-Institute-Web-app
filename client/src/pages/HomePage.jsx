@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchMyAttendanceHistory } from '../api/attendanceApi';
-import { fetchMyBalances } from '../api/paymentApi';
+import { fetchMyBalances, fetchMyBankDetails } from '../api/paymentApi';
 import Icon from '../../../shared/client/src/components/common/Icon';
 import StatCard from '../../../shared/client/src/components/common/StatCard';
 import Footer from '../../../shared/client/src/components/layout/Footer';
@@ -173,9 +173,76 @@ function StudentDashboard({ user }) {
   );
 }
 
+// New tutors get paid by bank transfer, so nudge them once per session until
+// an account is on file.
+function useBankDetailsPrompt() {
+  const [needsBankDetails, setNeedsBankDetails] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const dismissKey = 'brilliant_bank_prompt_dismissed';
+    let alreadyDismissed = false;
+    try {
+      alreadyDismissed = window.sessionStorage.getItem(dismissKey) === 'true';
+    } catch {
+      alreadyDismissed = false;
+    }
+    if (alreadyDismissed) return undefined;
+
+    fetchMyBankDetails()
+      .then((details) => {
+        if (!isMounted) return;
+        setNeedsBankDetails(!details || (!details.bankName && !details.accountNumber));
+      })
+      .catch(() => {
+        /* non-critical - the Profile page surfaces any real error */
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  function dismiss() {
+    try {
+      window.sessionStorage.setItem('brilliant_bank_prompt_dismissed', 'true');
+    } catch {
+      /* storage may be unavailable */
+    }
+    setNeedsBankDetails(false);
+  }
+
+  return { needsBankDetails, dismiss };
+}
+
+function BankDetailsPrompt({ onDismiss }) {
+  return (
+    <div className="modal-overlay" onClick={onDismiss}>
+      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+        <h2>Add your banking details</h2>
+        <p className="muted">
+          The institute pays tutors by bank transfer, and we don&apos;t have an account on file for you
+          yet. Add it on your profile so your payouts aren&apos;t held up.
+        </p>
+        <div className="flex-between" style={{ marginTop: '18px' }}>
+          <button type="button" className="btn btn-secondary" onClick={onDismiss}>
+            Later
+          </button>
+          <Link to="/profile" className="btn btn-primary" onClick={onDismiss}>
+            Add banking details
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TutorDashboard({ user }) {
+  const { needsBankDetails, dismiss } = useBankDetailsPrompt();
+
   return (
     <div className="page">
+      {needsBankDetails && <BankDetailsPrompt onDismiss={dismiss} />}
       <div className="page-header">
         <h1>Good day, {user.fullName.split(' ')[0]}!</h1>
         <p className="muted">Open a class to take attendance for today&apos;s session.</p>
@@ -202,6 +269,13 @@ function TutorDashboard({ user }) {
           </div>
           <h2>My Students</h2>
           <p className="muted">See every student enrolled across your classes.</p>
+        </Link>
+        <Link to="/notify" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="megaphone" size={22} />
+          </div>
+          <h2>Notify Students</h2>
+          <p className="muted">Send a notice to your students, the office, or both.</p>
         </Link>
         <Link to="/admin/feedback" className="card link-card">
           <div className="feature-icon-box">

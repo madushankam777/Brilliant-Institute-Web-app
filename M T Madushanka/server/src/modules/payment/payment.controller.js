@@ -192,6 +192,17 @@ const payTutor = asyncHandler(async (req, res) => {
   });
 });
 
+// admin saving a tutor's payout account from the Pay Tutors screen
+const updateTutorBankDetailsAsAdmin = asyncHandler(async (req, res) => {
+  const tutorId = Number(req.params.tutorId);
+  const bankDetails = await service.updateTutorBankDetailsAsAdmin(req.user, tutorId, req.body);
+  res.status(200).json({
+    success: true,
+    message: 'Banking details saved for this Tutor.',
+    data: { bankDetails },
+  });
+});
+
 const listTutorPayouts = asyncHandler(async (req, res) => {
   const data = await service.listTutorPayouts();
   res.status(200).json({ success: true, data });
@@ -217,4 +228,5 @@ module.exports = {
   updatePaymentSettings,
   payTutor,
   listTutorPayouts,
+  updateTutorBankDetailsAsAdmin,
 };

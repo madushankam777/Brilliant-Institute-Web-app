@@ -87,6 +87,12 @@ export async function rejectBankTransfer(paymentId) {
 // tutor picker list - the payment module's own list (not Course Management's
 // public /courses/tutors), so bank payout details can safely ride along for
 // Admin only instead of being exposed on a route any logged-in role can hit
+// admin filling in a tutor's payout account from the Pay Tutors screen
+export async function updateTutorBankDetailsAsAdmin(tutorId, details) {
+  const response = await httpClient.put(`/payments/admin/tutors/${tutorId}/bank-details`, details);
+  return response.data.data.bankDetails;
+}
+
 export async function fetchAllTutors() {
   const response = await httpClient.get('/payments/admin/tutors');
   return response.data.data.tutors;

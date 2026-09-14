@@ -108,6 +108,13 @@ router.get(
 );
 
 router.get('/admin/tutors', authorize(ROLES.ADMIN), controller.listActiveTutors);
+router.put(
+  '/admin/tutors/:tutorId/bank-details',
+  authorize(ROLES.ADMIN),
+  bankDetailsRules,
+  validateRequest,
+  controller.updateTutorBankDetailsAsAdmin
+);
 router.get('/admin/tutor-payouts', authorize(ROLES.ADMIN), controller.listTutorPayouts);
 router.post(
   '/admin/tutor-payouts',

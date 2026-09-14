@@ -35,6 +35,8 @@ import MyStudentsPage from './pages/courses/MyStudentsPage';
 import SubmitFeedbackPage from './pages/feedback/SubmitFeedbackPage';
 import StaffFeedbackPage from './pages/feedback/StaffFeedbackPage';
 
+import NotifyStudentsPage from './pages/notifications/NotifyStudentsPage';
+
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import ManageUsersPage from './pages/admin/ManageUsersPage';
 import UserProfilePage from './pages/admin/UserProfilePage';
@@ -68,7 +70,6 @@ function App() {
             <Route path="/attendance/sessions/:sessionId" element={<MarkAttendancePage />} />
             <Route path="/attendance/students/:studentId" element={<TutorStudentHistoryPage />} />
             <Route path="/courses/manage" element={<ManageClassesPage />} />
-            <Route path="/courses/manage/new" element={<CreateEditClassPage />} />
             <Route path="/courses/manage/:classId/edit" element={<CreateEditClassPage />} />
             <Route path="/admin/feedback" element={<StaffFeedbackPage />} />
           </Route>
@@ -87,14 +88,17 @@ function App() {
             <Route path="/feedback" element={<SubmitFeedbackPage />} />
           </Route>
 
-          {/* Tutor only - their own student roster */}
+          {/* Tutor only - their own student roster + notifying their students */}
           <Route element={<ProtectedRoute allowedRoles={['TUTOR']} />}>
             <Route path="/students/mine" element={<MyStudentsPage />} />
+            <Route path="/notify" element={<NotifyStudentsPage />} />
           </Route>
 
           {/* Admin only - operations dashboard, user management, announcements */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            {/* only Admin creates classes; tutors edit the ones assigned to them */}
+            <Route path="/courses/manage/new" element={<CreateEditClassPage />} />
             <Route path="/admin/users" element={<ManageUsersPage />} />
             <Route path="/admin/users/:userId" element={<UserProfilePage />} />
             <Route path="/admin/payments/verify" element={<PaymentVerificationPage />} />
