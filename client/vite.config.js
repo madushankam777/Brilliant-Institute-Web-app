@@ -20,9 +20,7 @@ export default defineConfig({
   publicDir: path.resolve(__dirname, '../shared/client/public'),
   server: {
     port: 5173,
-    // Dev-only: lets this server accept requests carrying a public tunnel's
-    // hostname (localtunnel/cloudflared) instead of only localhost/LAN-IP -
-    // Vite blocks unrecognized Host headers by default (DNS-rebinding guard).
+    // allow tunnel hostnames (Vite blocks unrecognized Host headers by default)
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     // Lets the dev server read shared/, which sits outside this app's own
     // root (one level up: client -> repo root).
@@ -55,10 +53,7 @@ export default defineConfig({
       },
     },
   },
-  // `vite preview` serves the production build (npm run build first) - a
-  // handful of bundled/minified files instead of dev mode's hundreds of
-  // separate unbundled modules, which holds up far better over a laggy
-  // tunnel. Mirrors the dev server's proxy + allowedHosts settings above.
+  // serves the production build (npm run build) - mirrors server config above
   preview: {
     port: 4173,
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],

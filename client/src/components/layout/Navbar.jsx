@@ -240,8 +240,8 @@ function Navbar() {
               <span className="avatar-chip-role">{user.role.replace('_', ' / ')}</span>
             </span>
           </NavLink>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={handleLogout}>
-            <Icon name="logout" size={15} /> Log out
+          <button type="button" className="btn btn-secondary btn-sm navbar-logout-btn" onClick={handleLogout}>
+            <Icon name="logout" size={15} /> <span className="btn-label">Log out</span>
           </button>
         </div>
       </header>
@@ -269,13 +269,17 @@ function Navbar() {
         <a href="/#contact" onClick={() => setMenuOpen(false)}>
           Contact
         </a>
+        {/* mobile-only: Register (hidden on desktop) */}
+        <NavLink to="/register" className="navbar-mobile-auth" onClick={() => setMenuOpen(false)}>
+          Register
+        </NavLink>
       </nav>
 
       <div className="navbar-actions">
         <NavLink to="/login" className="btn btn-secondary btn-sm">
           Log in
         </NavLink>
-        <NavLink to="/register" className="btn btn-primary btn-sm">
+        <NavLink to="/register" className="btn btn-primary btn-sm navbar-topbar-auth">
           Register
         </NavLink>
         <button
