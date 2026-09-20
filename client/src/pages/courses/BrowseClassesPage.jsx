@@ -1,6 +1,6 @@
 // Any role: browse/search/filter classes (CRS-01)
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { browseClasses } from '../../api/courseApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
@@ -22,9 +22,11 @@ function BrowseClassesPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
-  const [search, setSearch] = useState('');
+  // the top bar's search box hands the term over as ?search=
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get('search') || '');
   const [subjectArea, setSubjectArea] = useState('');
-  const [level, setLevel] = useState(user.grade || '');
+  const [level, setLevel] = useState(searchParams.get('search') ? '' : user.grade || '');
   const [dayOfWeek, setDayOfWeek] = useState('');
   const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);

@@ -296,10 +296,7 @@ function ManageUsersPage() {
                       <td>{user.createdAt}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <Link
-                            to={user.role === 'TUTOR' ? `/courses/tutors/${user.id}` : `/admin/users/${user.id}`}
-                            className="btn btn-secondary btn-sm"
-                          >
+                          <Link to={`/admin/users/${user.id}`} className="btn btn-secondary btn-sm">
                             View
                           </Link>
                           {user.status === 'ACTIVE' ? (

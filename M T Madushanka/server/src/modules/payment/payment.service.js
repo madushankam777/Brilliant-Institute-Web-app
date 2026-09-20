@@ -552,6 +552,40 @@ async function updateMyBankDetails(tutorUser, { bankName, accountHolder, account
   return getMyBankDetails(tutorUser);
 }
 
+// Admin filling in a tutor's payout account for them (e.g. the tutor gave
+// it over the phone). Stored on the same fields the tutor edits themselves,
+// so there is only ever one account on file per tutor.
+async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, accountHolder, accountNumber, branch }) {
+  const tutor = await repository.findActiveTutorById(tutorId);
+  if (!tutor) {
+    throw ApiError.badRequest('Please select a valid, active Tutor.');
+  }
+
+  await repository.updateBankDetails(tutorId, { bankName, accountHolder, accountNumber, branch });
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'TUTOR_BANK_DETAILS_UPDATED_BY_ADMIN',
+    entityType: 'user',
+    entityId: tutorId,
+  });
+
+  await repository.createNotification({
+    recipientId: tutorId,
+    type: 'PAYOUT_RECORDED',
+    message: 'An Admin updated the bank account your payouts are sent to. Check your profile if this was unexpected.',
+    sentBy: adminUser.id,
+  });
+
+  const row = await repository.findBankDetails(tutorId);
+  return {
+    bankName: row ? row.bank_name : null,
+    bankAccountHolder: row ? row.bank_account_holder : null,
+    bankBranch: row ? row.bank_branch : null,
+    maskedAccountNumber: maskAccountNumber(row ? row.bank_account_number : null),
+    hasBankDetails: Boolean(row && (row.bank_name || row.bank_account_number)),
+  };
+}
+
 // pay tutor btn
 async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
   if (!(amount > 0)) {
@@ -823,6 +857,7 @@ module.exports = {
   listActiveTutors,
   getMyBankDetails,
   updateMyBankDetails,
+  updateTutorBankDetailsAsAdmin,
   getPaymentSettings,
   updatePaymentSettings,
   payTutor,

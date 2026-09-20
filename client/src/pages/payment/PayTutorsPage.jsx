@@ -1,6 +1,11 @@
 // Admin: pay Tutors - a manual payout ledger, not automatic payroll.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchTutorPayouts, fetchAllTutors, payTutor } from '../../api/paymentApi';
+import {
+  fetchTutorPayouts,
+  fetchAllTutors,
+  payTutor,
+  updateTutorBankDetailsAsAdmin,
+} from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
@@ -15,6 +20,7 @@ function formatCurrency(amount) {
 }
 
 const EMPTY_PAYOUT_FORM = { amount: '', note: '', periodLabel: '' };
+const EMPTY_BANK_FORM = { bankName: '', accountHolder: '', accountNumber: '', branch: '' };
 
 function PayTutorsPage() {
   const [tutors, setTutors] = useState([]);
@@ -29,6 +35,12 @@ function PayTutorsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // admin filling in / correcting the tutor's payout account
+  const [isEditingBank, setIsEditingBank] = useState(false);
+  const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
+  const [isSavingBank, setIsSavingBank] = useState(false);
+  const [bankError, setBankError] = useState('');
 
   const selectedTutor = useMemo(
     () => tutors.find((tutor) => tutor.id === selectedTutorId) || null,
@@ -59,6 +71,44 @@ function PayTutorsPage() {
     setForm(EMPTY_PAYOUT_FORM);
     setFormError('');
     setSuccessMessage('');
+    setBankError('');
+    setBankForm({
+      bankName: tutor.bankName || '',
+      accountHolder: tutor.bankAccountHolder || '',
+      accountNumber: '',
+      branch: tutor.bankBranch || '',
+    });
+    // no account on file yet - open straight into the form so the payout
+    // isn't recorded against a tutor nobody can actually pay
+    setIsEditingBank(!tutor.hasBankDetails);
+  }
+
+  async function handleSaveBankDetails(event) {
+    event.preventDefault();
+    setBankError('');
+
+    if (!bankForm.bankName.trim() || !bankForm.accountNumber.trim()) {
+      setBankError('Bank name and account number are both required.');
+      return;
+    }
+
+    setIsSavingBank(true);
+    try {
+      const saved = await updateTutorBankDetailsAsAdmin(payingTutor.id, {
+        bankName: bankForm.bankName.trim(),
+        accountHolder: bankForm.accountHolder.trim(),
+        accountNumber: bankForm.accountNumber.trim(),
+        branch: bankForm.branch.trim(),
+      });
+      const updatedTutor = { ...payingTutor, ...saved };
+      setPayingTutor(updatedTutor);
+      setTutors((prev) => prev.map((t) => (t.id === updatedTutor.id ? { ...t, ...saved } : t)));
+      setIsEditingBank(false);
+    } catch (error) {
+      setBankError(error.message);
+    } finally {
+      setIsSavingBank(false);
+    }
   }
 
   function closePayModal() {
@@ -177,8 +227,96 @@ function PayTutorsPage() {
             <p className="muted" style={{ marginTop: 0 }}>{payingTutor.email}</p>
 
             <div className="card" style={{ background: 'var(--color-bg-soft)', marginBottom: '16px' }}>
-              <h3 style={{ marginTop: 0, fontSize: '0.95rem' }}>Banking information</h3>
-              {payingTutor.hasBankDetails ? (
+              <div className="flex-between">
+                <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Banking information</h3>
+                {!isEditingBank && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setBankError('');
+                      setIsEditingBank(true);
+                    }}
+                  >
+                    {payingTutor.hasBankDetails ? 'Change' : 'Add details'}
+                  </button>
+                )}
+              </div>
+
+              {isEditingBank ? (
+                <>
+                  <p className="muted" style={{ fontSize: '0.84rem' }}>
+                    Saving this updates the Tutor&apos;s payout account and notifies them of the change.
+                  </p>
+                  <div className="card-field-row">
+                    <div className="form-field">
+                      <label htmlFor="admin-bank-name">Bank name</label>
+                      <input
+                        id="admin-bank-name"
+                        type="text"
+                        placeholder="e.g. People's Bank"
+                        value={bankForm.bankName}
+                        onChange={(e) => setBankForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label htmlFor="admin-bank-holder">Account holder</label>
+                      <input
+                        id="admin-bank-holder"
+                        type="text"
+                        placeholder="Name exactly as on the account"
+                        value={bankForm.accountHolder}
+                        onChange={(e) => setBankForm((prev) => ({ ...prev, accountHolder: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="card-field-row">
+                    <div className="form-field">
+                      <label htmlFor="admin-bank-account">Account number</label>
+                      <input
+                        id="admin-bank-account"
+                        type="text"
+                        placeholder="e.g. 8001234567"
+                        value={bankForm.accountNumber}
+                        onChange={(e) => setBankForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label htmlFor="admin-bank-branch">Branch</label>
+                      <input
+                        id="admin-bank-branch"
+                        type="text"
+                        placeholder="e.g. Colombo 07"
+                        value={bankForm.branch}
+                        onChange={(e) => setBankForm((prev) => ({ ...prev, branch: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <Alert type="error" message={bankError} />
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={isSavingBank}
+                      onClick={handleSaveBankDetails}
+                    >
+                      {isSavingBank ? 'Saving...' : 'Save banking details'}
+                    </button>
+                    {payingTutor.hasBankDetails && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={isSavingBank}
+                        onClick={() => setIsEditingBank(false)}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : payingTutor.hasBankDetails ? (
                 <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
                   <div>
                     <dt className="muted" style={{ fontSize: '0.78rem' }}>Bank</dt>
@@ -199,8 +337,8 @@ function PayTutorsPage() {
                 </dl>
               ) : (
                 <p className="muted" style={{ margin: 0, fontSize: '0.88rem' }}>
-                  This Tutor hasn&apos;t added their banking details yet - ask them to add it from their
-                  profile before you send this payout.
+                  This Tutor hasn&apos;t added their banking details yet - add them here, or ask the Tutor
+                  to add them from their own profile.
                 </p>
               )}
             </div>

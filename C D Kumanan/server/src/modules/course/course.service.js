@@ -114,6 +114,51 @@ async function createClass(actingUser, data) {
   return { classData: toSafeClass(created), warnings };
 }
 
+// Which edits a student actually needs to hear about. Cosmetic edits
+// (description wording, capacity) don't earn a notification.
+const NOTIFIABLE_FIELDS = [
+  { key: 'dayOfWeek', column: 'day_of_week', label: 'day', kind: 'text' },
+  { key: 'startTime', column: 'start_time', label: 'start time', kind: 'time' },
+  { key: 'endTime', column: 'end_time', label: 'end time', kind: 'time' },
+  { key: 'venue', column: 'venue', label: 'venue', kind: 'text' },
+  { key: 'fee', column: 'fee', label: 'fee', kind: 'number' },
+  { key: 'subject', column: 'subject', label: 'class title', kind: 'text' },
+];
+
+// MySQL hands times back as "15:00:00" while the form sends "15:00", so
+// times are compared on HH:MM only.
+function hasFieldChanged(field, before, after) {
+  if (before === undefined || before === null || after === undefined || after === null) return false;
+  if (field.kind === 'number') return Number(before) !== Number(after);
+  if (field.kind === 'time') return String(before).slice(0, 5) !== String(after).slice(0, 5);
+  return String(before) !== String(after);
+}
+
+function describeClassChanges(existing, data) {
+  return NOTIFIABLE_FIELDS.filter((field) =>
+    hasFieldChanged(field, existing[field.column], data[field.key])
+  ).map((field) => `${field.label} is now ${data[field.key]}`);
+}
+
+// Tell everyone enrolled that their class moved/changed. Never blocks the
+// edit itself - a notification that fails to send shouldn't undo the update.
+async function notifyEnrolledStudents(classId, message, actorId) {
+  try {
+    const studentIds = await repository.listActiveStudentIdsForClass(classId);
+    for (const studentId of studentIds) {
+      await repository.createNotification({
+        recipientId: studentId,
+        type: 'CLASS_REMINDER',
+        message: message.slice(0, 500),
+        sentBy: actorId,
+      });
+    }
+    return studentIds.length;
+  } catch (error) {
+    return 0;
+  }
+}
+
 async function updateClass(tutorUser, classId, data) {
   const existing = await repository.findClassById(classId);
   assertOwnsClass(tutorUser, existing);
@@ -127,21 +172,39 @@ async function updateClass(tutorUser, classId, data) {
     excludeClassId: classId,
   });
 
+  const changes = describeClassChanges(existing, data);
+
   await repository.updateClass(classId, data);
   await recordAuditEvent({
     actorId: tutorUser.id,
     action: 'CLASS_UPDATED',
     entityType: 'class',
     entityId: classId,
+    details: changes.length > 0 ? { changes } : undefined,
   });
 
+  let notifiedCount = 0;
+  if (changes.length > 0) {
+    notifiedCount = await notifyEnrolledStudents(
+      classId,
+      `"${data.subject || existing.subject}" has been updated: ${changes.join(', ')}.`,
+      tutorUser.id
+    );
+  }
+
   const updated = await repository.findClassWithTutorAndCount(classId);
-  return { classData: toSafeClass(updated), warnings };
+  return { classData: toSafeClass(updated), warnings, notifiedCount };
 }
 
 async function cancelClass(tutorUser, classId) {
   const existing = await repository.findClassById(classId);
   assertOwnsClass(tutorUser, existing);
+
+  const notifiedCount = await notifyEnrolledStudents(
+    classId,
+    `"${existing.subject}" has been cancelled. Please contact the institute if you have questions.`,
+    tutorUser.id
+  );
 
   await repository.cancelClass(classId);
   await recordAuditEvent({
@@ -150,6 +213,8 @@ async function cancelClass(tutorUser, classId) {
     entityType: 'class',
     entityId: classId,
   });
+
+  return { notifiedCount };
 }
 
 // My Classes - all classes for admin, own classes for tutor

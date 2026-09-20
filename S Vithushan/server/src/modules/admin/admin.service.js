@@ -154,13 +154,22 @@ async function listUsers(filters) {
   return rows.map(toSafeUserForAdmin);
 }
 
-// view profile btn
+// view profile btn - Admin also sees the CV/certificates captured when this
+// tutor's enrollment key was issued. Tutors never get this on their own
+// profile: every route serving it sits behind authorize(ADMIN).
 async function getUserProfile(userId) {
   const user = await repository.findUserById(userId);
   if (!user || user.status === 'DELETED') {
     throw ApiError.notFound('User not found.');
   }
-  return toSafeUserForAdmin(user);
+
+  const safeUser = toSafeUserForAdmin(user);
+  if (user.role !== ROLES.TUTOR) {
+    return safeUser;
+  }
+
+  const key = await repository.findTutorKeyByUserId(userId);
+  return { ...safeUser, enrollmentKey: key ? toSafeTutorKey(key, { includeCode: false }) : null };
 }
 
 async function assertCanActOnUser(actingUser, targetUser) {
@@ -425,6 +434,68 @@ async function sendReminders(adminUser, { type, studentIds }) {
   return { type, recipientCount: recipients.length, sentCount };
 }
 
+// tutor's own class list, for picking who a message goes to
+async function listMyClassesForMessaging(tutorUser) {
+  const rows = await repository.listClassesForTutor(tutorUser.id);
+  return rows.map((row) => ({ id: row.id, subject: row.subject, level: row.level }));
+}
+
+// Tutor -> their own students and/or Admin. A tutor can never reach a student
+// who isn't actively enrolled in one of their classes: the recipient list is
+// built from their own enrollments, never from anything the client sends.
+async function sendTutorMessage(tutorUser, { audience, classId, subject, message }) {
+  const recipientIds = new Set();
+
+  if (audience === 'STUDENTS' || audience === 'BOTH') {
+    if (classId) {
+      const ownsClass = (await repository.listClassesForTutor(tutorUser.id)).some(
+        (row) => row.id === Number(classId)
+      );
+      if (!ownsClass) {
+        throw ApiError.forbidden('You can only message students in your own classes.');
+      }
+    }
+    const studentIds = await repository.listStudentIdsForTutor(tutorUser.id, classId);
+    studentIds.forEach((id) => recipientIds.add(id));
+  }
+
+  if (audience === 'ADMIN' || audience === 'BOTH') {
+    const adminIds = await repository.listAdminIds();
+    adminIds.forEach((id) => recipientIds.add(id));
+  }
+
+  if (recipientIds.size === 0) {
+    throw ApiError.badRequest(
+      audience === 'ADMIN'
+        ? 'No active Admin account was found to send this to.'
+        : 'No students are actively enrolled in your classes yet.'
+    );
+  }
+
+  // req.user only carries id/role/email, so read the tutor's display name
+  const sender = await repository.findUserById(tutorUser.id);
+  const senderName = sender ? sender.full_name : 'your tutor';
+  const body = `${subject.trim()} - ${message.trim()} (from ${senderName})`;
+  for (const recipientId of recipientIds) {
+    await repository.logNotification({
+      recipientId,
+      channel: 'EMAIL',
+      type: 'ANNOUNCEMENT',
+      message: body.slice(0, 500),
+      sentBy: tutorUser.id,
+    });
+  }
+
+  await recordAuditEvent({
+    actorId: tutorUser.id,
+    action: 'TUTOR_MESSAGE_SENT',
+    entityType: 'notification_batch',
+    details: { audience, classId: classId || null, recipientCount: recipientIds.size },
+  });
+
+  return { recipientCount: recipientIds.size, audience };
+}
+
 // notification bell - personal reminders for this user
 async function listMyNotifications(user) {
   const rows = await repository.listNotificationsForUser(user.id, 30);
@@ -453,4 +524,6 @@ module.exports = {
   sendReminders,
   getReminderCandidates,
   listMyNotifications,
+  listMyClassesForMessaging,
+  sendTutorMessage,
 };

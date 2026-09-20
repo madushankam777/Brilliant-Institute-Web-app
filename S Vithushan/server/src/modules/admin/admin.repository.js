@@ -173,6 +173,15 @@ async function findTutorKeyById(keyId) {
   return rows[0] || null;
 }
 
+// admin viewing a tutor: the key they redeemed carries their CV/certificates
+async function findTutorKeyByUserId(userId) {
+  const [rows] = await pool.execute(
+    `SELECT * FROM tutor_enrollment_keys WHERE used_by = ? ORDER BY used_at DESC LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
 async function revokeTutorKey(keyId) {
   await pool.execute(`UPDATE tutor_enrollment_keys SET status = 'REVOKED' WHERE id = ?`, [keyId]);
 }
@@ -180,6 +189,41 @@ async function revokeTutorKey(keyId) {
 // delete btn - remove key record
 async function deleteTutorKey(keyId) {
   await pool.execute(`DELETE FROM tutor_enrollment_keys WHERE id = ?`, [keyId]);
+}
+
+async function listAdminIds() {
+  const [rows] = await pool.execute(
+    `SELECT id FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'`
+  );
+  return rows.map((row) => row.id);
+}
+
+// students a tutor may message - everyone actively enrolled in their classes,
+// optionally narrowed to one class
+async function listStudentIdsForTutor(tutorId, classId) {
+  const params = [tutorId];
+  let clause = '';
+  if (classId) {
+    clause = ' AND c.id = ?';
+    params.push(classId);
+  }
+  const [rows] = await pool.execute(
+    `SELECT DISTINCT e.student_id
+     FROM enrollments e
+     JOIN classes c ON c.id = e.class_id
+     JOIN users u ON u.id = e.student_id
+     WHERE c.tutor_id = ? AND e.status = 'ACTIVE' AND u.status = 'ACTIVE'${clause}`,
+    params
+  );
+  return rows.map((row) => row.student_id);
+}
+
+async function listClassesForTutor(tutorId) {
+  const [rows] = await pool.execute(
+    `SELECT id, subject, level FROM classes WHERE tutor_id = ? AND status = 'ACTIVE' ORDER BY subject ASC`,
+    [tutorId]
+  );
+  return rows;
 }
 
 // --- Announcements -----------------------------------------------------------
@@ -321,6 +365,10 @@ module.exports = {
   createTutorKey,
   listTutorKeys,
   findTutorKeyById,
+  findTutorKeyByUserId,
+  listAdminIds,
+  listStudentIdsForTutor,
+  listClassesForTutor,
   revokeTutorKey,
   deleteTutorKey,
   createAnnouncement,

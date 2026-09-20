@@ -83,9 +83,11 @@ function ManageClassesPage() {
                 : 'Manage the classes you teach - edit details or cancel a session series.'}
             </p>
           </div>
-          <Link to="/courses/manage/new" className="btn btn-primary">
-            <Icon name="plus" size={16} /> Create Class
-          </Link>
+          {isAdmin && (
+            <Link to="/courses/manage/new" className="btn btn-primary">
+              <Icon name="plus" size={16} /> Create Class
+            </Link>
+          )}
         </div>
 
         <Alert type="error" message={errorMessage} />
@@ -93,7 +95,11 @@ function ManageClassesPage() {
         {isLoading ? (
           <LoadingSpinner label="Loading your classes..." />
         ) : classes.length === 0 ? (
-          <p className="muted">You have not created any classes yet.</p>
+          <p className="muted">
+            {isAdmin
+              ? 'No classes have been created yet.'
+              : 'No classes have been assigned to you yet - an Admin creates classes and assigns them to Tutors.'}
+          </p>
         ) : (
           <div className="card">
             <div className="table-scroll">

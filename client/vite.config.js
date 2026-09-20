@@ -20,6 +20,8 @@ export default defineConfig({
   publicDir: path.resolve(__dirname, '../shared/client/public'),
   server: {
     port: 5173,
+    // allow tunnel hostnames (Vite blocks unrecognized Host headers by default)
+    allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     // Lets the dev server read shared/, which sits outside this app's own
     // root (one level up: client -> repo root).
     fs: {
@@ -35,6 +37,27 @@ export default defineConfig({
       // that point, not the browser's cross-origin request, so the backend
       // should see it as same-origin (needed for CORS to work no matter
       // what public URL - LAN IP, tunnel, real domain - served the page).
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'));
+        },
+      },
+      '/uploads': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'));
+        },
+      },
+    },
+  },
+  // serves the production build (npm run build) - mirrors server config above
+  preview: {
+    port: 4173,
+    allowedHosts: ['.loca.lt', '.trycloudflare.com'],
+    proxy: {
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

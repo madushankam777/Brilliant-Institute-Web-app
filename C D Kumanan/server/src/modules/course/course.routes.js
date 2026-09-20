@@ -31,9 +31,10 @@ router.get(
   authorize(ROLES.TUTOR, ROLES.ADMIN),
   controller.listMyTaughtClasses
 );
+// Only Admin creates classes - tutors edit the ones assigned to them.
 router.post(
   '/classes',
-  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  authorize(ROLES.ADMIN),
   createClassRules,
   validateRequest,
   controller.createClass

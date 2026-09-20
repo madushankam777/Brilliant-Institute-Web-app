@@ -1,7 +1,7 @@
 // Admin: read-only view of a single user's/tutor's full profile
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { fetchUserProfile } from '../../api/adminApi';
+import { fetchUserProfile, getTutorKeyDocumentUrl } from '../../api/adminApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
@@ -130,6 +130,73 @@ function UserProfilePage() {
             </div>
           )}
         </div>
+
+        {/* Admin-only: the vetting documents captured when this tutor's
+            enrollment key was issued. Tutors never see these. */}
+        {user.role === 'TUTOR' && (
+          <div className="card">
+            <h2>Verification documents</h2>
+            <p className="muted" style={{ fontSize: '0.88rem', marginTop: '-4px' }}>
+              Submitted when this Tutor&apos;s enrollment key was issued. Visible to Admin accounts only.
+            </p>
+
+            {!user.enrollmentKey ? (
+              <p className="muted">
+                This Tutor was created directly by an Admin, so there are no enrollment-key documents on
+                file for them.
+              </p>
+            ) : (
+              <>
+                <div className="feature-grid" style={{ marginBottom: '14px' }}>
+                  <div>
+                    <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>Issued for</p>
+                    <p style={{ marginTop: 0 }}>{user.enrollmentKey.intendedFor || 'Not recorded'}</p>
+                  </div>
+                  <div>
+                    <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>National ID / Passport</p>
+                    <p style={{ marginTop: 0 }}>{user.enrollmentKey.idNumber || 'Not recorded'}</p>
+                  </div>
+                  <div>
+                    <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>Key issued</p>
+                    <p style={{ marginTop: 0 }}>{user.enrollmentKey.createdAt}</p>
+                  </div>
+                  <div>
+                    <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>Key redeemed</p>
+                    <p style={{ marginTop: 0 }}>{user.enrollmentKey.usedAt || 'Not recorded'}</p>
+                  </div>
+                </div>
+
+                {!user.enrollmentKey.hasCv && user.enrollmentKey.certificateCount === 0 ? (
+                  <p className="muted">No CV or certificates were uploaded with this key.</p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {user.enrollmentKey.hasCv && (
+                      <a
+                        href={getTutorKeyDocumentUrl(user.enrollmentKey.id, 'cv')}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-sm"
+                      >
+                        View CV
+                      </a>
+                    )}
+                    {Array.from({ length: user.enrollmentKey.certificateCount }).map((_, index) => (
+                      <a
+                        key={index}
+                        href={getTutorKeyDocumentUrl(user.enrollmentKey.id, `certificate-${index}`)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Certificate {index + 1}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </PortalShell>
   );

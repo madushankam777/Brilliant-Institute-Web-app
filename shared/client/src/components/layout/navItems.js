@@ -18,6 +18,7 @@ export function getNavItems(role) {
       { to: '/attendance/classes', label: 'Mark Attendance', icon: 'calendar' },
       { to: '/courses/manage', label: 'My Classes', icon: 'book' },
       { to: '/students/mine', label: 'My Students', icon: 'users' },
+      { to: '/notify', label: 'Notify Students', icon: 'megaphone' },
       { to: '/admin/feedback', label: 'Feedback', icon: 'chat' },
       { to: '/profile', label: 'My Profile', icon: 'user' },
     ];

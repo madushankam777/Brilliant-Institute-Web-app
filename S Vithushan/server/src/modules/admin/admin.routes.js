@@ -18,6 +18,7 @@ const {
   updateAnnouncementRules,
   sendRemindersRules,
   reminderCandidatesQueryRules,
+  tutorMessageRules,
 } = require('./admin.validation');
 
 const router = express.Router();
@@ -52,8 +53,16 @@ router.delete(
   controller.deleteUser
 );
 
-// --- Tutor only: their own student roster ---
+// --- Tutor only: their own student roster + messaging their own students ---
 router.get('/students/mine', authorize(ROLES.TUTOR), controller.listMyStudents);
+router.get('/tutor/my-classes', authorize(ROLES.TUTOR), controller.listMyClassesForMessaging);
+router.post(
+  '/tutor/messages',
+  authorize(ROLES.TUTOR),
+  tutorMessageRules,
+  validateRequest,
+  controller.sendTutorMessage
+);
 
 // --- Admin only: everything below ---
 router.use('/admin', authorize(ROLES.ADMIN));

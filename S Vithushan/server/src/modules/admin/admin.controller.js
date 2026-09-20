@@ -164,6 +164,21 @@ const listMyNotifications = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { notifications } });
 });
 
+// tutor -> their own students and/or Admin
+const listMyClassesForMessaging = asyncHandler(async (req, res) => {
+  const classes = await service.listMyClassesForMessaging(req.user);
+  res.status(200).json({ success: true, data: { classes } });
+});
+
+const sendTutorMessage = asyncHandler(async (req, res) => {
+  const result = await service.sendTutorMessage(req.user, req.body);
+  res.status(201).json({
+    success: true,
+    message: `Message sent to ${result.recipientCount} recipient(s).`,
+    data: { result },
+  });
+});
+
 module.exports = {
   getDashboardStats,
   listUsers,
@@ -186,4 +201,6 @@ module.exports = {
   sendReminders,
   getReminderCandidates,
   listMyNotifications,
+  listMyClassesForMessaging,
+  sendTutorMessage,
 };
