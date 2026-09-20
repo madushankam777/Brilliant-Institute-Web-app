@@ -7,6 +7,7 @@ const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const controller = require('./payment.controller');
 const {
   makePaymentRules,
+  onlineCheckoutRules,
   bankTransferRules,
   editBankTransferRules,
   paymentIdParamRules,
@@ -43,6 +44,24 @@ router.put(
 router.get('/balance', authorize(ROLES.STUDENT_PARENT), controller.getMyBalances);
 router.get('/history', authorize(ROLES.STUDENT_PARENT), controller.getMyPaymentHistory);
 router.post('/', authorize(ROLES.STUDENT_PARENT), makePaymentRules, validateRequest, controller.makePayment);
+
+// Real online payment (card / eZ Cash / mCash via PayHere). The webhook that
+// actually settles it is mounted separately in app.js, ahead of the auth and
+// CSRF guards, because PayHere calls it server-to-server.
+router.post(
+  '/checkout/online',
+  authorize(ROLES.STUDENT_PARENT),
+  onlineCheckoutRules,
+  validateRequest,
+  controller.startOnlineCheckout
+);
+router.get(
+  '/:paymentId/status',
+  authorize(ROLES.STUDENT_PARENT),
+  paymentIdParamRules,
+  validateRequest,
+  controller.getMyPaymentStatus
+);
 router.patch(
   '/:paymentId/retry',
   authorize(ROLES.STUDENT_PARENT),

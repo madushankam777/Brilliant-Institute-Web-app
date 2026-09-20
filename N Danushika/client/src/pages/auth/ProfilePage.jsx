@@ -24,6 +24,15 @@ function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
+// Letters, spaces, apostrophes, periods, and hyphens only - no digits or
+// other symbols typed into a name field by mistake.
+const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
+
+// Digits plus the punctuation real phone numbers are written with.
+const PHONE_REGEX = /^[0-9+\-\s()]+$/;
+const PHONE_ERROR = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
+
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/profile', label: 'My Profile', icon: 'user' },
@@ -35,6 +44,7 @@ function ProfilePage() {
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone || '');
   const [bio, setBio] = useState(user.bio || '');
+  const [profileFieldErrors, setProfileFieldErrors] = useState({});
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -94,6 +104,19 @@ function ProfilePage() {
     event.preventDefault();
     setProfileError('');
     setProfileMessage('');
+
+    const errors = {};
+    if (fullName.trim().length < 2) {
+      errors.fullName = 'Please enter your full name.';
+    } else if (!NAME_REGEX.test(fullName.trim())) {
+      errors.fullName = NAME_ERROR;
+    }
+    if (phone.trim() && !PHONE_REGEX.test(phone.trim())) {
+      errors.phone = PHONE_ERROR;
+    }
+    setProfileFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setIsSavingProfile(true);
     try {
       await updateMyProfile({ fullName, phone, bio });
@@ -209,6 +232,7 @@ function ProfilePage() {
               icon="user"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              error={profileFieldErrors.fullName}
               required
             />
             <FormField
@@ -217,6 +241,7 @@ function ProfilePage() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              error={profileFieldErrors.phone}
             />
 
             {user.role === 'TUTOR' && (

@@ -102,6 +102,31 @@ const config = {
     providerName: process.env.PAYMENT_GATEWAY_PROVIDER_NAME || 'mock-gateway',
     apiKey: process.env.PAYMENT_GATEWAY_API_KEY || '',
   },
+
+  // PayHere - the live card / eZ Cash / mCash gateway. When merchantId and
+  // merchantSecret are both set, real online payments are enabled; when they
+  // are blank the app falls back to the built-in simulator so the project
+  // still runs locally without credentials.
+  payhere: {
+    merchantId: process.env.PAYHERE_MERCHANT_ID || '',
+    merchantSecret: process.env.PAYHERE_MERCHANT_SECRET || '',
+    // 'sandbox' until you have gone through PayHere's live approval.
+    mode: process.env.PAYHERE_MODE === 'live' ? 'live' : 'sandbox',
+    currency: process.env.PAYHERE_CURRENCY || 'LKR',
+    // The public https:// origin the browser reaches this app on. PayHere
+    // sends the payer back here, and posts its server-to-server payment
+    // notification to <publicBaseUrl>/api/payments/payhere/notify - so
+    // "localhost" will NOT work, it must be reachable from the internet
+    // (a tunnel such as ngrok/cloudflared is fine while developing).
+    publicBaseUrl: (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, ''),
+    // Optional override when the API is served from a different public
+    // origin than the site (leave blank when Vite proxies /api).
+    notifyUrlOverride: process.env.PAYHERE_NOTIFY_URL || '',
+  },
 };
+
+config.payhere.isConfigured = Boolean(
+  config.payhere.merchantId && config.payhere.merchantSecret && config.payhere.publicBaseUrl
+);
 
 module.exports = config;

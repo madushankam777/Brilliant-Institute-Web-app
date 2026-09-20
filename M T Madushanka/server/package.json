@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "db:seed": "node scripts/seed.js",
+    "payhere:verify": "node scripts/verify-payhere.js",
     "check": "node --check src/server.js"
   },
   "dependencies": {

@@ -16,10 +16,20 @@ const initialForm = {
   enrollmentKey: '',
 };
 
+// Letters, spaces, apostrophes, periods, and hyphens only - no digits or
+// other symbols typed into a name field by mistake.
+const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
+
+// Digits plus the punctuation real phone numbers are written with.
+const PHONE_REGEX = /^[0-9+\-\s()]+$/;
+const PHONE_ERROR = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
+
 function PlaceholderRegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,9 +37,27 @@ function PlaceholderRegisterPage() {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  function validate() {
+    const errors = {};
+    if (form.fullName.trim().length < 2) {
+      errors.fullName = 'Please enter your full name.';
+    } else if (!NAME_REGEX.test(form.fullName.trim())) {
+      errors.fullName = NAME_ERROR;
+    }
+    if (form.phone.trim() && !PHONE_REGEX.test(form.phone.trim())) {
+      errors.phone = PHONE_ERROR;
+    }
+    return errors;
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
+
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setIsSubmitting(true);
     try {
       await register(form);
@@ -82,6 +110,7 @@ function PlaceholderRegisterPage() {
           placeholder="John Doe"
           value={form.fullName}
           onChange={(e) => updateField('fullName', e.target.value)}
+          error={fieldErrors.fullName}
           required
         />
         <FormField
@@ -102,6 +131,7 @@ function PlaceholderRegisterPage() {
           placeholder="+94 123 456 789"
           value={form.phone}
           onChange={(e) => updateField('phone', e.target.value)}
+          error={fieldErrors.phone}
         />
 
         {form.role === 'STUDENT_PARENT' && (

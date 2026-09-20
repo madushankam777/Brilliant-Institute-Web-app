@@ -15,6 +15,15 @@ function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
+// Letters, spaces, apostrophes, periods, and hyphens only - covers real
+// names ("Mary-Jane O'Brien") while catching digits/symbols typed by mistake.
+const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
+
+// Digits plus the punctuation real phone numbers are written with.
+const PHONE_REGEX = /^[0-9+\-\s()]+$/;
+const PHONE_ERROR = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
+
 const initialFormState = {
   fullName: '',
   email: '',
@@ -42,9 +51,14 @@ function RegisterPage() {
     const errors = {};
     if (form.fullName.trim().length < 2) {
       errors.fullName = 'Please enter your full name.';
+    } else if (!NAME_REGEX.test(form.fullName.trim())) {
+      errors.fullName = NAME_ERROR;
     }
     if (!/^\S+@\S+\.\S+$/.test(form.email)) {
       errors.email = 'Please enter a valid email address.';
+    }
+    if (form.phone.trim() && !PHONE_REGEX.test(form.phone.trim())) {
+      errors.phone = PHONE_ERROR;
     }
     if (!isStrongPassword(form.password)) {
       errors.password = PASSWORD_RULE_MESSAGE;

@@ -16,6 +16,12 @@ const router = express.Router();
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
 
+// Letters, spaces, apostrophes, periods, and hyphens only - no digits or
+// other symbols someone typed (or pasted) into a name field by mistake.
+const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+// Digits plus the punctuation real phone numbers are written with.
+const PHONE_REGEX = /^[0-9+\-\s()]+$/;
+
 function issueSessionCookie(res, user) {
   const token = jwt.sign({ sub: user.id, role: user.role }, config.auth.jwtSecret, {
     algorithm: 'HS256',
@@ -38,8 +44,17 @@ router.post(
     const { fullName, email, phone, password, grade, role, enrollmentKey } = req.body;
     const targetRole = role === 'TUTOR' ? 'TUTOR' : 'STUDENT_PARENT';
 
-    if (!fullName || String(fullName).trim().length < 2) {
-      throw ApiError.badRequest('Please enter your full name.');
+    const trimmedFullName = String(fullName || '').trim();
+    if (trimmedFullName.length < 2 || trimmedFullName.length > 150) {
+      throw ApiError.badRequest('Full name must be between 2 and 150 characters.');
+    }
+    if (!NAME_REGEX.test(trimmedFullName)) {
+      throw ApiError.badRequest(
+        'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.'
+      );
+    }
+    if (phone && !PHONE_REGEX.test(String(phone).trim())) {
+      throw ApiError.badRequest('Phone number can only contain digits, spaces, and the symbols + - ( ).');
     }
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       throw ApiError.badRequest('Please enter a valid email address.');
@@ -81,7 +96,7 @@ router.post(
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password_hash, phone, role, grade, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', NOW())`,
-      [fullName, email, passwordHash, phone || null, targetRole, targetRole === 'STUDENT_PARENT' ? grade : null]
+      [trimmedFullName, email, passwordHash, phone || null, targetRole, targetRole === 'STUDENT_PARENT' ? grade : null]
     );
     const userId = result.insertId;
 

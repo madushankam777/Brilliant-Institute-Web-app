@@ -6,6 +6,13 @@ const { INSTANT_PAYMENT_METHODS } = require('./payment.constants');
 // (07XXXXXXXX, or the same number written as +947XXXXXXXX).
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
+// Letters, spaces, apostrophes, and hyphens only - no digits or symbols.
+const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+
+// Letters, numbers, spaces, hyphens, and slashes - what a real bank
+// account number or transfer reference looks like, nothing else.
+const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
+
 function isMethod(...methods) {
   return (value, { req }) => methods.includes(req.body.paymentMethod);
 }
@@ -28,7 +35,9 @@ const makePaymentRules = [
     .if(isMethod('CARD'))
     .trim()
     .isLength({ min: 2, max: 100 })
-    .withMessage('Cardholder name is required.'),
+    .withMessage('Cardholder name is required.')
+    .matches(NAME_REGEX)
+    .withMessage('Cardholder name can only contain letters, spaces, apostrophes, and hyphens - no numbers or symbols.'),
   body('paymentDetails.cardLast4')
     .if(isMethod('CARD'))
     .matches(/^\d{4}$/)
@@ -45,13 +54,22 @@ const makePaymentRules = [
     .withMessage('Enter a valid mobile number registered for this wallet (e.g. 07XXXXXXXX).'),
 ];
 
+// Online checkout only needs what we sign - the payer picks their card or
+// wallet on PayHere's own page, so no instrument details come from here.
+const onlineCheckoutRules = [
+  body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
+  body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number.'),
+];
+
 const bankTransferRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
   body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number.'),
   body('bankReference')
     .trim()
     .isLength({ min: 4, max: 40 })
-    .withMessage('Enter your bank account number or transfer reference.'),
+    .withMessage('Enter your bank account number or transfer reference.')
+    .matches(BANK_REFERENCE_REGEX)
+    .withMessage('Reference can only contain letters, numbers, spaces, hyphens, and slashes - no other symbols.'),
 ];
 
 const paymentIdParamRules = [
@@ -65,7 +83,9 @@ const editBankTransferRules = [
     .optional({ checkFalsy: true })
     .trim()
     .isLength({ min: 4, max: 40 })
-    .withMessage('Enter your bank account number or transfer reference.'),
+    .withMessage('Enter your bank account number or transfer reference.')
+    .matches(BANK_REFERENCE_REGEX)
+    .withMessage('Reference can only contain letters, numbers, spaces, hyphens, and slashes - no other symbols.'),
 ];
 
 const payTutorRules = [
@@ -125,6 +145,7 @@ const paymentSettingsRules = [
 
 module.exports = {
   makePaymentRules,
+  onlineCheckoutRules,
   bankTransferRules,
   editBankTransferRules,
   paymentIdParamRules,

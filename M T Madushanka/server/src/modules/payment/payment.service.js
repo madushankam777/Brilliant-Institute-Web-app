@@ -5,6 +5,7 @@ const { recordAuditEvent } = require('../../../../../shared/server/src/utils/aud
 const { toSafePayment } = require('../../../../../shared/server/src/utils/sanitize');
 const { PAYMENT_STATUS } = require('./payment.constants');
 const gateway = require('./paymentGateway');
+const payhere = require('./payhereGateway');
 const repository = require('./payment.repository');
 
 // gateway timeout error
@@ -495,6 +496,10 @@ async function getPaymentSettings() {
     bankSwift: row ? row.bank_swift : null,
     ezCashNumber: row ? row.ez_cash_number : null,
     mcashNumber: row ? row.mcash_number : null,
+    // Tells the checkout screen whether to send people to the real gateway
+    // or fall back to the built-in simulator.
+    onlinePaymentsEnabled: payhere.isConfigured(),
+    onlinePaymentProvider: payhere.isConfigured() ? 'payhere' : null,
   };
 }
 
@@ -610,10 +615,202 @@ async function listTutorPayouts() {
   };
 }
 
+// =========================================================================
+// PayHere - real online payments (card / eZ Cash / mCash)
+// =========================================================================
+
+/**
+ * Step 1 of the online flow: reserve a PENDING payment row and hand back the
+ * signed field set the browser posts to PayHere. Nothing about the money has
+ * happened yet - the balance only moves when PayHere calls us back.
+ */
+async function startOnlineCheckout(studentUser, { enrollmentId, amount }) {
+  if (!payhere.isConfigured()) {
+    throw ApiError.badRequest(
+      'Online card payments are not switched on yet. Please use Bank Transfer, or ask an Administrator to finish the PayHere setup.'
+    );
+  }
+
+  // Reuses the same ownership / amount / balance checks as every other
+  // payment path. 'ONLINE' because the payer picks the actual instrument
+  // on PayHere's page - the notification tells us which one they used.
+  const paymentId = await createPendingPaymentRecord(studentUser, {
+    enrollmentId,
+    amount,
+    paymentMethod: 'ONLINE',
+    paymentDetails: { provider: 'payhere' },
+  });
+
+  const enrollment = await repository.findEnrollmentById(enrollmentId);
+
+  const checkout = payhere.buildCheckoutRequest({
+    paymentId,
+    amount,
+    itemDescription: `Tuition fee - ${enrollment ? enrollment.subject : 'Brilliant Institute'}`,
+    student: studentUser,
+  });
+
+  await recordAuditEvent({
+    actorId: studentUser.id,
+    action: 'PAYMENT_CHECKOUT_STARTED',
+    entityType: 'payment',
+    entityId: paymentId,
+    details: { provider: 'payhere', amount },
+  });
+
+  return { paymentId, ...checkout };
+}
+
+/**
+ * Step 2: PayHere's server-to-server notification. This is the ONLY place an
+ * online payment becomes SUCCESSFUL - the payer's browser returning to our
+ * site proves nothing and is never trusted.
+ *
+ * Safe to receive more than once: PayHere retries, so every branch here is
+ * idempotent.
+ */
+async function handlePayHereNotification(body) {
+  if (!payhere.isConfigured()) {
+    return { handled: false, reason: 'PayHere is not configured.' };
+  }
+
+  const result = payhere.verifyNotification(body);
+  if (!result.valid) {
+    // Anyone can POST to this public URL - an unsigned request is simply
+    // not from PayHere, so it must not touch a single row.
+    return { handled: false, reason: 'Signature verification failed.' };
+  }
+  if (!result.paymentId) {
+    return { handled: false, reason: 'Unrecognised order id.' };
+  }
+
+  const outcome = await withTransaction(async (connection) => {
+    const payment = await repository.findPaymentByIdForUpdate(result.paymentId, connection);
+    if (!payment) {
+      return { status: 'unknown-payment' };
+    }
+
+    // Already settled by an earlier delivery of this same notification.
+    if (payment.status === PAYMENT_STATUS.SUCCESSFUL) {
+      return { status: 'already-successful' };
+    }
+    if (payment.status !== PAYMENT_STATUS.PENDING) {
+      return { status: 'not-pending' };
+    }
+
+    // Never take the posted amount at face value - it decides how much
+    // credit the student gets, so it has to match what we asked for.
+    if (payhere.formatAmount(payment.amount) !== payhere.formatAmount(result.amount)) {
+      return { status: 'amount-mismatch' };
+    }
+
+    const storedDetails = {
+      method: result.mappedMethod,
+      provider: 'payhere',
+      providerPaymentId: result.providerPaymentId,
+      providerMethod: result.providerMethod,
+      cardholderName: result.cardHolderName,
+      cardLast4: result.cardLast4,
+    };
+
+    if (result.statusCode !== payhere.STATUS.SUCCESS) {
+      if (result.statusCode === payhere.STATUS.PENDING) {
+        // e.g. an offline instrument still clearing - leave it PENDING and
+        // wait for PayHere's follow-up notification.
+        return { status: 'still-pending' };
+      }
+      await repository.markPaymentFailed(
+        payment.id,
+        { gatewayTransactionId: result.providerPaymentId },
+        connection
+      );
+      await repository.updatePaymentMethodAndDetails(
+        payment.id,
+        { paymentMethod: result.mappedMethod, paymentDetails: storedDetails },
+        connection
+      );
+      return { status: 'failed', studentId: payment.student_id, amount: Number(payment.amount) };
+    }
+
+    const enrollment = await repository.findEnrollmentByIdForUpdate(
+      payment.enrollment_id,
+      connection
+    );
+    const balanceAfter = Number(enrollment.balance) - Number(payment.amount);
+
+    await repository.markPaymentSuccessful(
+      payment.id,
+      { gatewayTransactionId: result.providerPaymentId, balanceAfter },
+      connection
+    );
+    await repository.updatePaymentMethodAndDetails(
+      payment.id,
+      { paymentMethod: result.mappedMethod, paymentDetails: storedDetails },
+      connection
+    );
+    await repository.updateEnrollmentBalance(payment.enrollment_id, balanceAfter, connection);
+
+    const receiptNumber = buildReceiptNumber(payment.id);
+    await repository.createReceipt(payment.id, receiptNumber, connection);
+
+    return {
+      status: 'successful',
+      studentId: payment.student_id,
+      amount: Number(payment.amount),
+      subject: enrollment.subject,
+      receiptNumber,
+    };
+  });
+
+  if (outcome.status === 'successful') {
+    await recordAuditEvent({
+      actorId: outcome.studentId,
+      action: 'PAYMENT_SUCCESSFUL',
+      entityType: 'payment',
+      entityId: result.paymentId,
+      details: { provider: 'payhere', receiptNumber: outcome.receiptNumber },
+    });
+    await repository.createNotification({
+      recipientId: outcome.studentId,
+      type: 'PAYMENT_APPROVED',
+      message: `Your payment of LKR ${outcome.amount.toFixed(2)} for ${outcome.subject} was received. Receipt: ${outcome.receiptNumber}.`,
+      sentBy: null,
+    });
+  } else if (outcome.status === 'failed') {
+    await recordAuditEvent({
+      actorId: outcome.studentId,
+      action: 'PAYMENT_FAILED',
+      entityType: 'payment',
+      entityId: result.paymentId,
+      details: { provider: 'payhere', reason: result.statusMessage || result.statusCode },
+    });
+  }
+
+  return { handled: true, ...outcome };
+}
+
+/**
+ * Polled by the return page after PayHere sends the payer back, since the
+ * real result arrives on the webhook and may land a moment later.
+ */
+async function getMyPaymentStatus(studentUser, paymentId) {
+  const payment = await repository.findPaymentWithDetailsById(paymentId);
+  if (!payment) {
+    throw ApiError.notFound('Payment not found.');
+  }
+  if (payment.student_id !== studentUser.id) {
+    throw ApiError.forbidden('You can only view your own payments.');
+  }
+  return toSafePayment(payment);
+}
+
 module.exports = {
   getMyBalances,
   makePayment,
   retryPendingPayment,
+  startOnlineCheckout,
+  handlePayHereNotification,
+  getMyPaymentStatus,
   getBankTransferAvailability,
   submitBankTransferPayment,
   editBankTransferPayment,

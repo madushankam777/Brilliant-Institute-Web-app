@@ -10,6 +10,12 @@ import { getNavItems } from '../../components/layout/navItems';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// Digits, spaces, and dashes only - matches the server's own account
+// number rule (payment.validation.js bankDetailsRules/paymentSettingsRules).
+const ACCOUNT_NUMBER_REGEX = /^[0-9 -]{4,34}$/;
+// Sri Lankan mobile number - what eZ Cash / mCash are actually tied to.
+const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
+
 const EMPTY_FORM = {
   bankName: '',
   bankAccountName: '',
@@ -27,6 +33,7 @@ function PaymentSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   useEffect(() => {
     let isMounted = true;
@@ -58,10 +65,32 @@ function PaymentSettingsPage() {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  function validate() {
+    const errors = {};
+    if (form.bankAccountNumber.trim() && !ACCOUNT_NUMBER_REGEX.test(form.bankAccountNumber.trim())) {
+      errors.bankAccountNumber = 'Enter a valid account number (digits, spaces, and dashes only).';
+    }
+    if (form.ezCashNumber.trim() && !WALLET_PHONE_REGEX.test(form.ezCashNumber.trim())) {
+      errors.ezCashNumber = 'Enter a valid eZ Cash mobile number (e.g. 0771234567).';
+    }
+    if (form.mcashNumber.trim() && !WALLET_PHONE_REGEX.test(form.mcashNumber.trim())) {
+      errors.mcashNumber = 'Enter a valid mCash mobile number (e.g. 0771234567).';
+    }
+    return errors;
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSaveError('');
     setSaveMessage('');
+
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setSaveError('Please fix the highlighted fields.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await updatePaymentSettings(form);
@@ -115,6 +144,7 @@ function PaymentSettingsPage() {
                 placeholder="e.g. 100-2-001-5-0123456"
                 value={form.bankAccountNumber}
                 onChange={(e) => updateField('bankAccountNumber', e.target.value)}
+                error={fieldErrors.bankAccountNumber}
               />
               <div className="card-field-row">
                 <FormField
@@ -146,6 +176,7 @@ function PaymentSettingsPage() {
                   placeholder="07XXXXXXXX"
                   value={form.ezCashNumber}
                   onChange={(e) => updateField('ezCashNumber', e.target.value)}
+                  error={fieldErrors.ezCashNumber}
                 />
                 <FormField
                   id="mcashNumber"
@@ -154,6 +185,7 @@ function PaymentSettingsPage() {
                   placeholder="07XXXXXXXX"
                   value={form.mcashNumber}
                   onChange={(e) => updateField('mcashNumber', e.target.value)}
+                  error={fieldErrors.mcashNumber}
                 />
               </div>
 

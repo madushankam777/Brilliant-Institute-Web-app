@@ -197,10 +197,46 @@ const listTutorPayouts = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+// Hands the browser a signed field set to POST to PayHere. No money has
+// moved at this point - the payment is only PENDING.
+const startOnlineCheckout = asyncHandler(async (req, res) => {
+  const { enrollmentId, amount } = req.body;
+  const checkout = await service.startOnlineCheckout(req.user, { enrollmentId, amount });
+  res.status(201).json({ success: true, data: { checkout } });
+});
+
+// Public webhook - PayHere calls this server-to-server. It is deliberately
+// unauthenticated (PayHere has no session cookie); the signature check
+// inside the service is what makes it trustworthy.
+//
+// Always answers 200: a non-2xx just makes PayHere retry, and a request
+// that fails verification is not going to start verifying on the 4th
+// attempt. Rejections are logged instead.
+const handlePayHereNotification = asyncHandler(async (req, res) => {
+  const outcome = await service.handlePayHereNotification(req.body);
+
+  if (!outcome.handled) {
+    // eslint-disable-next-line no-console
+    console.warn('[payhere] ignored notification:', outcome.reason, {
+      orderId: req.body && req.body.order_id,
+    });
+  }
+
+  res.status(200).send('OK');
+});
+
+const getMyPaymentStatus = asyncHandler(async (req, res) => {
+  const payment = await service.getMyPaymentStatus(req.user, Number(req.params.paymentId));
+  res.status(200).json({ success: true, data: { payment } });
+});
+
 module.exports = {
   getMyBalances,
   makePayment,
   retryPendingPayment,
+  startOnlineCheckout,
+  handlePayHereNotification,
+  getMyPaymentStatus,
   getMyPaymentHistory,
   getBankTransferAvailability,
   submitBankTransferPayment,

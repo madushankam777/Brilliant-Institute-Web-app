@@ -95,6 +95,20 @@ async function updatePaymentDetails(paymentId, paymentDetails, executor = pool) 
   ]);
 }
 
+// An online payment starts as 'ONLINE' because the payer only picks their
+// instrument on the gateway's own page - this writes back what they
+// actually used once the gateway tells us.
+async function updatePaymentMethodAndDetails(
+  paymentId,
+  { paymentMethod, paymentDetails },
+  executor = pool
+) {
+  await executor.execute(
+    `UPDATE payments SET payment_method = ?, payment_details = ? WHERE id = ?`,
+    [paymentMethod, JSON.stringify(paymentDetails || {}), paymentId]
+  );
+}
+
 async function createReceipt(paymentId, receiptNumber, executor = pool) {
   await executor.execute(
     `INSERT INTO receipts (payment_id, receipt_number, issued_at) VALUES (?, ?, NOW())`,
@@ -129,6 +143,25 @@ async function listPendingBankTransfers(executor = pool) {
      ORDER BY p.created_at ASC`
   );
   return rows;
+}
+
+// One payment with everything the receipt screen needs (subject + receipt
+// number), so the return-from-gateway page can render in a single query.
+async function findPaymentWithDetailsById(paymentId, executor = pool) {
+  const [rows] = await executor.execute(
+    `SELECT p.id, p.student_id, p.enrollment_id, c.subject, p.amount, p.balance_before,
+            p.balance_after, p.status, p.payment_method, p.payment_details,
+            p.gateway_transaction_id, p.created_at, p.paid_at,
+            r.receipt_number, r.issued_at AS receipt_issued_at
+     FROM payments p
+     JOIN enrollments e ON e.id = p.enrollment_id
+     JOIN classes c ON c.id = e.class_id
+     LEFT JOIN receipts r ON r.payment_id = p.id
+     WHERE p.id = ?
+     LIMIT 1`,
+    [paymentId]
+  );
+  return rows[0] || null;
 }
 
 async function listPaymentHistoryForStudent(studentId, executor = pool) {
@@ -302,9 +335,11 @@ module.exports = {
   markPaymentSuccessful,
   markPaymentFailed,
   updatePaymentDetails,
+  updatePaymentMethodAndDetails,
   createReceipt,
   findPaymentById,
   findPaymentByIdForUpdate,
+  findPaymentWithDetailsById,
   listPendingBankTransfers,
   listPaymentHistoryForStudent,
   listRecentPayments,

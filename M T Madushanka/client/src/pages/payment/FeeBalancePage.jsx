@@ -7,6 +7,8 @@ import {
   payByBankTransfer,
   fetchBankTransferAvailability,
   fetchPaymentSettings,
+  startOnlineCheckout,
+  redirectToGateway,
 } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../../shared/client/src/components/common/Alert';
@@ -16,6 +18,8 @@ import { getNavItems } from '../../components/layout/navItems';
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
+// Shown when no real gateway is configured - the built-in simulator, where
+// the "card" fields are collected here and no money actually moves.
 const PAYMENT_METHODS = [
   { value: 'CARD', label: 'Card' },
   { value: 'EZ_CASH', label: 'eZ Cash' },
@@ -23,8 +27,24 @@ const PAYMENT_METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
+// Shown when PayHere IS configured. Card/eZ Cash/mCash collapse into one
+// option because the payer chooses the instrument on PayHere's own page -
+// we deliberately never see a card number.
+const LIVE_PAYMENT_METHODS = [
+  { value: 'ONLINE', label: 'Card / eZ Cash / mCash' },
+  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+];
+
 // wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
+
+// Letters, spaces, apostrophes, and hyphens only - no digits or symbols
+// typed into a name field by mistake.
+const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+
+// Letters, numbers, spaces, hyphens, and slashes - what a real bank
+// account number or transfer reference looks like, nothing else.
+const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -96,6 +116,11 @@ function FeeBalancePage() {
   const [bankTransferClosedMessage, setBankTransferClosedMessage] = useState('');
   const [paymentSettings, setPaymentSettings] = useState(null);
 
+  // Set by the server: true once PayHere credentials are in place, false
+  // while the project is running on the built-in simulator.
+  const onlinePaymentsEnabled = Boolean(paymentSettings && paymentSettings.onlinePaymentsEnabled);
+  const methodTabs = onlinePaymentsEnabled ? LIVE_PAYMENT_METHODS : PAYMENT_METHODS;
+
   const loadBalances = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -126,10 +151,20 @@ function FeeBalancePage() {
       });
   }, [loadBalances]);
 
+  // Settings arrive a moment after the balances do, so a checkout that was
+  // auto-opened may have defaulted to the simulator's Card tab. Once we know
+  // the real gateway is live, move it onto the online option.
+  useEffect(() => {
+    if (!onlinePaymentsEnabled) return;
+    setPaymentMethod((current) =>
+      current === 'CARD' || current === 'EZ_CASH' || current === 'MCASH' ? 'ONLINE' : current
+    );
+  }, [onlinePaymentsEnabled]);
+
   function startPayment(enrollment) {
     setActiveEnrollment(enrollment);
     setAmount(String(enrollment.balance));
-    setPaymentMethod('CARD');
+    setPaymentMethod(onlinePaymentsEnabled ? 'ONLINE' : 'CARD');
     setCardDetails(emptyCardDetails);
     setWalletPhone('');
     setBankReference('');
@@ -160,6 +195,8 @@ function FeeBalancePage() {
     if (paymentMethod === 'CARD') {
       if (cardDetails.cardholderName.trim().length < 2) {
         errors.cardholderName = 'Enter the name on the card.';
+      } else if (!NAME_REGEX.test(cardDetails.cardholderName.trim())) {
+        errors.cardholderName = 'Cardholder name can only contain letters, spaces, apostrophes, and hyphens - no numbers or symbols.';
       }
       const digits = cardDetails.cardNumber.replace(/\D/g, '');
       if (!luhnCheck(digits)) {
@@ -187,6 +224,8 @@ function FeeBalancePage() {
       } else {
         if (bankReference.trim().length < 4) {
           errors.bankReference = 'Enter your bank account number or transfer reference.';
+        } else if (!BANK_REFERENCE_REGEX.test(bankReference.trim())) {
+          errors.bankReference = 'Reference can only contain letters, numbers, spaces, hyphens, and slashes - no other symbols.';
         }
         if (!receiptFile) {
           errors.receiptFile = 'Attach a photo or screenshot of your transfer receipt.';
@@ -222,6 +261,23 @@ function FeeBalancePage() {
     const parsedAmount = Number(amount);
     if (!(parsedAmount > 0)) {
       setPayError('Please enter a valid amount greater than zero.');
+      return;
+    }
+
+    // Real gateway: reserve the payment, then hand the browser over to
+    // PayHere. Nothing else on this page runs - we leave the site.
+    if (paymentMethod === 'ONLINE') {
+      setIsPaying(true);
+      try {
+        const checkout = await startOnlineCheckout({
+          enrollmentId: activeEnrollment.enrollmentId,
+          amount: parsedAmount,
+        });
+        redirectToGateway(checkout);
+      } catch (error) {
+        setPayError(error.message);
+        setIsPaying(false);
+      }
       return;
     }
 
@@ -494,7 +550,7 @@ function FeeBalancePage() {
                   <Alert type="error" message={payError} />
                   <form onSubmit={handlePaySubmit} noValidate>
                     <div className="payment-tabs">
-                      {PAYMENT_METHODS.map((method) => {
+                      {methodTabs.map((method) => {
                         const isDisabled = method.value === 'BANK_TRANSFER' && !bankTransferAvailable;
                         return (
                           <button
@@ -514,6 +570,17 @@ function FeeBalancePage() {
                         );
                       })}
                     </div>
+
+                    {paymentMethod === 'ONLINE' && (
+                      <div className="callout" style={{ marginBottom: '16px' }}>
+                        <span>
+                          <strong>You&apos;ll finish this payment on PayHere.</strong> Tap Pay and
+                          we&apos;ll hand you over to PayHere&apos;s secure page to choose your card,
+                          eZ Cash or mCash and enter your details. Brilliant Institute never sees or
+                          stores your card number. You&apos;ll come straight back here afterwards.
+                        </span>
+                      </div>
+                    )}
 
                     {paymentMethod === 'BANK_TRANSFER' && !bankTransferAvailable && (
                       <Alert type="warning" message={bankTransferClosedMessage} />
@@ -689,7 +756,9 @@ function FeeBalancePage() {
                     <button type="submit" className="btn btn-primary btn-block" disabled={isPaying}>
                       {isPaying && <span className="btn-spinner" aria-hidden="true" />}
                       {isPaying
-                        ? 'Submitting...'
+                        ? paymentMethod === 'ONLINE'
+                          ? 'Redirecting to PayHere...'
+                          : 'Submitting...'
                         : paymentMethod === 'BANK_TRANSFER'
                           ? 'Submit for Verification'
                           : `Pay ${formatCurrency(amount || 0)}`}

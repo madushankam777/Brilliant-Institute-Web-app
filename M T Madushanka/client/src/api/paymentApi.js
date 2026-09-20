@@ -15,6 +15,43 @@ export async function makePayment({ enrollmentId, amount, paymentMethod, payment
   return response.data.data.payment;
 }
 
+// pay online btn - reserves a pending payment and gets back the signed
+// fields to POST to the gateway. Card details are typed on the gateway's
+// own page, never here.
+export async function startOnlineCheckout({ enrollmentId, amount }) {
+  const response = await httpClient.post('/payments/checkout/online', { enrollmentId, amount });
+  return response.data.data.checkout;
+}
+
+// Polled on the way back from the gateway: the real result arrives on the
+// server's webhook, which can land a moment after the payer returns.
+export async function fetchPaymentStatus(paymentId) {
+  const response = await httpClient.get(`/payments/${paymentId}/status`);
+  return response.data.data.payment;
+}
+
+/**
+ * Leaves the SPA for the gateway's hosted payment page. A real form POST is
+ * what the gateway expects - fetch/XHR can't hand the browser over.
+ */
+export function redirectToGateway({ actionUrl, fields }) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = actionUrl;
+  form.style.display = 'none';
+
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value == null ? '' : String(value);
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
 export async function retryPayment(paymentId) {
   const response = await httpClient.patch(`/payments/${paymentId}/retry`);
   return response.data.data.payment;
