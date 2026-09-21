@@ -57,7 +57,6 @@ function toSafePayment(row) {
   };
 }
 
-// user data for admin's manage users list
 function toSafeUserForAdmin(userRow) {
   if (!userRow) return null;
   return {

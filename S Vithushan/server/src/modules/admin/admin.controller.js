@@ -1,6 +1,6 @@
-const path = require('path');
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
-const { UPLOADS_ROOT_DIR, toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
+const { toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
+const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
 const service = require('./admin.service');
 
 const getDashboardStats = asyncHandler(async (req, res) => {
@@ -70,7 +70,7 @@ const downloadTutorKeyDocument = asyncHandler(async (req, res) => {
   const index = certificateMatch ? Number(certificateMatch[1]) : undefined;
 
   const publicPath = await service.getTutorKeyDocumentPath(keyId, documentType, index);
-  const absolutePath = path.join(UPLOADS_ROOT_DIR, publicPath.replace(/^\/uploads\//, ''));
+  const absolutePath = resolveUploadPath(publicPath);
   res.sendFile(absolutePath);
 });
 

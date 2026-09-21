@@ -1,7 +1,7 @@
 // HTTP layer for payment routes
-const path = require('path');
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
-const { UPLOADS_ROOT_DIR, toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
+const { toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
+const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
 const service = require('./payment.service');
 
 const getMyBalances = asyncHandler(async (req, res) => {
@@ -130,7 +130,7 @@ const rejectBankTransferPayment = asyncHandler(async (req, res) => {
 const getReceiptImage = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const publicPath = await service.getReceiptImagePath(req.user, paymentId);
-  const absolutePath = path.join(UPLOADS_ROOT_DIR, publicPath.replace(/^\/uploads\//, ''));
+  const absolutePath = resolveUploadPath(publicPath);
   res.sendFile(absolutePath);
 });
 
@@ -155,7 +155,6 @@ const updatePaymentSettings = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Payment settings saved.', data: { settings } });
 });
 
-// tutor picker list
 const listActiveTutors = asyncHandler(async (req, res) => {
   const tutors = await service.listActiveTutors();
   res.status(200).json({ success: true, data: { tutors } });

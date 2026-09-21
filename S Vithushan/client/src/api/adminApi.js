@@ -19,7 +19,6 @@ export async function createUser(payload) {
   return response.data.data.user;
 }
 
-// view profile btn
 export async function fetchUserProfile(userId) {
   const response = await httpClient.get(`/admin/users/${userId}`);
   return response.data.data.user;
@@ -41,7 +40,6 @@ export async function deleteUser(userId) {
   await httpClient.delete(`/admin/users/${userId}`);
 }
 
-// tutor's student list
 export async function fetchMyStudents() {
   const response = await httpClient.get('/students/mine');
   return response.data.data.students;
@@ -116,7 +114,6 @@ export async function fetchReminderCandidates(type) {
   return response.data.data.candidates;
 }
 
-// send reminders btn
 export async function sendReminders({ type, studentIds }) {
   const response = await httpClient.post('/admin/reminders/send', { type, studentIds });
   return response.data.data.result;

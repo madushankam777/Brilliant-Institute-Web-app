@@ -20,7 +20,6 @@ export async function fetchTutorProfile(tutorId) {
   return response.data.data;
 }
 
-// tutor picker list
 export async function fetchAllTutors() {
   const response = await httpClient.get('/courses/tutors');
   return response.data.data.tutors;
@@ -59,7 +58,6 @@ export async function dropCourse(enrollmentId) {
   await httpClient.delete(`/courses/my-courses/${enrollmentId}`);
 }
 
-// delete btn
 export async function deleteEnrollmentRecord(enrollmentId) {
   await httpClient.delete(`/courses/my-courses/${enrollmentId}/permanent`, {
     data: { confirmText: 'DELETE' },

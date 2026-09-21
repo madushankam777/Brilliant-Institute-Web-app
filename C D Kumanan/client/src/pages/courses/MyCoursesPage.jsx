@@ -57,7 +57,6 @@ function MyCoursesPage() {
     }
   }
 
-  // re-add btn
   async function handleReEnroll(course) {
     setReEnrollingId(course.enrollmentId);
     setErrorMessage('');

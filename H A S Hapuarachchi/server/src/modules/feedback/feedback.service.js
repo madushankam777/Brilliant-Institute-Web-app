@@ -86,7 +86,6 @@ async function getTicketDetails(user, ticketId) {
   return toSafeFeedback(ticket);
 }
 
-// reply to ticket btn
 async function replyToTicket(user, ticketId, message) {
   const ticket = await repository.findTicketById(ticketId);
   if (!ticket) {

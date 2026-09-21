@@ -27,7 +27,6 @@ async function findUserById(id) {
   return rows[0] || null;
 }
 
-// Update a user's own name/phone/bio.
 async function updateUserProfile(id, { fullName, phone, bio }) {
   await pool.execute(
     `UPDATE users SET full_name = ?, phone = ?, bio = ?, updated_at = NOW() WHERE id = ?`,

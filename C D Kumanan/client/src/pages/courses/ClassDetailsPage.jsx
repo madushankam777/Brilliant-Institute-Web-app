@@ -49,7 +49,6 @@ function ClassDetailsPage() {
     setIsEnrolling(true);
     try {
       const enrollment = await enrollInClass(classId);
-      // go straight to payment page
       navigate('/payments', { state: { enrollmentId: enrollment.enrollmentId } });
     } catch (error) {
       setEnrollError(error.message);

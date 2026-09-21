@@ -514,7 +514,6 @@ async function updatePaymentSettings(adminUser, settings) {
   return getPaymentSettings();
 }
 
-// tutor picker list
 async function listActiveTutors() {
   const rows = await repository.listActiveTutors();
   return rows.map((row) => ({
@@ -586,7 +585,6 @@ async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, acc
   };
 }
 
-// pay tutor btn
 async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
   if (!(amount > 0)) {
     throw ApiError.badRequest('Payout amount must be greater than zero.');
@@ -596,10 +594,19 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
     throw ApiError.badRequest('Please select a valid, active Tutor.');
   }
 
+  // Record which account the money was sent to, so the ledger shows where
+  // each payout actually went even after the tutor later changes it. Only
+  // the last 4 digits are stored - the full number stays with its owner.
+  const bank = await repository.findBankDetails(tutorId);
+  const destination = bank && bank.bank_account_number
+    ? `to ${bank.bank_name || 'account'} ${maskAccountNumber(bank.bank_account_number)}`
+    : 'no bank account on file';
+  const noteWithDestination = [note && note.trim(), destination].filter(Boolean).join(' - ').slice(0, 255);
+
   const payoutId = await repository.createTutorPayout({
     tutorId,
     amount,
-    note,
+    note: noteWithDestination,
     periodLabel,
     paidBy: adminUser.id,
   });
@@ -615,7 +622,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
   await repository.createNotification({
     recipientId: tutorId,
     type: 'PAYOUT_RECORDED',
-    message: `A payout of LKR ${Number(amount).toFixed(2)} has been recorded for you${periodLabel ? ` (${periodLabel})` : ''}.`,
+    message: `A payout of LKR ${Number(amount).toFixed(2)} has been recorded for you${periodLabel ? ` (${periodLabel})` : ''} - ${destination}.`,
     sentBy: adminUser.id,
   });
 

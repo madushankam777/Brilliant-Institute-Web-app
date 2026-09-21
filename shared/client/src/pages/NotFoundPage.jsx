@@ -1,4 +1,3 @@
-// Catch-all 404 page
 import { Link } from 'react-router-dom';
 
 function NotFoundPage() {

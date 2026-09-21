@@ -46,7 +46,6 @@ async function findTutorProfile(tutorId) {
   return rows[0] || null;
 }
 
-// list tutors for the tutor picker
 async function listAllTutors() {
   const [rows] = await pool.execute(
     `SELECT id, full_name, email, profile_picture_path

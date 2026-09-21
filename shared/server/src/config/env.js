@@ -76,6 +76,12 @@ const config = {
   },
 
   auth: {
+    // Behind an HTTPS tunnel/reverse proxy the app still speaks plain HTTP,
+    // so NODE_ENV alone can't decide this. Set COOKIE_SECURE=true when the
+    // public URL is https:// so the session cookie is never sent in clear.
+    cookieSecure:
+      process.env.COOKIE_SECURE === 'true' ||
+      (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production'),
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30m',
     sessionTimeoutMinutes: toInt(process.env.SESSION_TIMEOUT_MINUTES, 30),

@@ -15,6 +15,7 @@ const { UPLOADS_ROOT_DIR } = require('../../shared/server/src/middleware/upload'
 const authRoutes = require('../../N Danushika/server/src/modules/auth/auth.routes');
 const attendanceRoutes = require('../../M T Madushanka/server/src/modules/attendance/attendance.routes');
 const paymentRoutes = require('../../M T Madushanka/server/src/modules/payment/payment.routes');
+const paymentController = require('../../M T Madushanka/server/src/modules/payment/payment.controller');
 const courseRoutes = require('../../C D Kumanan/server/src/modules/course/course.routes');
 const feedbackRoutes = require('../../H A S Hapuarachchi/server/src/modules/feedback/feedback.routes');
 const adminRoutes = require('../../S Vithushan/server/src/modules/admin/admin.routes');
@@ -59,6 +60,17 @@ app.use(
 );
 
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
+
+// PayHere's server-to-server payment notification. Mounted ahead of the rate
+// limiter and CSRF guard because it carries no session cookie and no
+// X-Requested-With header, and must not be throttled when several payments
+// settle at once. The md5 signature check inside the service is what makes it
+// safe - an unsigned request is ignored.
+app.post(
+  '/api/payments/payhere/notify',
+  express.urlencoded({ extended: false, limit: '32kb' }),
+  paymentController.handlePayHereNotification
+);
 
 app.use(apiLimiter);
 app.use(csrfGuard);

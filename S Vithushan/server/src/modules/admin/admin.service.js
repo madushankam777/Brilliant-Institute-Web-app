@@ -270,7 +270,6 @@ async function deleteUser(actingUser, userId) {
   });
 }
 
-// tutor's student list
 async function listMyStudents(tutorUser) {
   const rows = await repository.listStudentsForTutor(tutorUser.id);
   return rows.map((row) => ({

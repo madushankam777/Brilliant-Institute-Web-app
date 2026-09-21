@@ -283,7 +283,6 @@ async function listAllAnnouncements() {
   return rows;
 }
 
-// filter announcements by role + grade
 async function listAnnouncementsForAudience(role, grade) {
   const [rows] = await pool.execute(
     `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name

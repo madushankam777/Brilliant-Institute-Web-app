@@ -10,6 +10,28 @@ const sharedPackageAliases = ['react', 'react-dom', 'react/jsx-runtime', 'react-
   {}
 );
 
+const SECURITY_HEADERS = {
+  // The app loads only its own bundle; inline styles are needed because
+  // React writes style props out as inline style attributes. Form posts are
+  // limited to this site plus PayHere's hosted checkout.
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "form-action 'self' https://sandbox.payhere.lk https://www.payhere.lk",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "object-src 'none'",
+  ].join('; '),
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+};
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -20,6 +42,7 @@ export default defineConfig({
   publicDir: path.resolve(__dirname, '../shared/client/public'),
   server: {
     port: 5173,
+    headers: SECURITY_HEADERS,
     // allow tunnel hostnames (Vite blocks unrecognized Host headers by default)
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     // Lets the dev server read shared/, which sits outside this app's own
@@ -56,6 +79,7 @@ export default defineConfig({
   // serves the production build (npm run build) - mirrors server config above
   preview: {
     port: 4173,
+    headers: SECURITY_HEADERS,
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     proxy: {
       '/api': {

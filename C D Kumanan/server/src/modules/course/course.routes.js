@@ -21,7 +21,6 @@ router.use(authenticate);
 // --- Browse (any logged-in role) ---
 router.get('/classes', browseQueryRules, validateRequest, controller.browseClasses);
 router.get('/classes/:classId', classIdParamRules, validateRequest, controller.getClassDetails);
-// tutor picker list
 router.get('/tutors', controller.listTutors);
 router.get('/tutors/:tutorId', tutorIdParamRules, validateRequest, controller.getTutorProfile);
 

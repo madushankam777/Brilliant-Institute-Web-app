@@ -79,9 +79,19 @@ function PaymentSettingsPage() {
         <div className="page-header">
           <h1>Payment Settings</h1>
           <p className="muted">
-            Where student payments go. These details show up on the Bank Transfer, eZ Cash, and mCash
-            tabs at checkout.
+            The account students send money to. These details appear on the Bank Transfer, eZ Cash,
+            and mCash tabs at checkout, and every student sees the change immediately after you save.
           </p>
+        </div>
+
+        <div className="callout">
+          <span>
+            <strong>Card payments don&apos;t come here.</strong> Card, eZ Cash, and mCash paid online go
+            through PayHere first, and PayHere settles them into the bank account registered on your
+            PayHere merchant account - changing the number below does not redirect card money. To
+            change where card money lands, update the bank account in your PayHere dashboard. The
+            account below is what students use for <strong>manual bank transfers</strong>.
+          </span>
         </div>
 
         <Alert type="error" message={loadError} />

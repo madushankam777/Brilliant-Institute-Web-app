@@ -96,9 +96,13 @@ function signSessionToken(user) {
 // Store the login token in a cookie that JavaScript can't read and that
 // only gets sent back to our own site (httpOnly + SameSite=Strict).
 function attachSessionCookie(res, token) {
+  // A Secure cookie is dropped by the browser over plain http://, so decide
+  // per request: HTTPS (including through a trusted proxy) gets Secure,
+  // local http://localhost does not. COOKIE_SECURE=true forces it on.
+  const isHttps = Boolean(res.req && res.req.secure);
   res.cookie(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: config.isProduction, // HTTPS-only outside local development
+    secure: config.auth.cookieSecure || isHttps, // HTTPS-only outside local development
     sameSite: 'strict',
     maxAge: config.auth.sessionTimeoutMinutes * 60 * 1000,
     path: '/',

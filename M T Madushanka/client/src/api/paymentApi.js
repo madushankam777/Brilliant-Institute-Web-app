@@ -94,7 +94,6 @@ export async function editBankTransferPayment(paymentId, { bankReference, receip
   return response.data.data.payment;
 }
 
-// view receipt image link
 export function getReceiptImageUrl(paymentId) {
   const base = (httpClient.defaults.baseURL || '').replace(/\/$/, '');
   return `${base}/payments/${paymentId}/receipt-image`;
@@ -121,7 +120,6 @@ export async function rejectBankTransfer(paymentId) {
   return response.data.data.payment;
 }
 
-// pay tutor btn
 export async function fetchTutorPayouts() {
   const response = await httpClient.get('/payments/admin/tutor-payouts');
   return response.data.data;

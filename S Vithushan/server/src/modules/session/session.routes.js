@@ -21,7 +21,7 @@ function issueSessionCookie(res, user) {
   });
   res.cookie(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: config.isProduction,
+    secure: config.auth.cookieSecure,
     sameSite: 'strict',
     maxAge: config.auth.sessionTimeoutMinutes * 60 * 1000,
   });

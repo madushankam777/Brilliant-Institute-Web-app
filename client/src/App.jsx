@@ -20,6 +20,7 @@ import SelfCheckInPage from './pages/attendance/SelfCheckInPage';
 
 import FeeBalancePage from './pages/payment/FeeBalancePage';
 import PaymentHistoryPage from './pages/payment/PaymentHistoryPage';
+import PaymentReturnPage from './pages/payment/PaymentReturnPage';
 import PaymentVerificationPage from './pages/payment/PaymentVerificationPage';
 import PayTutorsPage from './pages/payment/PayTutorsPage';
 import PaymentSettingsPage from './pages/payment/PaymentSettingsPage';
@@ -80,6 +81,8 @@ function App() {
             <Route path="/attendance/checkin" element={<SelfCheckInPage />} />
             <Route path="/payments" element={<FeeBalancePage />} />
             <Route path="/payments/history" element={<PaymentHistoryPage />} />
+            {/* where PayHere sends the payer back to */}
+            <Route path="/payments/return" element={<PaymentReturnPage />} />
             <Route path="/courses/my-courses" element={<MyCoursesPage />} />
           </Route>
 

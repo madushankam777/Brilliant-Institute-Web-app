@@ -2,7 +2,6 @@
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
 const service = require('./attendance.service');
 
-// class picker list
 const getMyTaughtClasses = asyncHandler(async (req, res) => {
   const classes = await service.getMyTaughtClasses(req.user);
   res.status(200).json({ success: true, data: { classes } });
@@ -14,7 +13,6 @@ const listClassSessions = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
-// mark attendance btn
 const getOrCreateTodaySession = asyncHandler(async (req, res) => {
   const classId = Number(req.params.classId);
   const data = await service.getOrCreateTodaySession(req.user, classId);
@@ -38,7 +36,6 @@ const markAttendance = asyncHandler(async (req, res) => {
   });
 });
 
-// generate key btn
 const startSelfCheckIn = asyncHandler(async (req, res) => {
   const sessionId = Number(req.params.sessionId);
   const data = await service.startSelfCheckIn(req.user, sessionId);
