@@ -129,3 +129,47 @@ export async function sendReminders({ type, studentIds }) {
   const response = await httpClient.post('/admin/reminders/send', { type, studentIds });
   return response.data.data.result;
 }
+
+// --- Student re-registration ---
+// The key code comes back only from this call; no later listing includes it.
+export async function generateReregistrationKey(payload) {
+  const response = await httpClient.post('/admin/reregistration-keys', payload);
+  return response.data.data.key;
+}
+
+export async function fetchReregistrationKeys(academicYear) {
+  const response = await httpClient.get('/admin/reregistration-keys', {
+    params: academicYear ? { academicYear } : {},
+  });
+  return response.data.data.keys;
+}
+
+export async function revokeReregistrationKey(keyId) {
+  await httpClient.patch(`/admin/reregistration-keys/${keyId}/revoke`);
+}
+
+export async function fetchRolloverPreview(academicYear) {
+  const response = await httpClient.get('/admin/reregistration/rollover', {
+    params: { academicYear },
+  });
+  return response.data.data.preview;
+}
+
+export async function runYearlyRollover(academicYear) {
+  const response = await httpClient.post('/admin/reregistration/rollover', {
+    academicYear,
+    confirm: 'RUN',
+  });
+  return response.data.data.result;
+}
+
+// student side
+export async function fetchMyReregistrationStatus() {
+  const response = await httpClient.get('/reregistration/mine');
+  return response.data.data.status;
+}
+
+export async function redeemReregistrationKey(keyCode) {
+  const response = await httpClient.post('/reregistration/redeem', { keyCode });
+  return response.data.data.result;
+}

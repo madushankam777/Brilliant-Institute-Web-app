@@ -11,7 +11,7 @@ const {
   toSafeNotification,
 } = require('../../../../../shared/server/src/utils/sanitize');
 const { USER_STATUS, ROLES } = require('../../../../../shared/server/src/config/roles');
-const { GRADES } = require('../../../../../shared/server/src/config/grades');
+const { GRADES, nextGrade, isFinalGrade } = require('../../../../../shared/server/src/config/grades');
 const gateway = require('./notificationGateway');
 const repository = require('./admin.repository');
 
@@ -284,6 +284,208 @@ function assertValidTargetGrade(targetGrade) {
   }
 }
 
+// --- Student re-registration -------------------------------------------------
+// Each January the institute reopens: a student who re-registers moves up a
+// grade, one who doesn't is closed out. Admin issues a one-time key for a
+// student, reads it out to them, and the student types it in to confirm.
+
+const REREGISTRATION_KEY_VALID_DAYS = 120;
+
+function generateReregistrationKeyCode() {
+  const raw = crypto.randomBytes(6).toString('hex').toUpperCase();
+  return `REG-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+}
+
+function currentAcademicYear() {
+  return new Date().getFullYear();
+}
+
+async function generateReregistrationKey(adminUser, { studentId, toGrade, academicYear }) {
+  const student = await repository.findUserById(studentId);
+  if (!student || student.role !== ROLES.STUDENT_PARENT) {
+    throw ApiError.badRequest('Please choose a student to re-register.');
+  }
+  if (student.status === USER_STATUS.DELETED) {
+    throw ApiError.badRequest('That account has been deleted.');
+  }
+
+  const thisYear = currentAcademicYear();
+  const year = Number(academicYear) || thisYear + 1;
+  if (year < thisYear || year > thisYear + 1) {
+    throw ApiError.badRequest(`Keys can only be issued for ${thisYear} or ${thisYear + 1}.`);
+  }
+
+  // Default to one grade up. Admin can override for a student repeating a
+  // year or joining at a different level.
+  const resolvedGrade = toGrade || nextGrade(student.grade);
+  if (!resolvedGrade) {
+    throw ApiError.badRequest(
+      `${student.full_name} is in ${student.grade || 'the final grade'} and has finished - there is no grade above it.`
+    );
+  }
+  if (!GRADES.includes(resolvedGrade)) {
+    throw ApiError.badRequest('Please choose a valid grade.');
+  }
+
+  const keyCode = generateReregistrationKeyCode();
+  const expiresAt = new Date(Date.now() + REREGISTRATION_KEY_VALID_DAYS * 24 * 60 * 60 * 1000);
+  const keyId = await repository.createReregistrationKey({
+    keyCode,
+    studentId: student.id,
+    fromGrade: student.grade,
+    toGrade: resolvedGrade,
+    academicYear: year,
+    expiresAt,
+    createdBy: adminUser.id,
+  });
+
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'REREGISTRATION_KEY_ISSUED',
+    entityType: 'student_reregistration_key',
+    entityId: keyId,
+    details: { studentId: student.id, toGrade: resolvedGrade, academicYear: year },
+  });
+
+  // The key itself never goes through the bell - it is read out to the student
+  // in person, the same way tutor enrollment keys are handed over.
+  await repository.logNotification({
+    recipientId: student.id,
+    channel: 'IN_APP',
+    type: 'REREGISTRATION',
+    message:
+      `Re-registration for ${year} is open. Ask the office for your key, then enter it on the ` +
+      `Re-register page to confirm your place in ${resolvedGrade}.`,
+    sentBy: adminUser.id,
+  });
+
+  return {
+    id: keyId,
+    keyCode,
+    studentId: student.id,
+    studentName: student.full_name,
+    fromGrade: student.grade,
+    toGrade: resolvedGrade,
+    academicYear: year,
+    expiresAt,
+  };
+}
+
+// The code is shown once, when it is created, and never listed again.
+function toSafeReregistrationKey(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    studentName: row.student_name,
+    studentEmail: row.student_email,
+    studentCode: row.student_code,
+    studentStatus: row.student_status,
+    currentGrade: row.current_grade,
+    fromGrade: row.from_grade,
+    toGrade: row.to_grade,
+    academicYear: row.academic_year,
+    status: row.status,
+    expiresAt: row.expires_at,
+    usedAt: row.used_at,
+    createdByName: row.created_by_name,
+    createdAt: row.created_at,
+  };
+}
+
+async function listReregistrationKeys(academicYear) {
+  const year = Number(academicYear);
+  const rows = await repository.listReregistrationKeys(Number.isInteger(year) ? year : null);
+  return rows.map(toSafeReregistrationKey);
+}
+
+async function revokeReregistrationKey(adminUser, keyId) {
+  const key = await repository.findReregistrationKeyById(keyId);
+  if (!key) {
+    throw ApiError.notFound('Re-registration key not found.');
+  }
+  const revoked = await repository.revokeReregistrationKey(keyId);
+  if (!revoked) {
+    throw ApiError.badRequest('Only an unused key can be revoked.');
+  }
+
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'REREGISTRATION_KEY_REVOKED',
+    entityType: 'student_reregistration_key',
+    entityId: keyId,
+  });
+}
+
+// The student's side: type the key, confirm the place.
+async function redeemReregistrationKey(studentUser, keyCode) {
+  const normalised = String(keyCode || '').trim().toUpperCase();
+  const key = await repository.findRedeemableKeyForStudent(normalised, studentUser.id);
+  if (!key) {
+    throw ApiError.badRequest(
+      'That key is not valid for your account, has already been used, or has expired.'
+    );
+  }
+
+  // Claim it before anything changes, so a key can only ever be spent once.
+  const claimed = await repository.markReregistrationKeyUsed(key.id);
+  if (!claimed) {
+    throw ApiError.conflict('That key has just been used.');
+  }
+
+  // A key for a year already under way takes effect now. One for next year
+  // only confirms the place - the January roll-over moves the grade.
+  const appliesNow = key.academic_year <= currentAcademicYear();
+  if (appliesNow) {
+    await repository.setStudentGrade(studentUser.id, key.to_grade, key.academic_year);
+  } else {
+    await repository.setStudentReregistered(studentUser.id, key.academic_year);
+  }
+
+  await recordAuditEvent({
+    actorId: studentUser.id,
+    action: 'REREGISTRATION_COMPLETED',
+    entityType: 'student_reregistration_key',
+    entityId: key.id,
+    details: { toGrade: key.to_grade, academicYear: key.academic_year, appliedImmediately: appliesNow },
+  });
+
+  const message = appliesNow
+    ? `You are re-registered for ${key.academic_year} and have moved into ${key.to_grade}.`
+    : `Your place for ${key.academic_year} is confirmed. You move into ${key.to_grade} on 1 January.`;
+
+  await repository.logNotification({
+    recipientId: studentUser.id,
+    channel: 'IN_APP',
+    type: 'REREGISTRATION',
+    message,
+    sentBy: null,
+  });
+
+  return {
+    academicYear: key.academic_year,
+    toGrade: key.to_grade,
+    appliedImmediately: appliesNow,
+    message,
+  };
+}
+
+// What a student sees on their own re-registration page.
+async function getMyReregistrationStatus(studentUser) {
+  const user = await repository.findUserById(studentUser.id);
+  if (!user) {
+    throw ApiError.notFound('Account not found.');
+  }
+  const nextYear = currentAcademicYear() + 1;
+  return {
+    grade: user.grade,
+    nextYear,
+    confirmedForYear: user.reregistered_for_year || null,
+    isConfirmedForNextYear: user.reregistered_for_year === nextYear,
+    nextGrade: nextGrade(user.grade),
+    isFinalGrade: isFinalGrade(user.grade),
+  };
+}
+
 async function createAnnouncement(adminUser, { title, body, priority, targetAudience, targetGrade }) {
   assertValidTargetGrade(targetGrade);
   const announcementId = await repository.createAnnouncement({
@@ -525,4 +727,10 @@ module.exports = {
   listMyNotifications,
   listMyClassesForMessaging,
   sendTutorMessage,
+  generateReregistrationKey,
+  listReregistrationKeys,
+  revokeReregistrationKey,
+  redeemReregistrationKey,
+  getMyReregistrationStatus,
+  currentAcademicYear,
 };

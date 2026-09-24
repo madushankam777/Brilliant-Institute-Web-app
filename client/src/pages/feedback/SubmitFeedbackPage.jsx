@@ -124,7 +124,15 @@ function SubmitFeedbackPage() {
       setForm(emptyForm);
       await loadTickets();
     } catch (error) {
-      setSubmitError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setFieldErrors(mapped);
+        setSubmitError('');
+      } else {
+        setSubmitError(error.message);
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -12,6 +12,8 @@ const {
   editBankTransferRules,
   paymentIdParamRules,
   payTutorRules,
+  confirmPayoutRules,
+  failPayoutRules,
   bankDetailsRules,
   paymentSettingsRules,
 } = require('./payment.validation');
@@ -141,6 +143,25 @@ router.post(
   payTutorRules,
   validateRequest,
   controller.payTutor
+);
+
+// --- Admin: getting payout money to real bank accounts ---
+router.get('/admin/payouts/method', authorize(ROLES.ADMIN), controller.getPayoutMethodStatus);
+router.get('/admin/payouts/batch', authorize(ROLES.ADMIN), controller.getPayoutBatch);
+router.post('/admin/payouts/export', authorize(ROLES.ADMIN), controller.exportPayoutFile);
+router.patch(
+  '/admin/payouts/:payoutId/settled',
+  authorize(ROLES.ADMIN),
+  confirmPayoutRules,
+  validateRequest,
+  controller.confirmPayoutSettled
+);
+router.patch(
+  '/admin/payouts/:payoutId/failed',
+  authorize(ROLES.ADMIN),
+  failPayoutRules,
+  validateRequest,
+  controller.markPayoutFailed
 );
 
 module.exports = router;

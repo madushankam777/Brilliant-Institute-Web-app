@@ -5,6 +5,11 @@ import {
   fetchAllTutors,
   payTutor,
   updateTutorBankDetailsAsAdmin,
+  fetchPayoutMethod,
+  fetchPayoutBatch,
+  exportPayoutFile,
+  confirmPayoutSettled,
+  markPayoutFailed,
 } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
@@ -19,6 +24,13 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+const PAYOUT_STATUS_LABELS = {
+  RECORDED: { label: 'Recorded', badge: 'neutral' },
+  QUEUED: { label: 'Waiting to transfer', badge: 'warning' },
+  SENT: { label: 'Transferred', badge: 'success' },
+  FAILED: { label: 'Failed', badge: 'danger' },
+};
+
 const EMPTY_PAYOUT_FORM = { amount: '', note: '', periodLabel: '' };
 const EMPTY_BANK_FORM = { bankName: '', accountHolder: '', accountNumber: '', branch: '' };
 
@@ -29,11 +41,18 @@ function PayTutorsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // how payouts actually leave this install, and what is waiting to go
+  const [payoutMethod, setPayoutMethod] = useState(null);
+  const [batch, setBatch] = useState(null);
+  const [transferError, setTransferError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+
   const [selectedTutorId, setSelectedTutorId] = useState(null);
   const [payingTutor, setPayingTutor] = useState(null); // the tutor the modal is open for
   const [form, setForm] = useState(EMPTY_PAYOUT_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [payoutFieldErrors, setPayoutFieldErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
 
   // admin filling in / correcting the tutor's payout account
@@ -41,6 +60,7 @@ function PayTutorsPage() {
   const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [bankError, setBankError] = useState('');
+  const [bankFieldErrors, setBankFieldErrors] = useState({});
 
   const selectedTutor = useMemo(
     () => tutors.find((tutor) => tutor.id === selectedTutorId) || null,
@@ -51,10 +71,17 @@ function PayTutorsPage() {
     setIsLoading(true);
     setLoadError('');
     try {
-      const [tutorList, payoutData] = await Promise.all([fetchAllTutors(), fetchTutorPayouts()]);
+      const [tutorList, payoutData, method, batchData] = await Promise.all([
+        fetchAllTutors(),
+        fetchTutorPayouts(),
+        fetchPayoutMethod(),
+        fetchPayoutBatch(),
+      ]);
       setTutors(tutorList);
       setPayouts(payoutData.payouts);
       setTotalsByTutor(payoutData.totalsByTutor || {});
+      setPayoutMethod(method);
+      setBatch(batchData);
     } catch (error) {
       setLoadError(error.message);
     } finally {
@@ -88,10 +115,14 @@ function PayTutorsPage() {
     setBankError('');
 
     if (!bankForm.bankName.trim() || !bankForm.accountNumber.trim()) {
-      setBankError('Bank name and account number are both required.');
+      setBankFieldErrors({
+        bankName: !bankForm.bankName.trim() ? 'Enter the bank name.' : undefined,
+        accountNumber: !bankForm.accountNumber.trim() ? 'Enter the account number.' : undefined,
+      });
       return;
     }
 
+    setBankFieldErrors({});
     setIsSavingBank(true);
     try {
       const saved = await updateTutorBankDetailsAsAdmin(payingTutor.id, {
@@ -105,7 +136,15 @@ function PayTutorsPage() {
       setTutors((prev) => prev.map((t) => (t.id === updatedTutor.id ? { ...t, ...saved } : t)));
       setIsEditingBank(false);
     } catch (error) {
-      setBankError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setBankFieldErrors(mapped);
+        setBankError('');
+      } else {
+        setBankError(error.message);
+      }
     } finally {
       setIsSavingBank(false);
     }
@@ -119,10 +158,11 @@ function PayTutorsPage() {
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
+    setPayoutFieldErrors({});
 
     const amountValue = Number(form.amount);
     if (!(amountValue > 0)) {
-      setFormError('Enter a payout amount greater than zero.');
+      setPayoutFieldErrors({ amount: 'Enter a payout amount greater than zero.' });
       return;
     }
 
@@ -138,9 +178,69 @@ function PayTutorsPage() {
       setSuccessMessage(`Payout of ${formatCurrency(payout.amount)} recorded for ${payout.tutorName}.`);
       await load();
     } catch (error) {
-      setFormError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setPayoutFieldErrors(mapped);
+        setFormError('');
+      } else {
+        setFormError(error.message);
+      }
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  // The bank moves the money; this downloads the instruction to give it.
+  async function handleExportFile() {
+    setTransferError('');
+    setSuccessMessage('');
+    setIsExporting(true);
+    try {
+      const file = await exportPayoutFile();
+      const url = URL.createObjectURL(file.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setSuccessMessage(
+        `${file.filename} downloaded - ${file.count} transfer(s), ${formatCurrency(file.total)}. ` +
+          'Upload it to your bank, then mark each payout transferred once the bank confirms it.'
+      );
+      await load();
+    } catch (error) {
+      setTransferError(error.message);
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function handleMarkSettled(payoutId) {
+    setTransferError('');
+    const reference = window.prompt('Bank reference for this transfer (optional):') || '';
+    try {
+      await confirmPayoutSettled(payoutId, reference.trim());
+      setSuccessMessage('Payout marked as transferred - the tutor has been notified.');
+      await load();
+    } catch (error) {
+      setTransferError(error.message);
+    }
+  }
+
+  async function handleMarkFailed(payoutId) {
+    setTransferError('');
+    const reason = window.prompt('Why did the transfer fail?');
+    if (!reason || !reason.trim()) return;
+    try {
+      await markPayoutFailed(payoutId, reason.trim());
+      setSuccessMessage('Payout marked as failed.');
+      await load();
+    } catch (error) {
+      setTransferError(error.message);
     }
   }
 
@@ -150,10 +250,100 @@ function PayTutorsPage() {
         <div className="page-header">
           <h1>Pay Tutors</h1>
           <p className="muted">
-            Record a payout to a Tutor. This is a manual ledger for keeping track of what each Tutor
-            has been paid - pick a Tutor, then Pay to open their payout form.
+            Approve a payout to a Tutor, then send it to their bank account. A payout stays
+            &quot;waiting to transfer&quot; until the bank confirms it - it is never shown as paid
+            before the money has actually moved.
           </p>
         </div>
+
+
+        {payoutMethod && (
+          <div className="card">
+            <h2>How payouts are sent</h2>
+            {payoutMethod.ready ? (
+              <p className="callout" style={{ background: 'var(--color-success-bg)', borderColor: '#bbf7d0' }}>
+                <strong>{payoutMethod.label}.</strong> {payoutMethod.reason}
+              </p>
+            ) : (
+              <p className="callout" style={{ background: 'var(--color-warning-bg)', borderColor: '#fde68a' }}>
+                <strong>No live transfer route is set up yet.</strong> {payoutMethod.reason} Until
+                then a payout is an instruction on this system only - no money leaves any account.
+              </p>
+            )}
+
+            <Alert type="error" message={transferError} />
+
+            {batch && batch.count > 0 ? (
+              <>
+                <p>
+                  <strong>{batch.count}</strong> payout(s) waiting to be transferred, totalling{' '}
+                  <strong>{formatCurrency(batch.total)}</strong>.
+                </p>
+                <div className="table-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Tutor</th>
+                        <th>Amount</th>
+                        <th>Account</th>
+                        <th>In file</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batch.payouts.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.tutorName}</td>
+                          <td>{formatCurrency(item.amount)}</td>
+                          <td>
+                            {item.hasAccount ? (
+                              `${item.bankName || 'Account'} \u2022\u2022\u2022\u2022 ${item.accountLast4}`
+                            ) : (
+                              <span style={{ color: 'var(--color-danger)' }}>No account on file</span>
+                            )}
+                          </td>
+                          <td>{item.exportedAt ? 'Exported' : 'Not yet'}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-primary"
+                                onClick={() => handleMarkSettled(item.id)}
+                              >
+                                Mark transferred
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                onClick={() => handleMarkFailed(item.id)}
+                              >
+                                Failed
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {payoutMethod.provider === 'BANK_FILE' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleExportFile}
+                    disabled={isExporting}
+                    style={{ marginTop: '12px' }}
+                  >
+                    {isExporting ? 'Preparing...' : 'Download bank transfer file'}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="muted">Nothing is waiting to be transferred.</p>
+            )}
+          </div>
+        )}
 
         <div className="card">
           <Alert type="error" message={loadError} />
@@ -191,6 +381,7 @@ function PayTutorsPage() {
                         <th>Tutor</th>
                         <th>Amount</th>
                         <th>Period</th>
+                        <th>Status</th>
                         <th>Note</th>
                         <th>Paid By</th>
                         <th>Total Paid To Date</th>
@@ -203,6 +394,21 @@ function PayTutorsPage() {
                           <td>{payout.tutorName}</td>
                           <td>{formatCurrency(payout.amount)}</td>
                           <td>{payout.periodLabel || '-'}</td>
+                          <td>
+                            <span
+                              className={`badge badge-${(PAYOUT_STATUS_LABELS[payout.status] || {}).badge || 'neutral'}`}
+                            >
+                              {(PAYOUT_STATUS_LABELS[payout.status] || {}).label || payout.status}
+                            </span>
+                            {payout.failureReason && (
+                              <>
+                                <br />
+                                <span className="muted" style={{ fontSize: '0.78rem' }}>
+                                  {payout.failureReason}
+                                </span>
+                              </>
+                            )}
+                          </td>
                           <td>{payout.note || '-'}</td>
                           <td>{payout.paidByName}</td>
                           <td>{formatCurrency(totalsByTutor[payout.tutorId] || payout.amount)}</td>
@@ -256,8 +462,14 @@ function PayTutorsPage() {
                         type="text"
                         placeholder="e.g. People's Bank"
                         value={bankForm.bankName}
-                        onChange={(e) => setBankForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                        onChange={(e) => {
+                          setBankForm((prev) => ({ ...prev, bankName: e.target.value }));
+                          setBankFieldErrors((prev) => ({ ...prev, bankName: undefined }));
+                        }}
+                        className={bankFieldErrors.bankName ? 'input-error' : ''}
+                        aria-invalid={Boolean(bankFieldErrors.bankName)}
                       />
+                      {bankFieldErrors.bankName && <p className="field-error">{bankFieldErrors.bankName}</p>}
                     </div>
                     <div className="form-field">
                       <label htmlFor="admin-bank-holder">Account holder</label>
@@ -266,8 +478,14 @@ function PayTutorsPage() {
                         type="text"
                         placeholder="Name exactly as on the account"
                         value={bankForm.accountHolder}
-                        onChange={(e) => setBankForm((prev) => ({ ...prev, accountHolder: e.target.value }))}
+                        onChange={(e) => {
+                          setBankForm((prev) => ({ ...prev, accountHolder: e.target.value }));
+                          setBankFieldErrors((prev) => ({ ...prev, accountHolder: undefined }));
+                        }}
+                        className={bankFieldErrors.accountHolder ? 'input-error' : ''}
+                        aria-invalid={Boolean(bankFieldErrors.accountHolder)}
                       />
+                      {bankFieldErrors.accountHolder && <p className="field-error">{bankFieldErrors.accountHolder}</p>}
                     </div>
                   </div>
                   <div className="card-field-row">
@@ -278,8 +496,14 @@ function PayTutorsPage() {
                         type="text"
                         placeholder="e.g. 8001234567"
                         value={bankForm.accountNumber}
-                        onChange={(e) => setBankForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
+                        onChange={(e) => {
+                          setBankForm((prev) => ({ ...prev, accountNumber: e.target.value }));
+                          setBankFieldErrors((prev) => ({ ...prev, accountNumber: undefined }));
+                        }}
+                        className={bankFieldErrors.accountNumber ? 'input-error' : ''}
+                        aria-invalid={Boolean(bankFieldErrors.accountNumber)}
                       />
+                      {bankFieldErrors.accountNumber && <p className="field-error">{bankFieldErrors.accountNumber}</p>}
                     </div>
                     <div className="form-field">
                       <label htmlFor="admin-bank-branch">Branch</label>
@@ -288,8 +512,14 @@ function PayTutorsPage() {
                         type="text"
                         placeholder="e.g. Colombo 07"
                         value={bankForm.branch}
-                        onChange={(e) => setBankForm((prev) => ({ ...prev, branch: e.target.value }))}
+                        onChange={(e) => {
+                          setBankForm((prev) => ({ ...prev, branch: e.target.value }));
+                          setBankFieldErrors((prev) => ({ ...prev, branch: undefined }));
+                        }}
+                        className={bankFieldErrors.branch ? 'input-error' : ''}
+                        aria-invalid={Boolean(bankFieldErrors.branch)}
                       />
+                      {bankFieldErrors.branch && <p className="field-error">{bankFieldErrors.branch}</p>}
                     </div>
                   </div>
 
@@ -353,10 +583,16 @@ function PayTutorsPage() {
                     min="0.01"
                     step="0.01"
                     value={form.amount}
-                    onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, amount: e.target.value }));
+                      setPayoutFieldErrors((prev) => ({ ...prev, amount: undefined }));
+                    }}
                     placeholder="e.g. 25000"
+                    className={payoutFieldErrors.amount ? 'input-error' : ''}
+                    aria-invalid={Boolean(payoutFieldErrors.amount)}
                     autoFocus
                   />
+                  {payoutFieldErrors.amount && <p className="field-error">{payoutFieldErrors.amount}</p>}
                 </div>
 
                 <div className="form-field">

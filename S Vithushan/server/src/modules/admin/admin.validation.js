@@ -82,8 +82,65 @@ const tutorMessageRules = [
   body('message').trim().isLength({ min: 3, max: 350 }).withMessage('Please write your message (3-350 characters).'),
 ];
 
+const reregistrationKeyIdParamRules = [
+  param('keyId').isInt({ min: 1 }).withMessage('Invalid key id.'),
+];
+
+const generateReregistrationKeyRules = [
+  body('studentId').isInt({ min: 1 }).withMessage('Please choose a student.'),
+  body('toGrade')
+    .optional({ checkFalsy: true })
+    .isIn(GRADES)
+    .withMessage('Please choose a valid grade.'),
+  body('academicYear')
+    .optional({ checkFalsy: true })
+    .isInt({ min: 2000, max: 2100 })
+    .withMessage('Please choose a valid year.'),
+];
+
+const reregistrationKeyQueryRules = [
+  query('academicYear')
+    .optional({ checkFalsy: true })
+    .isInt({ min: 2000, max: 2100 })
+    .withMessage('Please choose a valid year.'),
+];
+
+const redeemReregistrationKeyRules = [
+  body('keyCode')
+    .trim()
+    .notEmpty()
+    .withMessage('Enter the key the office gave you.')
+    .bail()
+    .isLength({ min: 8, max: 24 })
+    .withMessage('That key does not look right - check it and try again.')
+    .bail()
+    .matches(/^[A-Za-z0-9-]+$/)
+    .withMessage('A key only contains letters, numbers and dashes.'),
+];
+
+const rolloverQueryRules = [
+  query('academicYear')
+    .isInt({ min: 2000, max: 2100 })
+    .withMessage('Please choose a valid year.'),
+];
+
+const runRolloverRules = [
+  body('academicYear')
+    .isInt({ min: 2000, max: 2100 })
+    .withMessage('Please choose a valid year.'),
+  body('confirm')
+    .equals('RUN')
+    .withMessage('Type RUN to confirm - this closes the accounts of students who did not re-register.'),
+];
+
 module.exports = {
   tutorMessageRules,
+  rolloverQueryRules,
+  runRolloverRules,
+  generateReregistrationKeyRules,
+  reregistrationKeyIdParamRules,
+  reregistrationKeyQueryRules,
+  redeemReregistrationKeyRules,
   userIdParamRules,
   createUserRules,
   keyIdParamRules,

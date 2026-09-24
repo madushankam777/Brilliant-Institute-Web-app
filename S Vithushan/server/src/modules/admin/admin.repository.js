@@ -128,7 +128,7 @@ async function listStudentsForTutor(tutorId) {
      FROM users u
      JOIN enrollments e ON e.student_id = u.id AND e.status = 'ACTIVE'
      JOIN classes c ON c.id = e.class_id AND c.tutor_id = ?
-     WHERE u.status != 'DELETED'
+     WHERE u.status NOT IN ('DELETED', 'LEFT')
      GROUP BY u.id
      ORDER BY u.full_name ASC`,
     [tutorId]
@@ -224,6 +224,144 @@ async function listClassesForTutor(tutorId) {
     [tutorId]
   );
   return rows;
+}
+
+// --- Student re-registration (yearly grade roll-over) -----------------------
+
+async function createReregistrationKey({ keyCode, studentId, fromGrade, toGrade, academicYear, expiresAt, createdBy }) {
+  const [result] = await pool.execute(
+    `INSERT INTO student_reregistration_keys
+       (key_code, student_id, from_grade, to_grade, academic_year, status, expires_at, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, 'UNUSED', ?, ?, NOW())`,
+    [keyCode, studentId, fromGrade || null, toGrade, academicYear, expiresAt || null, createdBy]
+  );
+  return result.insertId;
+}
+
+async function findReregistrationKeyById(keyId) {
+  const [rows] = await pool.execute(
+    `SELECT * FROM student_reregistration_keys WHERE id = ? LIMIT 1`,
+    [keyId]
+  );
+  return rows[0] || null;
+}
+
+// The student redeeming a key must be the student it was issued to, so the
+// lookup is always scoped to their own id.
+async function findRedeemableKeyForStudent(keyCode, studentId) {
+  const [rows] = await pool.execute(
+    `SELECT * FROM student_reregistration_keys
+     WHERE key_code = ? AND student_id = ? AND status = 'UNUSED'
+       AND (expires_at IS NULL OR expires_at > NOW())
+     LIMIT 1`,
+    [keyCode, studentId]
+  );
+  return rows[0] || null;
+}
+
+async function markReregistrationKeyUsed(keyId) {
+  const [result] = await pool.execute(
+    `UPDATE student_reregistration_keys SET status = 'USED', used_at = NOW()
+     WHERE id = ? AND status = 'UNUSED'`,
+    [keyId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function revokeReregistrationKey(keyId) {
+  const [result] = await pool.execute(
+    `UPDATE student_reregistration_keys SET status = 'REVOKED' WHERE id = ? AND status = 'UNUSED'`,
+    [keyId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function listReregistrationKeys(academicYear) {
+  const params = [];
+  let clause = '';
+  if (academicYear) {
+    clause = 'WHERE k.academic_year = ?';
+    params.push(academicYear);
+  }
+  const [rows] = await pool.execute(
+    `SELECT k.*, s.full_name AS student_name, s.email AS student_email,
+            s.student_code, s.grade AS current_grade, s.status AS student_status,
+            a.full_name AS created_by_name
+     FROM student_reregistration_keys k
+     JOIN users s ON s.id = k.student_id
+     JOIN users a ON a.id = k.created_by
+     ${clause}
+     ORDER BY k.created_at DESC
+     LIMIT 300`,
+    params
+  );
+  return rows;
+}
+
+async function setStudentReregistered(studentId, academicYear) {
+  await pool.execute(
+    `UPDATE users SET reregistered_for_year = ?, updated_at = NOW()
+     WHERE id = ? AND role = 'STUDENT_PARENT'`,
+    [academicYear, studentId]
+  );
+}
+
+async function setStudentGrade(studentId, grade, academicYear) {
+  await pool.execute(
+    `UPDATE users SET grade = ?, reregistered_for_year = ?, updated_at = NOW()
+     WHERE id = ? AND role = 'STUDENT_PARENT'`,
+    [grade, academicYear, studentId]
+  );
+}
+
+// Everyone the roll-over has to decide about: active students, and whether
+// they hold a confirmed place for the year being opened.
+async function listStudentsForRollover(academicYear) {
+  const [rows] = await pool.execute(
+    `SELECT id, full_name, email, grade, reregistered_for_year
+     FROM users
+     WHERE role = 'STUDENT_PARENT' AND status = 'ACTIVE'`,
+    []
+  );
+  return rows.map((row) => ({ ...row, hasReregistered: row.reregistered_for_year === academicYear }));
+}
+
+async function markStudentLeft(studentId) {
+  await pool.execute(
+    `UPDATE users SET status = 'LEFT', left_at = NOW(), updated_at = NOW() WHERE id = ?`,
+    [studentId]
+  );
+}
+
+// Leaving the institute ends their enrolments too, so they stop appearing on
+// class rosters, attendance sheets and fee-due lists. The rows stay for the
+// records - only their status changes.
+async function closeEnrollmentsForStudent(studentId) {
+  const [result] = await pool.execute(
+    `UPDATE enrollments SET status = 'REMOVED' WHERE student_id = ? AND status = 'ACTIVE'`,
+    [studentId]
+  );
+  return result.affectedRows;
+}
+
+async function findRolloverLog(academicYear) {
+  const [rows] = await pool.execute(
+    `SELECT * FROM yearly_rollover_log WHERE academic_year = ? LIMIT 1`,
+    [academicYear]
+  );
+  return rows[0] || null;
+}
+
+async function recordRolloverLog({ academicYear, promotedCount, removedCount, graduatedCount }) {
+  await pool.execute(
+    `INSERT INTO yearly_rollover_log (academic_year, promoted_count, removed_count, graduated_count, ran_at)
+     VALUES (?, ?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE promoted_count = VALUES(promoted_count),
+                             removed_count = VALUES(removed_count),
+                             graduated_count = VALUES(graduated_count),
+                             ran_at = VALUES(ran_at)`,
+    [academicYear, promotedCount, removedCount, graduatedCount]
+  );
 }
 
 // --- Announcements -----------------------------------------------------------
@@ -368,6 +506,19 @@ module.exports = {
   listAdminIds,
   listStudentIdsForTutor,
   listClassesForTutor,
+  createReregistrationKey,
+  findReregistrationKeyById,
+  findRedeemableKeyForStudent,
+  markReregistrationKeyUsed,
+  revokeReregistrationKey,
+  listReregistrationKeys,
+  setStudentReregistered,
+  setStudentGrade,
+  listStudentsForRollover,
+  markStudentLeft,
+  closeEnrollmentsForStudent,
+  findRolloverLog,
+  recordRolloverLog,
   revokeTutorKey,
   deleteTutorKey,
   createAnnouncement,

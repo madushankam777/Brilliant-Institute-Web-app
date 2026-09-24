@@ -32,6 +32,11 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
 };
 
+// The dev server injects an inline React Refresh script and an HMR websocket,
+// which a strict CSP blocks - so dev gets every header except the CSP, and
+// the strict CSP applies to the production build served by `vite preview`.
+const { 'Content-Security-Policy': _strictCsp, ...DEV_HEADERS } = SECURITY_HEADERS;
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -42,7 +47,8 @@ export default defineConfig({
   publicDir: path.resolve(__dirname, '../shared/client/public'),
   server: {
     port: 5173,
-    headers: SECURITY_HEADERS,
+    strictPort: true,
+    headers: DEV_HEADERS,
     // allow tunnel hostnames (Vite blocks unrecognized Host headers by default)
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     // Lets the dev server read shared/, which sits outside this app's own
@@ -63,6 +69,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        xfwd: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'));
         },
@@ -70,6 +77,7 @@ export default defineConfig({
       '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        xfwd: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'));
         },
@@ -79,12 +87,14 @@ export default defineConfig({
   // serves the production build (npm run build) - mirrors server config above
   preview: {
     port: 4173,
+    strictPort: true,
     headers: SECURITY_HEADERS,
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        xfwd: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'));
         },
@@ -92,6 +102,7 @@ export default defineConfig({
       '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        xfwd: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'));
         },

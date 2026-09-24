@@ -36,4 +36,17 @@ const checkinLimiter = rateLimit({
   },
 });
 
-module.exports = { authLimiter, apiLimiter, checkinLimiter };
+// blocks guessing a re-registration key. A key is only valid for the student
+// it was issued to, so this is already narrow - the limit closes the gap.
+const keyRedemptionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many attempts. Please wait a while, then check the key with the office.',
+  },
+});
+
+module.exports = { authLimiter, apiLimiter, checkinLimiter, keyRedemptionLimiter };

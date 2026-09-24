@@ -4,6 +4,7 @@ const authorize = require('../../../../../shared/server/src/middleware/authorize
 const validateRequest = require('../../../../../shared/server/src/middleware/validateRequest');
 const { tutorDocumentsUpload } = require('../../../../../shared/server/src/middleware/upload');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
+const { keyRedemptionLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
 const controller = require('./admin.controller');
 const {
   userIdParamRules,
@@ -19,6 +20,12 @@ const {
   sendRemindersRules,
   reminderCandidatesQueryRules,
   tutorMessageRules,
+  generateReregistrationKeyRules,
+  reregistrationKeyIdParamRules,
+  reregistrationKeyQueryRules,
+  redeemReregistrationKeyRules,
+  rolloverQueryRules,
+  runRolloverRules,
 } = require('./admin.validation');
 
 const router = express.Router();
@@ -51,6 +58,21 @@ router.delete(
   userIdParamRules,
   validateRequest,
   controller.deleteUser
+);
+
+// --- Student only: redeem the key the office gave them ---
+router.get(
+  '/reregistration/mine',
+  authorize(ROLES.STUDENT_PARENT),
+  controller.getMyReregistrationStatus
+);
+router.post(
+  '/reregistration/redeem',
+  authorize(ROLES.STUDENT_PARENT),
+  keyRedemptionLimiter,
+  redeemReregistrationKeyRules,
+  validateRequest,
+  controller.redeemReregistrationKey
 );
 
 // --- Tutor only: their own student roster + messaging their own students ---
@@ -103,6 +125,38 @@ router.get(
   keyDocumentParamRules,
   validateRequest,
   controller.downloadTutorKeyDocument
+);
+
+router.post(
+  '/admin/reregistration-keys',
+  generateReregistrationKeyRules,
+  validateRequest,
+  controller.generateReregistrationKey
+);
+router.get(
+  '/admin/reregistration-keys',
+  reregistrationKeyQueryRules,
+  validateRequest,
+  controller.listReregistrationKeys
+);
+router.patch(
+  '/admin/reregistration-keys/:keyId/revoke',
+  reregistrationKeyIdParamRules,
+  validateRequest,
+  controller.revokeReregistrationKey
+);
+
+router.get(
+  '/admin/reregistration/rollover',
+  rolloverQueryRules,
+  validateRequest,
+  controller.previewYearlyRollover
+);
+router.post(
+  '/admin/reregistration/rollover',
+  runRolloverRules,
+  validateRequest,
+  controller.runYearlyRollover
 );
 
 router.get('/admin/announcements', controller.listAllAnnouncements);

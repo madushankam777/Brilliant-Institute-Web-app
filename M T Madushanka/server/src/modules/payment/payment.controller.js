@@ -184,11 +184,55 @@ const updateMyBankDetails = asyncHandler(async (req, res) => {
 const payTutor = asyncHandler(async (req, res) => {
   const { tutorId, amount, note, periodLabel } = req.body;
   const payout = await service.payTutor(req.user, { tutorId, amount, note, periodLabel });
+  const outcome = {
+    SENT: `Payout sent to ${payout.tutorName}.`,
+    QUEUED: `Payout for ${payout.tutorName} is queued - export the transfer file to send it.`,
+    FAILED: `The transfer to ${payout.tutorName} failed: ${payout.failureReason}`,
+  };
   res.status(201).json({
     success: true,
-    message: `Payout recorded for ${payout.tutorName}.`,
+    message: outcome[payout.status] || `Payout recorded for ${payout.tutorName}.`,
     data: { payout },
   });
+});
+
+// How payouts leave this install, so the screen can say so plainly rather
+// than implying money moved when it has not.
+const getPayoutMethodStatus = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: { method: service.getPayoutMethodStatus() } });
+});
+
+const getPayoutBatch = asyncHandler(async (req, res) => {
+  const batch = await service.getPayoutBatch();
+  res.status(200).json({ success: true, data: { batch } });
+});
+
+// Streams the bulk-credit file admin uploads to their bank.
+const exportPayoutFile = asyncHandler(async (req, res) => {
+  const file = await service.exportPayoutFile(req.user);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+  res.setHeader('X-Payout-Count', String(file.rowCount));
+  res.setHeader('X-Payout-Total', file.total.toFixed(2));
+  res.status(200).send(file.csv);
+});
+
+const confirmPayoutSettled = asyncHandler(async (req, res) => {
+  const result = await service.confirmPayoutSettled(
+    req.user,
+    Number(req.params.payoutId),
+    req.body.providerReference
+  );
+  res.status(200).json({ success: true, message: 'Payout marked as transferred.', data: { result } });
+});
+
+const markPayoutFailed = asyncHandler(async (req, res) => {
+  const result = await service.markPayoutFailed(
+    req.user,
+    Number(req.params.payoutId),
+    req.body.reason
+  );
+  res.status(200).json({ success: true, message: 'Payout marked as failed.', data: { result } });
 });
 
 // admin saving a tutor's payout account from the Pay Tutors screen
@@ -263,5 +307,10 @@ module.exports = {
   updatePaymentSettings,
   payTutor,
   listTutorPayouts,
+  getPayoutMethodStatus,
+  getPayoutBatch,
+  exportPayoutFile,
+  confirmPayoutSettled,
+  markPayoutFailed,
   updateTutorBankDetailsAsAdmin,
 };

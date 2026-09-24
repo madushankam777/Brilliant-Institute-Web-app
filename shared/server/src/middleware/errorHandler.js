@@ -14,9 +14,13 @@ function errorHandler(err, req, res, next) {
   const isKnownError = err instanceof ApiError;
   const statusCode = isKnownError ? err.statusCode : 500;
 
-  // Always log full details server-side for debugging / audits.
-  // eslint-disable-next-line no-console
-  console.error(`[error] ${req.method} ${req.originalUrl} ->`, err);
+  // Expected client errors (401 on a logged-out page load, wrong password,
+  // validation) are already visible as a status line from the request logger;
+  // only unexpected failures deserve a full stack trace in the console.
+  if (!isKnownError || statusCode >= 500) {
+    // eslint-disable-next-line no-console
+    console.error(`[error] ${req.method} ${req.originalUrl} ->`, err);
+  }
 
   const responseBody = {
     success: false,

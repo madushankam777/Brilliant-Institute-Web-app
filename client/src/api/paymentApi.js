@@ -176,3 +176,42 @@ export async function updatePaymentSettings(payload) {
   const response = await httpClient.put('/payments/admin/settings', payload);
   return response.data.data.settings;
 }
+
+// --- Tutor payouts: getting the money to real bank accounts ---
+export async function fetchPayoutMethod() {
+  const response = await httpClient.get('/payments/admin/payouts/method');
+  return response.data.data.method;
+}
+
+export async function fetchPayoutBatch() {
+  const response = await httpClient.get('/payments/admin/payouts/batch');
+  return response.data.data.batch;
+}
+
+// Comes back as a CSV file, not JSON - the caller saves it and uploads it to
+// the bank's corporate portal.
+export async function exportPayoutFile() {
+  const response = await httpClient.post('/payments/admin/payouts/export', null, {
+    responseType: 'blob',
+  });
+  const disposition = response.headers['content-disposition'] || '';
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  return {
+    blob: response.data,
+    filename: match ? match[1] : 'tutor-payouts.csv',
+    count: Number(response.headers['x-payout-count'] || 0),
+    total: Number(response.headers['x-payout-total'] || 0),
+  };
+}
+
+export async function confirmPayoutSettled(payoutId, providerReference) {
+  const response = await httpClient.patch(`/payments/admin/payouts/${payoutId}/settled`, {
+    providerReference,
+  });
+  return response.data.data.result;
+}
+
+export async function markPayoutFailed(payoutId, reason) {
+  const response = await httpClient.patch(`/payments/admin/payouts/${payoutId}/failed`, { reason });
+  return response.data.data.result;
+}

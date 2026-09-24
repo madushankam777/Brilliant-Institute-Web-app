@@ -7,6 +7,7 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import FormField from '../../../../shared/client/src/components/common/FormField';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -25,7 +26,7 @@ function PaymentSettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
+  const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
   const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
@@ -56,18 +57,45 @@ function PaymentSettingsPage() {
 
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
+    clearFieldError(field);
+  }
+
+  // Same shapes the server checks for, so a typo is caught here first.
+  const ACCOUNT_PATTERN = /^[0-9 -]{4,34}$/;
+  const WALLET_PATTERN = /^(?:\+94|0)7\d{8}$/;
+
+  function validateSettings() {
+    return validate({
+      bankName: form.bankName.length > 100 && 'Bank name must be 100 characters or fewer.',
+      bankAccountName: form.bankAccountName.length > 150 && 'Account name must be 150 characters or fewer.',
+      bankAccountNumber:
+        form.bankAccountNumber.trim() &&
+        !ACCOUNT_PATTERN.test(form.bankAccountNumber.trim()) &&
+        'Use 4-34 digits, spaces or dashes only.',
+      bankBranch: form.bankBranch.length > 100 && 'Branch must be 100 characters or fewer.',
+      bankSwift: form.bankSwift.length > 20 && 'SWIFT code must be 20 characters or fewer.',
+      ezCashNumber:
+        form.ezCashNumber.trim() &&
+        !WALLET_PATTERN.test(form.ezCashNumber.trim()) &&
+        'Enter a valid mobile number, e.g. 0771234567.',
+      mcashNumber:
+        form.mcashNumber.trim() &&
+        !WALLET_PATTERN.test(form.mcashNumber.trim()) &&
+        'Enter a valid mobile number, e.g. 0771234567.',
+    });
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setSaveError('');
     setSaveMessage('');
+    if (!validateSettings()) return;
+
     setIsSaving(true);
     try {
       await updatePaymentSettings(form);
       setSaveMessage('Payment settings saved. Students will see the updated details at checkout.');
     } catch (error) {
-      setSaveError(error.message);
+      captureError(error);
     } finally {
       setIsSaving(false);
     }
@@ -101,7 +129,7 @@ function PaymentSettingsPage() {
         ) : (
           <div className="card">
             <Alert type="success" message={saveMessage} />
-            <Alert type="error" message={saveError} />
+            <Alert type="error" message={formError} />
 
             <form onSubmit={handleSubmit} noValidate>
               <h2 style={{ fontSize: '0.95rem' }}>Bank transfer</h2>
@@ -111,6 +139,7 @@ function PaymentSettingsPage() {
                 placeholder="e.g. People's Bank"
                 value={form.bankName}
                 onChange={(e) => updateField('bankName', e.target.value)}
+                error={fieldErrors.bankName}
               />
               <FormField
                 id="bankAccountName"
@@ -118,6 +147,7 @@ function PaymentSettingsPage() {
                 placeholder="e.g. Brilliant Institute (Pvt) Ltd"
                 value={form.bankAccountName}
                 onChange={(e) => updateField('bankAccountName', e.target.value)}
+                error={fieldErrors.bankAccountName}
               />
               <FormField
                 id="bankAccountNumber"
@@ -125,6 +155,7 @@ function PaymentSettingsPage() {
                 placeholder="e.g. 100-2-001-5-0123456"
                 value={form.bankAccountNumber}
                 onChange={(e) => updateField('bankAccountNumber', e.target.value)}
+                error={fieldErrors.bankAccountNumber}
               />
               <div className="card-field-row">
                 <FormField
@@ -133,6 +164,7 @@ function PaymentSettingsPage() {
                   placeholder="e.g. Colombo 07"
                   value={form.bankBranch}
                   onChange={(e) => updateField('bankBranch', e.target.value)}
+                error={fieldErrors.bankBranch}
                 />
                 <FormField
                   id="bankSwift"
@@ -140,6 +172,7 @@ function PaymentSettingsPage() {
                   placeholder="e.g. PSBKLKLX"
                   value={form.bankSwift}
                   onChange={(e) => updateField('bankSwift', e.target.value)}
+                error={fieldErrors.bankSwift}
                 />
               </div>
 
@@ -156,6 +189,7 @@ function PaymentSettingsPage() {
                   placeholder="07XXXXXXXX"
                   value={form.ezCashNumber}
                   onChange={(e) => updateField('ezCashNumber', e.target.value)}
+                error={fieldErrors.ezCashNumber}
                 />
                 <FormField
                   id="mcashNumber"
@@ -164,6 +198,7 @@ function PaymentSettingsPage() {
                   placeholder="07XXXXXXXX"
                   value={form.mcashNumber}
                   onChange={(e) => updateField('mcashNumber', e.target.value)}
+                error={fieldErrors.mcashNumber}
                 />
               </div>
 

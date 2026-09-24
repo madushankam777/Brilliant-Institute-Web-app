@@ -257,19 +257,107 @@ async function findActiveTutorById(tutorId) {
   return rows[0] || null;
 }
 
-async function createTutorPayout({ tutorId, amount, note, periodLabel, paidBy }) {
+// The destination account is copied onto the payout row rather than read
+// back from the tutor later, so the ledger still shows where each transfer
+// actually went after the tutor changes their details.
+async function createTutorPayout({
+  tutorId,
+  amount,
+  note,
+  periodLabel,
+  paidBy,
+  status,
+  method,
+  bankName,
+  bankAccountHolder,
+  bankAccountLast4,
+  bankBranch,
+}) {
   const [result] = await pool.execute(
-    `INSERT INTO tutor_payouts (tutor_id, amount, note, period_label, paid_by, paid_at)
-     VALUES (?, ?, ?, ?, ?, NOW())`,
-    [tutorId, amount, note || null, periodLabel || null, paidBy]
+    `INSERT INTO tutor_payouts
+       (tutor_id, amount, status, method, bank_name, bank_account_holder, bank_account_last4,
+        bank_branch, note, period_label, paid_by, paid_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+    [
+      tutorId,
+      amount,
+      status || 'RECORDED',
+      method || 'MANUAL',
+      bankName || null,
+      bankAccountHolder || null,
+      bankAccountLast4 || null,
+      bankBranch || null,
+      note || null,
+      periodLabel || null,
+      paidBy,
+    ]
   );
   return result.insertId;
+}
+
+async function findTutorPayoutById(payoutId) {
+  const [rows] = await pool.execute(
+    `SELECT tp.*, t.full_name AS tutor_name
+     FROM tutor_payouts tp
+     JOIN users t ON t.id = tp.tutor_id
+     WHERE tp.id = ?
+     LIMIT 1`,
+    [payoutId]
+  );
+  return rows[0] || null;
+}
+
+// Queued payouts joined to the tutor's CURRENT full account number - the
+// only place the full number is read, and only to build the bank file.
+async function listPayoutsAwaitingTransfer() {
+  const [rows] = await pool.execute(
+    `SELECT tp.id, tp.tutor_id, t.full_name AS tutor_name, tp.amount, tp.period_label,
+            tp.note, tp.exported_at, tp.paid_at,
+            t.bank_name, t.bank_account_holder, t.bank_account_number, t.bank_branch
+     FROM tutor_payouts tp
+     JOIN users t ON t.id = tp.tutor_id
+     WHERE tp.status = 'QUEUED'
+     ORDER BY tp.paid_at ASC`
+  );
+  return rows;
+}
+
+async function markPayoutsExported(payoutIds) {
+  if (!payoutIds.length) return 0;
+  const placeholders = payoutIds.map(() => '?').join(', ');
+  const [result] = await pool.execute(
+    `UPDATE tutor_payouts SET exported_at = NOW()
+     WHERE id IN (${placeholders}) AND status = 'QUEUED'`,
+    payoutIds
+  );
+  return result.affectedRows;
+}
+
+async function markPayoutSent(payoutId, providerReference) {
+  const [result] = await pool.execute(
+    `UPDATE tutor_payouts
+     SET status = 'SENT', provider_reference = ?, failure_reason = NULL, settled_at = NOW()
+     WHERE id = ? AND status IN ('QUEUED', 'FAILED')`,
+    [providerReference || null, payoutId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function markPayoutFailed(payoutId, reason) {
+  const [result] = await pool.execute(
+    `UPDATE tutor_payouts SET status = 'FAILED', failure_reason = ?
+     WHERE id = ? AND status IN ('QUEUED', 'SENT')`,
+    [String(reason || 'Transfer failed.').slice(0, 255), payoutId]
+  );
+  return result.affectedRows > 0;
 }
 
 async function listTutorPayouts() {
   const [rows] = await pool.execute(
     `SELECT tp.id, tp.tutor_id, t.full_name AS tutor_name, tp.amount, tp.note, tp.period_label,
-            tp.paid_by, a.full_name AS paid_by_name, tp.paid_at
+            tp.status, tp.method, tp.bank_name, tp.bank_account_holder, tp.bank_account_last4,
+            tp.bank_branch, tp.provider_reference, tp.failure_reason, tp.exported_at,
+            tp.settled_at, tp.paid_by, a.full_name AS paid_by_name, tp.paid_at
      FROM tutor_payouts tp
      JOIN users t ON t.id = tp.tutor_id
      JOIN users a ON a.id = tp.paid_by
@@ -352,6 +440,11 @@ module.exports = {
   upsertPaymentSettings,
   findActiveTutorById,
   createTutorPayout,
+  findTutorPayoutById,
+  listPayoutsAwaitingTransfer,
+  markPayoutsExported,
+  markPayoutSent,
+  markPayoutFailed,
   listTutorPayouts,
   sumPayoutsByTutor,
 };

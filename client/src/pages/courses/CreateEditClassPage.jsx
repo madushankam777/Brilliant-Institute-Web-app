@@ -9,6 +9,7 @@ import TutorPicker from '../../../../shared/client/src/components/common/TutorPi
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
+import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import { useAuth } from '../../context/AuthContext';
 
 const SUBJECT_AREAS = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Other'];
@@ -27,6 +28,50 @@ const emptyForm = {
   fee: '',
   tutorId: null,
 };
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function toMinutes(time) {
+  const [h, m] = String(time).split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Mirrors the server's own rules so a mistake is caught before the request
+// goes out - the server still re-checks everything.
+function validateClassForm(form, { requireTutor }) {
+  const capacity = Number(form.capacity);
+  const fee = Number(form.fee);
+  const subject = form.subject.trim();
+  const venue = form.venue.trim();
+
+  return {
+    tutorId: requireTutor && !form.tutorId && 'Choose which tutor teaches this class.',
+    subject:
+      (!subject && 'Enter a subject name.') ||
+      (subject.length < 3 && 'Subject name must be at least 3 characters.') ||
+      (subject.length > 150 && 'Subject name must be 150 characters or fewer.'),
+    venue:
+      (!venue && 'Enter the venue or classroom.') ||
+      (venue.length > 150 && 'Venue must be 150 characters or fewer.'),
+    description:
+      form.description.length > 2000 && 'Description must be 2000 characters or fewer.',
+    startTime: !TIME_PATTERN.test(form.startTime) && 'Enter a start time.',
+    endTime:
+      (!TIME_PATTERN.test(form.endTime) && 'Enter an end time.') ||
+      (TIME_PATTERN.test(form.startTime) &&
+        toMinutes(form.endTime) <= toMinutes(form.startTime) &&
+        'End time must be after the start time.'),
+    capacity:
+      (form.capacity === '' && 'Enter how many seats this class has.') ||
+      (!Number.isInteger(capacity) && 'Capacity must be a whole number.') ||
+      (capacity < 1 && 'Capacity must be at least 1.') ||
+      (capacity > 500 && 'Capacity cannot be more than 500.'),
+    fee:
+      (form.fee === '' && 'Enter the monthly fee.') ||
+      (Number.isNaN(fee) && 'Fee must be a number.') ||
+      (fee < 0 && 'Fee cannot be negative.'),
+  };
+}
 
 function computeDuration(startTime, endTime) {
   if (!startTime || !endTime) return '-';
@@ -52,7 +97,7 @@ function CreateEditClassPage() {
   const [isLoading, setIsLoading] = useState(isEditMode);
   const [loadError, setLoadError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
+  const { fieldErrors, formError, validate, captureError, clearErrors, clearFieldError } = useFormErrors();
   const [warnings, setWarnings] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -97,18 +142,21 @@ function CreateEditClassPage() {
 
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
+    clearFieldError(field);
+    // the two times are validated against each other, so fixing one
+    // should clear the complaint shown on the other
+    if (field === 'startTime') clearFieldError('endTime');
+    if (field === 'endTime') clearFieldError('startTime');
   }
 
   const duration = useMemo(() => computeDuration(form.startTime, form.endTime), [form.startTime, form.endTime]);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setSaveError('');
     setWarnings([]);
     setSuccessMessage('');
 
-    if (isAdmin && !isEditMode && !form.tutorId) {
-      setSaveError('Please select which Tutor this class belongs to.');
+    if (!validate(validateClassForm(form, { requireTutor: isAdmin && !isEditMode }))) {
       return;
     }
 
@@ -134,7 +182,7 @@ function CreateEditClassPage() {
       setSuccessMessage(isEditMode ? 'Class updated successfully.' : 'Class published successfully.');
       setTimeout(() => navigate('/courses/manage'), 1200);
     } catch (error) {
-      setSaveError(error.message);
+      captureError(error);
     } finally {
       setIsSaving(false);
     }
@@ -163,7 +211,7 @@ function CreateEditClassPage() {
           <Alert key={warning} type="warning" message={warning} />
         ))}
         <Alert type="success" message={successMessage} />
-        <Alert type="error" message={saveError} />
+        <Alert type="error" message={formError} />
 
         <div className="card">
           <form onSubmit={handleSubmit} noValidate>
@@ -176,8 +224,10 @@ function CreateEditClassPage() {
                   placeholder="e.g. Advanced Mathematics - Form 4"
                   value={form.subject}
                   onChange={(e) => updateField('subject', e.target.value)}
-                  required
+                  aria-invalid={Boolean(fieldErrors.subject)}
+                  className={fieldErrors.subject ? 'input-error' : ''}
                 />
+                {fieldErrors.subject && <p className="field-error">{fieldErrors.subject}</p>}
               </div>
               <div className="form-field">
                 <label htmlFor="level">Grade / Level</label>
@@ -206,6 +256,7 @@ function CreateEditClassPage() {
                   onChange={(tutorId) => updateField('tutorId', tutorId)}
                   emptyMessage="No active tutors found. A tutor must register first."
                 />
+                {fieldErrors.tutorId && <p className="field-error">{fieldErrors.tutorId}</p>}
                 {form.tutorId ? (
                   <p className="field-help">
                     Selected: {tutors.find((t) => t.id === form.tutorId)?.fullName}
@@ -239,7 +290,10 @@ function CreateEditClassPage() {
                 placeholder="Comprehensive coverage of geometry, calculus fundamentals, and algebra."
                 value={form.description}
                 onChange={(e) => updateField('description', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.description)}
+                className={fieldErrors.description ? 'input-error' : ''}
               />
+              {fieldErrors.description && <p className="field-error">{fieldErrors.description}</p>}
             </div>
 
             <div className="card-field-row">
@@ -251,8 +305,10 @@ function CreateEditClassPage() {
                   placeholder="e.g. Classroom A"
                   value={form.venue}
                   onChange={(e) => updateField('venue', e.target.value)}
-                  required
+                  aria-invalid={Boolean(fieldErrors.venue)}
+                  className={fieldErrors.venue ? 'input-error' : ''}
                 />
+                {fieldErrors.venue && <p className="field-error">{fieldErrors.venue}</p>}
               </div>
               <div className="form-field">
                 <label htmlFor="dayOfWeek">Day of Week</label>
@@ -274,8 +330,10 @@ function CreateEditClassPage() {
                   type="time"
                   value={form.startTime}
                   onChange={(e) => updateField('startTime', e.target.value)}
-                  required
+                  aria-invalid={Boolean(fieldErrors.startTime)}
+                  className={fieldErrors.startTime ? 'input-error' : ''}
                 />
+                {fieldErrors.startTime && <p className="field-error">{fieldErrors.startTime}</p>}
               </div>
               <div className="form-field">
                 <label htmlFor="endTime">End Time</label>
@@ -284,11 +342,15 @@ function CreateEditClassPage() {
                   type="time"
                   value={form.endTime}
                   onChange={(e) => updateField('endTime', e.target.value)}
-                  required
+                  aria-invalid={Boolean(fieldErrors.endTime)}
+                  className={fieldErrors.endTime ? 'input-error' : ''}
                 />
+                {fieldErrors.endTime && <p className="field-error">{fieldErrors.endTime}</p>}
               </div>
             </div>
-            <p className="field-help" style={{ marginTop: '-10px' }}>Duration: {duration}</p>
+            {!fieldErrors.startTime && !fieldErrors.endTime && (
+              <p className="field-help" style={{ marginTop: '-10px' }}>Duration: {duration}</p>
+            )}
 
             <div className="card-field-row">
               <div className="form-field">
@@ -300,8 +362,10 @@ function CreateEditClassPage() {
                   max="500"
                   value={form.capacity}
                   onChange={(e) => updateField('capacity', e.target.value)}
-                  required
+                  aria-invalid={Boolean(fieldErrors.capacity)}
+                  className={fieldErrors.capacity ? 'input-error' : ''}
                 />
+                {fieldErrors.capacity && <p className="field-error">{fieldErrors.capacity}</p>}
               </div>
               <div className="form-field">
                 <label htmlFor="fee">Monthly Fee (LKR)</label>
@@ -312,8 +376,10 @@ function CreateEditClassPage() {
                   step="0.01"
                   value={form.fee}
                   onChange={(e) => updateField('fee', e.target.value)}
-                  required
+                  aria-invalid={Boolean(fieldErrors.fee)}
+                  className={fieldErrors.fee ? 'input-error' : ''}
                 />
+                {fieldErrors.fee && <p className="field-error">{fieldErrors.fee}</p>}
               </div>
             </div>
 

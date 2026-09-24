@@ -7,6 +7,8 @@ const { PAYMENT_STATUS } = require('./payment.constants');
 const gateway = require('./paymentGateway');
 const payhere = require('./payhereGateway');
 const repository = require('./payment.repository');
+const payoutGateway = require('./payoutGateway');
+const config = require('../../../../../shared/server/src/config/env');
 
 // gateway timeout error
 class GatewayUnavailableError extends Error {}
@@ -585,6 +587,11 @@ async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, acc
   };
 }
 
+// How admin is told payouts will actually be sent on this install.
+function getPayoutMethodStatus() {
+  return payoutGateway.describe();
+}
+
 async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
   if (!(amount > 0)) {
     throw ApiError.badRequest('Payout amount must be greater than zero.');
@@ -594,39 +601,207 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
     throw ApiError.badRequest('Please select a valid, active Tutor.');
   }
 
-  // Record which account the money was sent to, so the ledger shows where
-  // each payout actually went even after the tutor later changes it. Only
-  // the last 4 digits are stored - the full number stays with its owner.
+  // Money cannot be sent to an account that isn't there. Refusing here is
+  // better than writing a payout row that will never reach anyone.
   const bank = await repository.findBankDetails(tutorId);
-  const destination = bank && bank.bank_account_number
-    ? `to ${bank.bank_name || 'account'} ${maskAccountNumber(bank.bank_account_number)}`
-    : 'no bank account on file';
+  if (!bank || !bank.bank_account_number) {
+    throw ApiError.badRequest(
+      `${tutor.full_name} has no bank account on file. Add their account details before paying them.`
+    );
+  }
+
+  // The destination is copied onto the payout row, so the ledger still shows
+  // where the money went after the tutor later changes their details. Only
+  // the last 4 digits are kept - the full number stays with its owner.
+  const destination = `to ${bank.bank_name || 'account'} ${maskAccountNumber(bank.bank_account_number)}`;
   const noteWithDestination = [note && note.trim(), destination].filter(Boolean).join(' - ').slice(0, 255);
 
+  const usingApi = payoutGateway.isApiConfigured();
   const payoutId = await repository.createTutorPayout({
     tutorId,
     amount,
     note: noteWithDestination,
     periodLabel,
     paidBy: adminUser.id,
+    // QUEUED means "instructed, not yet confirmed by the bank". Nothing is
+    // ever marked SENT until the provider or the bank actually confirms it.
+    status: 'QUEUED',
+    method: usingApi ? 'PAYOUT_API' : 'BANK_FILE',
+    bankName: bank.bank_name,
+    bankAccountHolder: bank.bank_account_holder,
+    bankAccountLast4: payoutGateway.last4(bank.bank_account_number),
+    bankBranch: bank.bank_branch,
   });
+
+  let transferError = null;
+  if (usingApi) {
+    try {
+      const { reference } = await payoutGateway.sendTransfer({
+        payoutId,
+        amount,
+        currency: config.payouts.currency,
+        bank,
+        reference: `PAYOUT-${payoutId}`,
+      });
+      await repository.markPayoutSent(payoutId, reference);
+    } catch (error) {
+      transferError = error.message;
+      await repository.markPayoutFailed(payoutId, error.message);
+    }
+  }
 
   await recordAuditEvent({
     actorId: adminUser.id,
     action: 'TUTOR_PAID',
     entityType: 'tutor_payout',
     entityId: payoutId,
-    details: { tutorId, amount },
+    details: {
+      tutorId,
+      amount,
+      method: usingApi ? 'PAYOUT_API' : 'BANK_FILE',
+      outcome: transferError ? 'FAILED' : usingApi ? 'SENT' : 'QUEUED',
+    },
+  });
+
+  // Don't tell a tutor they have been paid when the transfer failed.
+  if (!transferError) {
+    await repository.createNotification({
+      recipientId: tutorId,
+      type: 'PAYOUT_RECORDED',
+      message:
+        `A payout of LKR ${Number(amount).toFixed(2)}${periodLabel ? ` (${periodLabel})` : ''} ` +
+        `has been ${usingApi ? 'sent' : 'approved'} ${destination}.` +
+        (usingApi ? '' : ' It will reach you once the bank processes the transfer.'),
+      sentBy: adminUser.id,
+    });
+  }
+
+  const status = transferError ? 'FAILED' : usingApi ? 'SENT' : 'QUEUED';
+  return {
+    id: payoutId,
+    tutorId,
+    tutorName: tutor.full_name,
+    amount,
+    note,
+    periodLabel,
+    status,
+    failureReason: transferError,
+  };
+}
+
+// --- Bank transfer file -------------------------------------------------
+// What corporate online banking expects: one file listing every account to
+// credit. The bank moves the money; this system records the instruction and
+// the confirmation.
+
+async function getPayoutBatch() {
+  const rows = await repository.listPayoutsAwaitingTransfer();
+  const method = payoutGateway.describe();
+  return {
+    method,
+    count: rows.length,
+    total: rows.reduce((sum, row) => sum + Number(row.amount), 0),
+    payouts: rows.map((row) => ({
+      id: row.id,
+      tutorId: row.tutor_id,
+      tutorName: row.tutor_name,
+      amount: Number(row.amount),
+      periodLabel: row.period_label,
+      // never the full number, even to admin
+      bankName: row.bank_name,
+      accountLast4: payoutGateway.last4(row.bank_account_number),
+      hasAccount: Boolean(row.bank_account_number),
+      exportedAt: row.exported_at,
+      paidAt: row.paid_at,
+    })),
+  };
+}
+
+async function exportPayoutFile(adminUser) {
+  if (!payoutGateway.isBankFileConfigured()) {
+    throw ApiError.badRequest(
+      'The institute payout account is not set. Add PAYOUT_SOURCE_BANK_NAME and ' +
+        'PAYOUT_SOURCE_ACCOUNT_NUMBER to server/.env - that is the account the money leaves from.'
+    );
+  }
+
+  const rows = await repository.listPayoutsAwaitingTransfer();
+  if (rows.length === 0) {
+    throw ApiError.badRequest('There are no payouts waiting to be transferred.');
+  }
+
+  const file = payoutGateway.buildBankTransferFile(rows);
+  if (file.rowCount === 0) {
+    throw ApiError.badRequest('None of the waiting payouts have a bank account on file.');
+  }
+
+  const includedIds = rows
+    .filter((row) => row.bank_account_number)
+    .map((row) => row.id);
+  await repository.markPayoutsExported(includedIds);
+
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'PAYOUT_FILE_EXPORTED',
+    entityType: 'tutor_payout',
+    entityId: null,
+    details: { count: file.rowCount, total: file.total, payoutIds: includedIds },
+  });
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { ...file, filename: `tutor-payouts-${stamp}.csv` };
+}
+
+// Admin confirms, from the bank's own confirmation, that a payout landed.
+async function confirmPayoutSettled(adminUser, payoutId, providerReference) {
+  const payout = await repository.findTutorPayoutById(payoutId);
+  if (!payout) {
+    throw ApiError.notFound('Payout not found.');
+  }
+  const updated = await repository.markPayoutSent(payoutId, providerReference);
+  if (!updated) {
+    throw ApiError.badRequest('Only a queued or failed payout can be marked as sent.');
+  }
+
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'PAYOUT_SETTLED',
+    entityType: 'tutor_payout',
+    entityId: payoutId,
+    details: { providerReference: providerReference || null },
   });
 
   await repository.createNotification({
-    recipientId: tutorId,
+    recipientId: payout.tutor_id,
     type: 'PAYOUT_RECORDED',
-    message: `A payout of LKR ${Number(amount).toFixed(2)} has been recorded for you${periodLabel ? ` (${periodLabel})` : ''} - ${destination}.`,
+    message:
+      `Your payout of LKR ${Number(payout.amount).toFixed(2)}` +
+      `${payout.period_label ? ` (${payout.period_label})` : ''} has been transferred to your bank account.`,
     sentBy: adminUser.id,
   });
 
-  return { id: payoutId, tutorId, tutorName: tutor.full_name, amount, note, periodLabel };
+  return { id: payoutId, status: 'SENT' };
+}
+
+async function markPayoutFailed(adminUser, payoutId, reason) {
+  const payout = await repository.findTutorPayoutById(payoutId);
+  if (!payout) {
+    throw ApiError.notFound('Payout not found.');
+  }
+  const updated = await repository.markPayoutFailed(payoutId, reason);
+  if (!updated) {
+    throw ApiError.badRequest('That payout cannot be marked as failed.');
+  }
+
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'PAYOUT_FAILED',
+    entityType: 'tutor_payout',
+    entityId: payoutId,
+    details: { reason },
+  });
+
+  return { id: payoutId, status: 'FAILED' };
 }
 
 async function listTutorPayouts() {
@@ -651,6 +826,15 @@ async function listTutorPayouts() {
       periodLabel: row.period_label,
       paidByName: row.paid_by_name,
       paidAt: row.paid_at,
+      // where it is in the transfer, not just that a row exists
+      status: row.status || 'RECORDED',
+      method: row.method,
+      bankName: row.bank_name,
+      accountLast4: row.bank_account_last4,
+      providerReference: row.provider_reference,
+      failureReason: row.failure_reason,
+      exportedAt: row.exported_at,
+      settledAt: row.settled_at,
     })),
     totalsByTutor,
   };
@@ -869,4 +1053,9 @@ module.exports = {
   updatePaymentSettings,
   payTutor,
   listTutorPayouts,
+  getPayoutMethodStatus,
+  getPayoutBatch,
+  exportPayoutFile,
+  confirmPayoutSettled,
+  markPayoutFailed,
 };

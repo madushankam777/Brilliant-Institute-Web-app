@@ -42,6 +42,8 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import ManageUsersPage from './pages/admin/ManageUsersPage';
 import UserProfilePage from './pages/admin/UserProfilePage';
 import AnnouncementsPage from './pages/admin/AnnouncementsPage';
+import ReregistrationPage from './pages/admin/ReregistrationPage';
+import ReregisterPage from './pages/auth/ReregisterPage';
 
 function App() {
   return (
@@ -89,6 +91,7 @@ function App() {
           {/* Student / Parent or Tutor - submit + track feedback tickets */}
           <Route element={<ProtectedRoute allowedRoles={['STUDENT_PARENT', 'TUTOR']} />}>
             <Route path="/feedback" element={<SubmitFeedbackPage />} />
+            <Route path="/reregister" element={<ReregisterPage />} />
           </Route>
 
           {/* Tutor only - their own student roster + notifying their students */}
@@ -108,6 +111,7 @@ function App() {
             <Route path="/admin/payments/tutors" element={<PayTutorsPage />} />
             <Route path="/admin/payments/settings" element={<PaymentSettingsPage />} />
             <Route path="/admin/announcements" element={<AnnouncementsPage />} />
+            <Route path="/admin/reregistration" element={<ReregistrationPage />} />
           </Route>
 
           {/* Catch-all */}

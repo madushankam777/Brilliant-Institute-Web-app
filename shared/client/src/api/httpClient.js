@@ -36,9 +36,23 @@ export function setSessionExpiredHandler(handler) {
 // A 401 here is an expected inline error (e.g. wrong password), not an expired session.
 const AUTH_ENTRY_POINTS = ['/auth/login', '/auth/register'];
 
+// A file download (responseType: 'blob') gets its error body as a Blob too,
+// so the server's message has to be read back out of it or it is lost.
+async function readErrorBody(error) {
+  const data = error.response && error.response.data;
+  if (typeof Blob !== 'undefined' && data instanceof Blob) {
+    try {
+      return JSON.parse(await data.text());
+    } catch {
+      return {};
+    }
+  }
+  return data || {};
+}
+
 httpClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response ? error.response.status : null;
     const requestUrl = error.config ? error.config.url : '';
     const isAuthEntryPoint = AUTH_ENTRY_POINTS.some((path) => requestUrl.includes(path));
@@ -47,13 +61,12 @@ httpClient.interceptors.response.use(
       onSessionExpired();
     }
 
-    const serverMessage = error.response && error.response.data && error.response.data.message;
+    const body = await readErrorBody(error);
+    const serverMessage = body.message;
     const friendlyMessage =
       serverMessage || 'Something went wrong. Please check your connection and try again.';
 
-    const details = error.response && error.response.data && error.response.data.details;
-
-    return Promise.reject({ message: friendlyMessage, status, details });
+    return Promise.reject({ message: friendlyMessage, status, details: body.details });
   }
 );
 

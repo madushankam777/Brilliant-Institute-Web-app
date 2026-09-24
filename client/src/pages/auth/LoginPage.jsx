@@ -48,7 +48,15 @@ function LoginPage() {
       // Go back to the page the user came from, or the dashboard.
       navigate(redirectTo || '/', { replace: true });
     } catch (error) {
-      setFormError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setFieldErrors(mapped);
+        setFormError('');
+      } else {
+        setFormError(error.message);
+      }
     } finally {
       setIsSubmitting(false);
     }

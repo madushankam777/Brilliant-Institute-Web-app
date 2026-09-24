@@ -8,6 +8,7 @@ export function getNavItems(role) {
       { to: '/admin/payments/tutors', label: 'Pay Tutors', icon: 'card' },
       { to: '/admin/payments/settings', label: 'Payment Settings', icon: 'edit' },
       { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
+      { to: '/admin/reregistration', label: 'Re-registration', icon: 'checkCircle' },
       { to: '/admin/feedback', label: 'Feedback', icon: 'chat' },
       { to: '/profile', label: 'My Profile', icon: 'user' },
     ];
@@ -32,6 +33,7 @@ export function getNavItems(role) {
     { to: '/payments', label: 'Fees', icon: 'card' },
     { to: '/payments/history', label: 'History', icon: 'receipt' },
     { to: '/feedback', label: 'Feedback', icon: 'chat' },
+    { to: '/reregister', label: 'Re-register', icon: 'checkCircle' },
     { to: '/profile', label: 'My Profile', icon: 'user' },
   ];
 }

@@ -49,6 +49,13 @@ function toInt(value, fallback) {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+function parseTrustProxy(value) {
+  if (!value || value === 'false') return false;
+  if (value === 'true') return 'loopback';
+  if (/^\d+$/.test(value)) return Number(value);
+  return value;
+}
+
 const config = {
   env: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
@@ -64,7 +71,11 @@ const config = {
     .filter(Boolean),
   // Only trust X-Forwarded-For when we're actually behind a real reverse
   // proxy - otherwise a client could spoof it and dodge IP rate limits.
-  trustProxy: process.env.TRUST_PROXY === 'true',
+  // TRUST_PROXY=true means "proxies running on this machine" (Vite's proxy,
+  // the Cloudflare tunnel client) - never Express's boolean `true`, which
+  // trusts every hop and lets anyone fake their IP. A number (hop count) or
+  // an address list is also accepted.
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
 
   db: {
     host: process.env.DB_HOST,
@@ -128,6 +139,23 @@ const config = {
     // Optional override when the API is served from a different public
     // origin than the site (leave blank when Vite proxies /api).
     notifyUrlOverride: process.env.PAYHERE_NOTIFY_URL || '',
+  },
+
+  // Paying tutors OUT. PayHere cannot do this - it only collects money. See
+  // payment/payoutGateway.js for what each provider means.
+  payouts: {
+    // 'BANK_FILE' (export a bulk-credit file for corporate online banking)
+    // or 'API' (a payout provider the institute has an account with).
+    provider: process.env.PAYOUT_PROVIDER === 'API' ? 'API' : 'BANK_FILE',
+    providerName: process.env.PAYOUT_PROVIDER_NAME || '',
+    apiBaseUrl: (process.env.PAYOUT_API_BASE_URL || '').replace(/\/+$/, ''),
+    apiKey: process.env.PAYOUT_API_KEY || '',
+    currency: process.env.PAYOUT_CURRENCY || 'LKR',
+    // The institute's own account the money leaves from. Printed on the
+    // transfer file so the right account is debited at the bank.
+    sourceBankName: process.env.PAYOUT_SOURCE_BANK_NAME || '',
+    sourceAccountNumber: process.env.PAYOUT_SOURCE_ACCOUNT_NUMBER || '',
+    sourceAccountHolder: process.env.PAYOUT_SOURCE_ACCOUNT_HOLDER || '',
   },
 };
 

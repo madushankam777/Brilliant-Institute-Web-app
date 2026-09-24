@@ -38,7 +38,10 @@ function ForgotPasswordPage() {
         setDevOnlyResetToken(result.data.devOnlyResetToken);
       }
     } catch (error) {
-      setErrorMessage(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      const emailDetail = details.find((d) => d.field === 'email');
+      if (emailDetail) { setFieldError(emailDetail.message); setErrorMessage(''); }
+      else setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);
     }

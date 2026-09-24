@@ -15,18 +15,34 @@ function SelfCheckInPage() {
 
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [codeError, setCodeError] = useState('');
   const [result, setResult] = useState(null); // { success, message }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setIsSubmitting(true);
     setResult(null);
+
+    const entered = code.trim();
+    if (!entered) {
+      setCodeError('Enter the 6-digit key your tutor showed you.');
+      return;
+    }
+    if (!/^\d{6}$/.test(entered)) {
+      setCodeError('The key is exactly 6 digits, numbers only.');
+      return;
+    }
+    setCodeError('');
+
+    setIsSubmitting(true);
     try {
       const response = await selfCheckIn(code);
       setResult({ success: true, message: response.message });
       setCode('');
     } catch (error) {
-      setResult({ success: false, message: error.message });
+      const details = Array.isArray(error.details) ? error.details : [];
+      const codeDetail = details.find((d) => d.field === 'code');
+      if (codeDetail) setCodeError(codeDetail.message);
+      else setResult({ success: false, message: error.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -41,14 +57,21 @@ function SelfCheckInPage() {
 
           {result && <Alert type={result.success ? 'success' : 'error'} message={result.message} />}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-field">
+            <label htmlFor="checkinCode">Attendance key</label>
             <input
+              id="checkinCode"
               type="text"
               inputMode="numeric"
               maxLength={6}
               placeholder="000000"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, ''));
+                setCodeError('');
+              }}
+              aria-invalid={Boolean(codeError)}
               style={{
                 fontSize: '1.8rem',
                 textAlign: 'center',
@@ -56,12 +79,17 @@ function SelfCheckInPage() {
                 width: '100%',
                 margin: '14px 0',
               }}
-              required
             />
+            {codeError ? (
+              <p className="field-error">{codeError}</p>
+            ) : (
+              <p className="field-help">{code.length}/6 digits entered.</p>
+            )}
+            </div>
             <button
               type="submit"
               className="btn btn-primary btn-block"
-              disabled={isSubmitting || code.length !== 6}
+              disabled={isSubmitting}
             >
               {isSubmitting ? 'Checking in...' : 'Check In'}
             </button>

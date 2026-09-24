@@ -2,6 +2,7 @@ const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandle
 const { toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
 const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
 const service = require('./admin.service');
+const rollover = require('./yearlyRollover');
 
 const getDashboardStats = asyncHandler(async (req, res) => {
   const stats = await service.getDashboardStats();
@@ -179,8 +180,68 @@ const sendTutorMessage = asyncHandler(async (req, res) => {
   });
 });
 
+// --- Student re-registration ---
+// The code is returned here and nowhere else; admin reads it out to the
+// student, and no later listing includes it.
+const generateReregistrationKey = asyncHandler(async (req, res) => {
+  const key = await service.generateReregistrationKey(req.user, req.body);
+  res.status(201).json({
+    success: true,
+    message: `Re-registration key created for ${key.studentName}.`,
+    data: { key },
+  });
+});
+
+const listReregistrationKeys = asyncHandler(async (req, res) => {
+  const keys = await service.listReregistrationKeys(req.query.academicYear);
+  res.status(200).json({ success: true, data: { keys } });
+});
+
+const revokeReregistrationKey = asyncHandler(async (req, res) => {
+  await service.revokeReregistrationKey(req.user, Number(req.params.keyId));
+  res.status(200).json({ success: true, message: 'Re-registration key revoked.' });
+});
+
+const redeemReregistrationKey = asyncHandler(async (req, res) => {
+  const result = await service.redeemReregistrationKey(req.user, req.body.keyCode);
+  res.status(200).json({ success: true, message: result.message, data: { result } });
+});
+
+const getMyReregistrationStatus = asyncHandler(async (req, res) => {
+  const status = await service.getMyReregistrationStatus(req.user);
+  res.status(200).json({ success: true, data: { status } });
+});
+
+// Shows exactly who would move up and whose account would close, before
+// anything is changed.
+const previewYearlyRollover = asyncHandler(async (req, res) => {
+  const preview = await rollover.previewRollover(req.query.academicYear);
+  res.status(200).json({ success: true, data: { preview } });
+});
+
+const runYearlyRollover = asyncHandler(async (req, res) => {
+  const result = await rollover.runYearlyRollover({
+    academicYear: req.body.academicYear,
+    actorId: req.user.id,
+  });
+  res.status(200).json({
+    success: true,
+    message: result.skipped
+      ? `The ${result.academicYear} roll-over has already been run.`
+      : `Promoted ${result.promotedCount}, graduated ${result.graduatedCount}, closed ${result.removedCount}.`,
+    data: { result },
+  });
+});
+
 module.exports = {
   getDashboardStats,
+  previewYearlyRollover,
+  runYearlyRollover,
+  generateReregistrationKey,
+  listReregistrationKeys,
+  revokeReregistrationKey,
+  redeemReregistrationKey,
+  getMyReregistrationStatus,
   listUsers,
   createUser,
   getUserProfile,

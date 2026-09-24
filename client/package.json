@@ -5,8 +5,10 @@
   "description": "Brilliant Institute Tuition Class Management System - React frontend (combined site: Registration/Login + Attendance/Payment)",
   "type": "module",
   "scripts": {
+    "predev": "node ../scripts/free-port.js client",
     "dev": "vite",
     "build": "vite build",
+    "prepreview": "node ../scripts/free-port.js preview",
     "preview": "vite preview"
   },
   "dependencies": {

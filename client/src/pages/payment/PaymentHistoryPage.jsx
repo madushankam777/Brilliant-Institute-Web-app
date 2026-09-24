@@ -63,6 +63,7 @@ function PaymentHistoryPage() {
   const [editReference, setEditReference] = useState('');
   const [editReceiptFile, setEditReceiptFile] = useState(null);
   const [editError, setEditError] = useState('');
+  const [editFieldError, setEditFieldError] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const loadHistory = useCallback(async () => {
@@ -113,9 +114,10 @@ function PaymentHistoryPage() {
   async function handleSaveEdit(event) {
     event.preventDefault();
     setEditError('');
+    setEditFieldError('');
 
     if (editReference.trim().length < 4) {
-      setEditError('Enter your bank account number or transfer reference.');
+      setEditFieldError('Enter at least 4 characters of your account number or reference.');
       return;
     }
 
@@ -128,7 +130,10 @@ function PaymentHistoryPage() {
       closeEditModal();
       await loadHistory();
     } catch (error) {
-      setEditError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      const refDetail = details.find((d) => String(d.field).includes('bankReference'));
+      if (refDetail) { setEditFieldError(refDetail.message); setEditError(''); }
+      else setEditError(error.message);
     } finally {
       setIsSavingEdit(false);
     }
@@ -233,8 +238,14 @@ function PaymentHistoryPage() {
                   type="text"
                   placeholder="e.g. 8001234567"
                   value={editReference}
-                  onChange={(e) => setEditReference(e.target.value)}
+                  onChange={(e) => {
+                    setEditReference(e.target.value);
+                    setEditFieldError('');
+                  }}
+                  className={editFieldError ? 'input-error' : ''}
+                  aria-invalid={Boolean(editFieldError)}
                 />
+                {editFieldError && <p className="field-error">{editFieldError}</p>}
               </div>
               <div className="form-field">
                 <label htmlFor="editReceiptFile">Replace Receipt (optional)</label>

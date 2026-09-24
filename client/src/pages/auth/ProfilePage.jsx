@@ -108,7 +108,15 @@ function ProfilePage() {
       await refreshProfile();
       setProfileMessage('Profile updated successfully.');
     } catch (error) {
-      setProfileError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setProfileFieldErrors(mapped);
+        setProfileError('');
+      } else {
+        setProfileError(error.message);
+      }
     } finally {
       setIsSavingProfile(false);
     }
@@ -119,6 +127,7 @@ function ProfilePage() {
   const [isLoadingBank, setIsLoadingBank] = useState(isTutor);
   const [bankMessage, setBankMessage] = useState('');
   const [bankError, setBankError] = useState('');
+  const [bankFieldErrors, setBankFieldErrors] = useState({});
   const [isSavingBank, setIsSavingBank] = useState(false);
 
   useEffect(() => {
@@ -149,13 +158,22 @@ function ProfilePage() {
   async function handleBankSubmit(event) {
     event.preventDefault();
     setBankError('');
+    setBankFieldErrors({});
     setBankMessage('');
     setIsSavingBank(true);
     try {
       await updateMyBankDetails(bankForm);
       setBankMessage('Banking information saved.');
     } catch (error) {
-      setBankError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setBankFieldErrors(mapped);
+        setBankError('');
+      } else {
+        setBankError(error.message);
+      }
     } finally {
       setIsSavingBank(false);
     }
@@ -189,7 +207,15 @@ function ProfilePage() {
       setNewPassword('');
       setConfirmNewPassword('');
     } catch (error) {
-      setPasswordError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setPasswordFieldErrors(mapped);
+        setPasswordError('');
+      } else {
+        setPasswordError(error.message);
+      }
     } finally {
       setIsSavingPassword(false);
     }
@@ -316,6 +342,7 @@ function ProfilePage() {
                   placeholder="e.g. People's Bank"
                   value={bankForm.bankName}
                   onChange={(e) => setBankForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                  error={bankFieldErrors.bankName}
                 />
                 <FormField
                   id="accountHolder"
@@ -323,6 +350,7 @@ function ProfilePage() {
                   placeholder="Name exactly as it appears on the account"
                   value={bankForm.accountHolder}
                   onChange={(e) => setBankForm((prev) => ({ ...prev, accountHolder: e.target.value }))}
+                  error={bankFieldErrors.accountHolder}
                 />
                 <FormField
                   id="accountNumber"
@@ -330,6 +358,7 @@ function ProfilePage() {
                   placeholder="e.g. 8001234567"
                   value={bankForm.accountNumber}
                   onChange={(e) => setBankForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
+                  error={bankFieldErrors.accountNumber}
                 />
                 <FormField
                   id="branch"
@@ -337,6 +366,7 @@ function ProfilePage() {
                   placeholder="e.g. Colombo 07"
                   value={bankForm.branch}
                   onChange={(e) => setBankForm((prev) => ({ ...prev, branch: e.target.value }))}
+                  error={bankFieldErrors.branch}
                 />
 
                 <button type="submit" className="btn btn-primary" disabled={isSavingBank}>

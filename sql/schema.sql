@@ -11,9 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash         VARCHAR(255)  NOT NULL,
   phone                 VARCHAR(30)   NULL,
   role                  ENUM('STUDENT_PARENT', 'TUTOR', 'ADMIN') NOT NULL DEFAULT 'STUDENT_PARENT',
-  status                ENUM('ACTIVE', 'SUSPENDED', 'DELETED') NOT NULL DEFAULT 'ACTIVE',
+  status                ENUM('ACTIVE', 'SUSPENDED', 'DELETED', 'LEFT') NOT NULL DEFAULT 'ACTIVE',
   bio                   TEXT NULL,
   grade                 VARCHAR(10) NULL,
+  reregistered_for_year SMALLINT UNSIGNED NULL,
+  left_at               DATETIME NULL,
   profile_picture_path  VARCHAR(255) NULL,
   bank_name             VARCHAR(100) NULL,
   bank_account_holder   VARCHAR(150) NULL,
@@ -215,6 +217,16 @@ CREATE TABLE IF NOT EXISTS tutor_payouts (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   tutor_id      INT UNSIGNED NOT NULL,
   amount        DECIMAL(10,2) NOT NULL,
+  status        ENUM('RECORDED', 'QUEUED', 'SENT', 'FAILED') NOT NULL DEFAULT 'RECORDED',
+  method        VARCHAR(30) NOT NULL DEFAULT 'MANUAL',
+  bank_name           VARCHAR(100) NULL,
+  bank_account_holder VARCHAR(150) NULL,
+  bank_account_last4  CHAR(4) NULL,
+  bank_branch         VARCHAR(100) NULL,
+  provider_reference  VARCHAR(100) NULL,
+  failure_reason      VARCHAR(255) NULL,
+  exported_at   DATETIME NULL,
+  settled_at    DATETIME NULL,
   note          VARCHAR(255) NULL,
   period_label  VARCHAR(50) NULL,
   paid_by       INT UNSIGNED NOT NULL,
@@ -222,6 +234,39 @@ CREATE TABLE IF NOT EXISTS tutor_payouts (
   KEY idx_tutor_payouts_tutor (tutor_id),
   CONSTRAINT fk_tutor_payouts_tutor FOREIGN KEY (tutor_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_tutor_payouts_paid_by FOREIGN KEY (paid_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- A one-time key Admin issues so a student can confirm their place for the
+-- next academic year. The January roll-over promotes everyone who used one
+-- and closes the accounts of everyone who did not.
+CREATE TABLE IF NOT EXISTS student_reregistration_keys (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  key_code        VARCHAR(24)  NOT NULL,
+  student_id      INT UNSIGNED NOT NULL,
+  from_grade      VARCHAR(10)  NULL,
+  to_grade        VARCHAR(10)  NOT NULL,
+  academic_year   SMALLINT UNSIGNED NOT NULL,
+  status          ENUM('UNUSED', 'USED', 'REVOKED') NOT NULL DEFAULT 'UNUSED',
+  expires_at      DATETIME     NULL,
+  created_by      INT UNSIGNED NOT NULL,
+  used_at         DATETIME     NULL,
+  created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_rereg_key_code (key_code),
+  KEY idx_rereg_student (student_id),
+  KEY idx_rereg_status (status),
+  CONSTRAINT fk_rereg_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_rereg_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One row per academic year, so the roll-over can never run twice.
+CREATE TABLE IF NOT EXISTS yearly_rollover_log (
+  id                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  academic_year      SMALLINT UNSIGNED NOT NULL,
+  promoted_count     INT UNSIGNED NOT NULL DEFAULT 0,
+  removed_count      INT UNSIGNED NOT NULL DEFAULT 0,
+  graduated_count    INT UNSIGNED NOT NULL DEFAULT 0,
+  ran_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_rollover_year (academic_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Singleton row (id always 1) - the institute's own receiving details,
@@ -244,9 +289,10 @@ CREATE TABLE IF NOT EXISTS payment_settings (
 CREATE TABLE IF NOT EXISTS notification_log (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   recipient_id  INT UNSIGNED NOT NULL,
-  channel       ENUM('EMAIL', 'SMS') NOT NULL,
+  channel       ENUM('EMAIL', 'SMS', 'IN_APP') NOT NULL,
   type          ENUM('CLASS_REMINDER', 'FEE_DUE', 'LOW_ATTENDANCE', 'ANNOUNCEMENT',
-                     'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_SUBMITTED', 'PAYOUT_RECORDED') NOT NULL,
+                     'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_SUBMITTED', 'PAYOUT_RECORDED',
+                     'REREGISTRATION', 'ACCOUNT_CLOSED') NOT NULL,
   message       VARCHAR(500) NOT NULL,
   sent_by       INT UNSIGNED NULL,
   sent_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

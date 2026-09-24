@@ -71,7 +71,15 @@ function NotifyStudentsPage() {
       setSuccessMessage(response.message);
       setForm({ ...EMPTY_FORM, audience: form.audience });
     } catch (error) {
-      setFormError(error.message);
+      const details = Array.isArray(error.details) ? error.details : [];
+      if (details.length > 0) {
+        const mapped = {};
+        details.forEach((d) => { if (d.field && !mapped[d.field]) mapped[d.field] = d.message; });
+        setFieldErrors(mapped);
+        setFormError('');
+      } else {
+        setFormError(error.message);
+      }
     } finally {
       setIsSending(false);
     }

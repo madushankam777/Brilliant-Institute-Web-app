@@ -143,7 +143,34 @@ const paymentSettingsRules = [
     .withMessage('Enter a valid mCash mobile number (e.g. 0771234567).'),
 ];
 
+const payoutIdParamRules = [
+  param('payoutId').isInt({ min: 1 }).withMessage('Invalid payout id.'),
+];
+
+const confirmPayoutRules = [
+  param('payoutId').isInt({ min: 1 }).withMessage('Invalid payout id.'),
+  body('providerReference')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('That reference is too long.'),
+];
+
+const failPayoutRules = [
+  param('payoutId').isInt({ min: 1 }).withMessage('Invalid payout id.'),
+  body('reason')
+    .trim()
+    .notEmpty()
+    .withMessage('Say why the transfer failed.')
+    .bail()
+    .isLength({ max: 255 })
+    .withMessage('Keep the reason under 255 characters.'),
+];
+
 module.exports = {
+  payoutIdParamRules,
+  confirmPayoutRules,
+  failPayoutRules,
   makePaymentRules,
   onlineCheckoutRules,
   bankTransferRules,
