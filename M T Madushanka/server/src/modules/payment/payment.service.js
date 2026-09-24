@@ -8,6 +8,7 @@ const gateway = require('./paymentGateway');
 const payhere = require('./payhereGateway');
 const repository = require('./payment.repository');
 const payoutGateway = require('./payoutGateway');
+const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const config = require('../../../../../shared/server/src/config/env');
 
 // gateway timeout error
@@ -588,8 +589,19 @@ async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, acc
 }
 
 // How admin is told payouts will actually be sent on this install.
-function getPayoutMethodStatus() {
-  return payoutGateway.describe();
+async function getPayoutMethodStatus() {
+  const method = payoutGateway.describe();
+  if (!(await schema.hasPayoutTracking())) {
+    return {
+      ...method,
+      ready: false,
+      migrationPending: true,
+      reason:
+        'Payouts are saved as ledger records only until the one-time database update is run ' +
+        '(sql/migration_student_reregistration_and_payouts.sql, as root in MySQL Workbench).',
+    };
+  }
+  return method;
 }
 
 async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
@@ -616,7 +628,8 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
   const destination = `to ${bank.bank_name || 'account'} ${maskAccountNumber(bank.bank_account_number)}`;
   const noteWithDestination = [note && note.trim(), destination].filter(Boolean).join(' - ').slice(0, 255);
 
-  const usingApi = payoutGateway.isApiConfigured();
+  const tracking = await schema.hasPayoutTracking();
+  const usingApi = tracking && payoutGateway.isApiConfigured();
   const payoutId = await repository.createTutorPayout({
     tutorId,
     amount,
@@ -670,13 +683,13 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
       type: 'PAYOUT_RECORDED',
       message:
         `A payout of LKR ${Number(amount).toFixed(2)}${periodLabel ? ` (${periodLabel})` : ''} ` +
-        `has been ${usingApi ? 'sent' : 'approved'} ${destination}.` +
-        (usingApi ? '' : ' It will reach you once the bank processes the transfer.'),
+        `has been ${!tracking ? 'recorded' : usingApi ? 'sent' : 'approved'} ${destination}.` +
+        (tracking && !usingApi ? ' It will reach you once the bank processes the transfer.' : ''),
       sentBy: adminUser.id,
     });
   }
 
-  const status = transferError ? 'FAILED' : usingApi ? 'SENT' : 'QUEUED';
+  const status = !tracking ? 'RECORDED' : transferError ? 'FAILED' : usingApi ? 'SENT' : 'QUEUED';
   return {
     id: payoutId,
     tutorId,
@@ -718,6 +731,7 @@ async function getPayoutBatch() {
 }
 
 async function exportPayoutFile(adminUser) {
+  if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
   if (!payoutGateway.isBankFileConfigured()) {
     throw ApiError.badRequest(
       'The institute payout account is not set. Add PAYOUT_SOURCE_BANK_NAME and ' +
@@ -754,6 +768,7 @@ async function exportPayoutFile(adminUser) {
 
 // Admin confirms, from the bank's own confirmation, that a payout landed.
 async function confirmPayoutSettled(adminUser, payoutId, providerReference) {
+  if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
   const payout = await repository.findTutorPayoutById(payoutId);
   if (!payout) {
     throw ApiError.notFound('Payout not found.');
@@ -784,6 +799,7 @@ async function confirmPayoutSettled(adminUser, payoutId, providerReference) {
 }
 
 async function markPayoutFailed(adminUser, payoutId, reason) {
+  if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
   const payout = await repository.findTutorPayoutById(payoutId);
   if (!payout) {
     throw ApiError.notFound('Payout not found.');

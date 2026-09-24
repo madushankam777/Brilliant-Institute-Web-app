@@ -22,9 +22,17 @@ function errorHandler(err, req, res, next) {
     console.error(`[error] ${req.method} ${req.originalUrl} ->`, err);
   }
 
+  // A missing table/column means the code is ahead of the database - say so
+  // plainly instead of a generic failure, so an admin knows what to fix.
+  const isSchemaOutOfDate = err && (err.code === 'ER_NO_SUCH_TABLE' || err.code === 'ER_BAD_FIELD_ERROR');
+
   const responseBody = {
     success: false,
-    message: isKnownError ? err.message : 'Something went wrong. Please try again later.',
+    message: isKnownError
+      ? err.message
+      : isSchemaOutOfDate
+        ? 'This feature needs a database update. Ask the administrator to run the latest SQL migration in the sql/ folder.'
+        : 'Something went wrong. Please try again later.',
   };
 
   if (isKnownError && err.details) {

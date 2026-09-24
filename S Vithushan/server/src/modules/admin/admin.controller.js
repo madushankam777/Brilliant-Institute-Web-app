@@ -194,7 +194,8 @@ const generateReregistrationKey = asyncHandler(async (req, res) => {
 
 const listReregistrationKeys = asyncHandler(async (req, res) => {
   const keys = await service.listReregistrationKeys(req.query.academicYear);
-  res.status(200).json({ success: true, data: { keys } });
+  const ready = await service.isReregistrationReady();
+  res.status(200).json({ success: true, data: { keys, ready } });
 });
 
 const revokeReregistrationKey = asyncHandler(async (req, res) => {

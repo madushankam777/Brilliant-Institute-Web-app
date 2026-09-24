@@ -199,7 +199,7 @@ const payTutor = asyncHandler(async (req, res) => {
 // How payouts leave this install, so the screen can say so plainly rather
 // than implying money moved when it has not.
 const getPayoutMethodStatus = asyncHandler(async (req, res) => {
-  res.status(200).json({ success: true, data: { method: service.getPayoutMethodStatus() } });
+  res.status(200).json({ success: true, data: { method: await service.getPayoutMethodStatus() } });
 });
 
 const getPayoutBatch = asyncHandler(async (req, res) => {

@@ -9,6 +9,7 @@ const { nextGrade, isFinalGrade } = require('../../../../../shared/server/src/co
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const repository = require('./admin.repository');
+const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -37,6 +38,7 @@ function classify(students, academicYear) {
 
 // What the roll-over would do, without touching anything.
 async function previewRollover(academicYear) {
+  if (!(await schema.hasReregistration())) throw schema.migrationRequired();
   const year = Number(academicYear);
   const students = await repository.listStudentsForRollover(year);
   const { promote, graduate, remove } = classify(students, year);
@@ -58,6 +60,7 @@ async function previewRollover(academicYear) {
 // Idempotent per year: the log row is the guard, so a restart on 1 January
 // cannot run it twice.
 async function runYearlyRollover({ academicYear, actorId = null, force = false }) {
+  if (!(await schema.hasReregistration())) throw schema.migrationRequired();
   const year = Number(academicYear);
   if (!Number.isInteger(year)) {
     throw ApiError.badRequest('Please choose a valid year.');
@@ -155,6 +158,7 @@ async function runYearlyRollover({ academicYear, actorId = null, force = false }
 async function runIfDue() {
   const now = new Date();
   if (now.getMonth() !== 0 || now.getDate() > 7) return null;
+  if (!(await schema.hasReregistration())) return null;
 
   const year = now.getFullYear();
   if (await repository.findRolloverLog(year)) return null;

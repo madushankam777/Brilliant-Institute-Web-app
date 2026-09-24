@@ -71,17 +71,22 @@ function PayTutorsPage() {
     setIsLoading(true);
     setLoadError('');
     try {
-      const [tutorList, payoutData, method, batchData] = await Promise.all([
+      // Loaded independently, so one failing request doesn't empty the rest.
+      const [tutorList, payoutData, method, batchData] = await Promise.allSettled([
         fetchAllTutors(),
         fetchTutorPayouts(),
         fetchPayoutMethod(),
         fetchPayoutBatch(),
       ]);
-      setTutors(tutorList);
-      setPayouts(payoutData.payouts);
-      setTotalsByTutor(payoutData.totalsByTutor || {});
-      setPayoutMethod(method);
-      setBatch(batchData);
+      if (tutorList.status === 'fulfilled') setTutors(tutorList.value);
+      if (payoutData.status === 'fulfilled') {
+        setPayouts(payoutData.value.payouts);
+        setTotalsByTutor(payoutData.value.totalsByTutor || {});
+      }
+      if (method.status === 'fulfilled') setPayoutMethod(method.value);
+      if (batchData.status === 'fulfilled') setBatch(batchData.value);
+      const failed = [tutorList, payoutData, method, batchData].find((r) => r.status === 'rejected');
+      if (failed) setLoadError(failed.reason.message);
     } catch (error) {
       setLoadError(error.message);
     } finally {

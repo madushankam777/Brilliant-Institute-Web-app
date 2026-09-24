@@ -108,7 +108,11 @@ function ReregisterPage() {
               )}
             </div>
 
-            {!status?.isConfirmedForNextYear && (
+            {status?.isOpen === false && (
+              <p className="callout">Re-registration is not open yet. The office will let you know when it is.</p>
+            )}
+
+            {status?.isOpen !== false && !status?.isConfirmedForNextYear && (
               <div className="card">
                 <h2>Enter your key</h2>
 

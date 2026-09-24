@@ -14,6 +14,7 @@ const { USER_STATUS, ROLES } = require('../../../../../shared/server/src/config/
 const { GRADES, nextGrade, isFinalGrade } = require('../../../../../shared/server/src/config/grades');
 const gateway = require('./notificationGateway');
 const repository = require('./admin.repository');
+const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
 async function createUser(adminUser, { fullName, email, password, role }) {
   const existing = await repository.findUserByEmail(email);
@@ -301,6 +302,7 @@ function currentAcademicYear() {
 }
 
 async function generateReregistrationKey(adminUser, { studentId, toGrade, academicYear }) {
+  if (!(await schema.hasReregistration())) throw schema.migrationRequired();
   const student = await repository.findUserById(studentId);
   if (!student || student.role !== ROLES.STUDENT_PARENT) {
     throw ApiError.badRequest('Please choose a student to re-register.');
@@ -393,12 +395,15 @@ function toSafeReregistrationKey(row) {
 }
 
 async function listReregistrationKeys(academicYear) {
+  // before the migration there simply are no keys yet
+  if (!(await schema.hasReregistration())) return [];
   const year = Number(academicYear);
   const rows = await repository.listReregistrationKeys(Number.isInteger(year) ? year : null);
   return rows.map(toSafeReregistrationKey);
 }
 
 async function revokeReregistrationKey(adminUser, keyId) {
+  if (!(await schema.hasReregistration())) throw schema.migrationRequired();
   const key = await repository.findReregistrationKeyById(keyId);
   if (!key) {
     throw ApiError.notFound('Re-registration key not found.');
@@ -418,6 +423,9 @@ async function revokeReregistrationKey(adminUser, keyId) {
 
 // The student's side: type the key, confirm the place.
 async function redeemReregistrationKey(studentUser, keyCode) {
+  if (!(await schema.hasReregistration())) {
+    throw ApiError.badRequest('Re-registration is not open yet. Please check with the office.');
+  }
   const normalised = String(keyCode || '').trim().toUpperCase();
   const key = await repository.findRedeemableKeyForStudent(normalised, studentUser.id);
   if (!key) {
@@ -477,6 +485,7 @@ async function getMyReregistrationStatus(studentUser) {
   }
   const nextYear = currentAcademicYear() + 1;
   return {
+    isOpen: await schema.hasReregistration(),
     grade: user.grade,
     nextYear,
     confirmedForYear: user.reregistered_for_year || null,
@@ -733,4 +742,5 @@ module.exports = {
   redeemReregistrationKey,
   getMyReregistrationStatus,
   currentAcademicYear,
+  isReregistrationReady: schema.hasReregistration,
 };

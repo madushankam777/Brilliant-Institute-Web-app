@@ -1,4 +1,5 @@
 const { pool } = require('../../../../../shared/server/src/config/db');
+const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
 async function findEnrollmentById(enrollmentId, executor = pool) {
   const [rows] = await executor.execute(
@@ -273,6 +274,15 @@ async function createTutorPayout({
   bankAccountLast4,
   bankBranch,
 }) {
+  // older database without the transfer columns: record the ledger row only
+  if (!(await schema.hasPayoutTracking())) {
+    const [legacy] = await pool.execute(
+      `INSERT INTO tutor_payouts (tutor_id, amount, note, period_label, paid_by, paid_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [tutorId, amount, note || null, periodLabel || null, paidBy]
+    );
+    return legacy.insertId;
+  }
   const [result] = await pool.execute(
     `INSERT INTO tutor_payouts
        (tutor_id, amount, status, method, bank_name, bank_account_holder, bank_account_last4,
@@ -310,6 +320,7 @@ async function findTutorPayoutById(payoutId) {
 // Queued payouts joined to the tutor's CURRENT full account number - the
 // only place the full number is read, and only to build the bank file.
 async function listPayoutsAwaitingTransfer() {
+  if (!(await schema.hasPayoutTracking())) return [];
   const [rows] = await pool.execute(
     `SELECT tp.id, tp.tutor_id, t.full_name AS tutor_name, tp.amount, tp.period_label,
             tp.note, tp.exported_at, tp.paid_at,
@@ -353,6 +364,17 @@ async function markPayoutFailed(payoutId, reason) {
 }
 
 async function listTutorPayouts() {
+  if (!(await schema.hasPayoutTracking())) {
+    const [legacyRows] = await pool.execute(
+      `SELECT tp.id, tp.tutor_id, t.full_name AS tutor_name, tp.amount, tp.note, tp.period_label,
+              tp.paid_by, a.full_name AS paid_by_name, tp.paid_at
+       FROM tutor_payouts tp
+       JOIN users t ON t.id = tp.tutor_id
+       JOIN users a ON a.id = tp.paid_by
+       ORDER BY tp.paid_at DESC`
+    );
+    return legacyRows;
+  }
   const [rows] = await pool.execute(
     `SELECT tp.id, tp.tutor_id, t.full_name AS tutor_name, tp.amount, tp.note, tp.period_label,
             tp.status, tp.method, tp.bank_name, tp.bank_account_holder, tp.bank_account_last4,

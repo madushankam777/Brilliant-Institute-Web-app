@@ -141,7 +141,8 @@ export async function fetchReregistrationKeys(academicYear) {
   const response = await httpClient.get('/admin/reregistration-keys', {
     params: academicYear ? { academicYear } : {},
   });
-  return response.data.data.keys;
+  // ready is false until the database update for re-registration has been run
+  return { keys: response.data.data.keys, ready: response.data.data.ready !== false };
 }
 
 export async function revokeReregistrationKey(keyId) {

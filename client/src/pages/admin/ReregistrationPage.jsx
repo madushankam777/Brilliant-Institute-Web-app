@@ -37,6 +37,7 @@ function ReregistrationPage() {
 
   const [students, setStudents] = useState([]);
   const [keys, setKeys] = useState([]);
+  const [isReady, setIsReady] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -56,18 +57,19 @@ function ReregistrationPage() {
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
-    try {
-      const [studentRows, keyRows] = await Promise.all([
-        fetchUsers({ role: 'STUDENT_PARENT', status: 'ACTIVE' }),
-        fetchReregistrationKeys(year),
-      ]);
-      setStudents(studentRows);
-      setKeys(keyRows);
-    } catch (error) {
-      setLoadError(error.message);
-    } finally {
-      setIsLoading(false);
+    // Loaded independently, so one failing request doesn't empty the other.
+    const [studentResult, keyResult] = await Promise.allSettled([
+      fetchUsers({ role: 'STUDENT_PARENT', status: 'ACTIVE' }),
+      fetchReregistrationKeys(year),
+    ]);
+    if (studentResult.status === 'fulfilled') setStudents(studentResult.value);
+    if (keyResult.status === 'fulfilled') {
+      setKeys(keyResult.value.keys);
+      setIsReady(keyResult.value.ready);
     }
+    const failed = [studentResult, keyResult].find((r) => r.status === 'rejected');
+    if (failed) setLoadError(failed.reason.message);
+    setIsLoading(false);
   }, [year]);
 
   useEffect(() => {
@@ -117,7 +119,7 @@ function ReregistrationPage() {
       setJustGeneratedKey(key);
       setForm({ studentId: '', toGrade: '' });
       clearErrors();
-      setKeys(await fetchReregistrationKeys(year));
+      setKeys((await fetchReregistrationKeys(year)).keys);
     } catch (error) {
       captureError(error);
     } finally {
@@ -130,7 +132,7 @@ function ReregistrationPage() {
     try {
       await revokeReregistrationKey(keyId);
       setSuccessMessage('Key revoked.');
-      setKeys(await fetchReregistrationKeys(year));
+      setKeys((await fetchReregistrationKeys(year)).keys);
     } catch (error) {
       setLoadError(error.message);
     }
@@ -184,6 +186,13 @@ function ReregistrationPage() {
           </p>
         </div>
 
+        {!isReady && (
+          <p className="callout" style={{ background: 'var(--color-warning-bg)', borderColor: '#fde68a' }}>
+            <strong>One-time setup needed.</strong> Before keys can be issued, run{' '}
+            <code>sql/migration_student_reregistration_and_payouts.sql</code> as root in MySQL
+            Workbench. Everything else on this page works in the meantime.
+          </p>
+        )}
         <Alert type="error" message={loadError} />
         <Alert type="success" message={successMessage} />
 
