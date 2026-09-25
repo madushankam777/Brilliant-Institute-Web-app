@@ -37,12 +37,15 @@ import SubmitFeedbackPage from './pages/feedback/SubmitFeedbackPage';
 import StaffFeedbackPage from './pages/feedback/StaffFeedbackPage';
 
 import NotifyStudentsPage from './pages/notifications/NotifyStudentsPage';
+import RemindersPage from './pages/notifications/RemindersPage';
+import CalendarPage from './pages/calendar/CalendarPage';
 
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import ManageUsersPage from './pages/admin/ManageUsersPage';
 import UserProfilePage from './pages/admin/UserProfilePage';
 import AnnouncementsPage from './pages/admin/AnnouncementsPage';
 import ReregistrationPage from './pages/admin/ReregistrationPage';
+import TimetablesPage from './pages/admin/TimetablesPage';
 import ReregisterPage from './pages/auth/ReregisterPage';
 
 function App() {
@@ -62,6 +65,7 @@ function App() {
           {/* Any logged-in user */}
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/courses/classes" element={<BrowseClassesPage />} />
             <Route path="/courses/classes/:classId" element={<ClassDetailsPage />} />
             <Route path="/courses/tutors/:tutorId" element={<TutorProfilePage />} />
@@ -94,10 +98,11 @@ function App() {
             <Route path="/reregister" element={<ReregisterPage />} />
           </Route>
 
-          {/* Tutor only - their own student roster + notifying their students */}
+          {/* Tutor only - their own student roster, notices and scheduled reminders */}
           <Route element={<ProtectedRoute allowedRoles={['TUTOR']} />}>
             <Route path="/students/mine" element={<MyStudentsPage />} />
             <Route path="/notify" element={<NotifyStudentsPage />} />
+            <Route path="/reminders" element={<RemindersPage />} />
           </Route>
 
           {/* Admin only - operations dashboard, user management, announcements */}
@@ -107,6 +112,7 @@ function App() {
             <Route path="/courses/manage/new" element={<CreateEditClassPage />} />
             <Route path="/admin/users" element={<ManageUsersPage />} />
             <Route path="/admin/users/:userId" element={<UserProfilePage />} />
+            <Route path="/admin/timetables" element={<TimetablesPage />} />
             <Route path="/admin/payments/verify" element={<PaymentVerificationPage />} />
             <Route path="/admin/payments/tutors" element={<PayTutorsPage />} />
             <Route path="/admin/payments/settings" element={<PaymentSettingsPage />} />

@@ -1,5 +1,5 @@
-// Admin: review bank-transfer receipts submitted by students and either
-// approve (moves the balance, issues a receipt) or reject them.
+// Admin: check bank slips uploaded by students. Approving takes the amount
+// read off the slip - that amount reduces the balance and counts as revenue.
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchPendingBankTransfers,
@@ -18,12 +18,25 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+function formatDateTime(value) {
+  return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function PaymentVerificationPage() {
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const [confirmTarget, setConfirmTarget] = useState(null); // { payment, action: 'approve' | 'reject' }
+  const [target, setTarget] = useState(null); // { payment, action: 'approve' | 'reject' }
+  const [receivedAmount, setReceivedAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
+  const [slipFailed, setSlipFailed] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
 
@@ -31,8 +44,7 @@ function PaymentVerificationPage() {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const data = await fetchPendingBankTransfers();
-      setPayments(data);
+      setPayments(await fetchPendingBankTransfers());
     } catch (error) {
       setErrorMessage(error.message);
     } finally {
@@ -44,22 +56,49 @@ function PaymentVerificationPage() {
     load();
   }, [load]);
 
-  function closeConfirmModal() {
-    setConfirmTarget(null);
+  function openModal(payment, action) {
+    setTarget({ payment, action });
+    setReceivedAmount(String(payment.amount));
+    setAmountError('');
     setConfirmError('');
+    setSlipFailed(false);
+    setSuccessMessage('');
+  }
+
+  function closeModal() {
+    if (isConfirming) return;
+    setTarget(null);
   }
 
   async function handleConfirm() {
-    if (!confirmTarget) return;
-    setIsConfirming(true);
+    const { payment, action } = target;
     setConfirmError('');
-    try {
-      if (confirmTarget.action === 'approve') {
-        await approveBankTransfer(confirmTarget.payment.id);
-      } else {
-        await rejectBankTransfer(confirmTarget.payment.id);
+
+    if (action === 'approve') {
+      const amount = Number(receivedAmount);
+      if (!(amount > 0)) {
+        setAmountError('Enter the amount shown on the bank slip.');
+        return;
       }
-      closeConfirmModal();
+      if (amount > payment.outstandingBalance) {
+        setAmountError(`This is more than the outstanding balance of ${formatCurrency(payment.outstandingBalance)}.`);
+        return;
+      }
+    }
+
+    setIsConfirming(true);
+    try {
+      if (action === 'approve') {
+        const amount = Number(receivedAmount);
+        await approveBankTransfer(payment.id, amount);
+        setSuccessMessage(
+          `Approved ${formatCurrency(amount)} from ${payment.studentName}. It is now included in revenue.`
+        );
+      } else {
+        await rejectBankTransfer(payment.id);
+        setSuccessMessage(`Rejected the slip from ${payment.studentName}. They have been asked to resubmit.`);
+      }
+      setTarget(null);
       await load();
     } catch (error) {
       setConfirmError(error.message);
@@ -68,24 +107,28 @@ function PaymentVerificationPage() {
     }
   }
 
+  const received = Number(receivedAmount);
+  const differsFromClaim = target && target.action === 'approve' && received > 0 && received !== target.payment.amount;
+
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
         <div className="page-header">
           <h1>Payment Verification</h1>
           <p className="muted">
-            Bank transfer receipts awaiting review. Approving moves the balance and issues a receipt;
-            rejecting lets the student re-submit.
+            Check each bank slip and enter the amount it shows. Approving updates the student&apos;s
+            balance, issues a receipt and adds the amount to revenue.
           </p>
         </div>
 
         <Alert type="error" message={errorMessage} />
+        <Alert type="success" message={successMessage} />
 
         {isLoading ? (
-          <LoadingSpinner label="Loading pending transfers..." />
+          <LoadingSpinner label="Loading bank slips..." />
         ) : payments.length === 0 ? (
           <div className="card">
-            <p className="muted">No bank transfers are waiting for verification right now.</p>
+            <p className="muted" style={{ margin: 0 }}>No bank slips are waiting for verification.</p>
           </div>
         ) : (
           <div className="card">
@@ -96,16 +139,15 @@ function PaymentVerificationPage() {
                     <th>Submitted</th>
                     <th>Student</th>
                     <th>Class</th>
-                    <th>Amount</th>
-                    <th>Bank Reference</th>
-                    <th>Receipt</th>
-                    <th></th>
+                    <th>Amount entered</th>
+                    <th>Bank reference</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {payments.map((payment) => (
                     <tr key={payment.id}>
-                      <td>{payment.createdAt}</td>
+                      <td>{formatDateTime(payment.createdAt)}</td>
                       <td>
                         <div className="order-line-title">{payment.studentName}</div>
                         <div className="order-line-sub">{payment.studentEmail}</div>
@@ -114,33 +156,11 @@ function PaymentVerificationPage() {
                       <td>{formatCurrency(payment.amount)}</td>
                       <td>{payment.bankReference}</td>
                       <td>
-                        {payment.hasReceiptImage ? (
-                          <a
-                            href={getReceiptImageUrl(payment.id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-ghost btn-sm"
-                          >
-                            View
-                          </a>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            onClick={() => setConfirmTarget({ payment, action: 'approve' })}
-                          >
-                            Approve
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button type="button" className="btn btn-primary btn-sm" onClick={() => openModal(payment, 'approve')}>
+                            Verify
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-sm"
-                            onClick={() => setConfirmTarget({ payment, action: 'reject' })}
-                          >
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openModal(payment, 'reject')}>
                             Reject
                           </button>
                         </div>
@@ -154,42 +174,111 @@ function PaymentVerificationPage() {
         )}
       </div>
 
-      {confirmTarget && (
-        <div className="modal-overlay" onClick={() => !isConfirming && closeConfirmModal()}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <h2>{confirmTarget.action === 'approve' ? 'Approve Bank Transfer' : 'Reject Bank Transfer'}</h2>
-            <p className="muted">
-              {confirmTarget.action === 'approve' ? (
-                <>
-                  Approve <strong>{formatCurrency(confirmTarget.payment.amount)}</strong> from{' '}
-                  <strong>{confirmTarget.payment.studentName}</strong>? Their balance will update and a
-                  receipt will be issued immediately.
-                </>
-              ) : (
-                <>
-                  Reject this transfer from <strong>{confirmTarget.payment.studentName}</strong>? They will
-                  need to submit a new receipt.
-                </>
-              )}
-            </p>
+      {target && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div
+            className="modal-dialog"
+            style={{ maxWidth: target.action === 'approve' ? '560px' : '440px' }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verify-title"
+          >
+            <h2 id="verify-title">{target.action === 'approve' ? 'Verify bank slip' : 'Reject bank slip'}</h2>
+
+            <dl className="detail-grid" style={{ marginBottom: '14px' }}>
+              <div>
+                <dt>Student</dt>
+                <dd>{target.payment.studentName}</dd>
+              </div>
+              <div>
+                <dt>Class</dt>
+                <dd>{target.payment.subject}</dd>
+              </div>
+              <div>
+                <dt>Bank reference</dt>
+                <dd>{target.payment.bankReference || '-'}</dd>
+              </div>
+              <div>
+                <dt>Outstanding balance</dt>
+                <dd>{formatCurrency(target.payment.outstandingBalance)}</dd>
+              </div>
+            </dl>
+
+            {target.payment.hasReceiptImage && (
+              <div className="transfer-box soft" style={{ textAlign: 'center' }}>
+                {slipFailed ? (
+                  <p className="muted" style={{ margin: 0 }}>The slip could not be previewed here.</p>
+                ) : (
+                  <img
+                    src={getReceiptImageUrl(target.payment.id)}
+                    alt={`Bank slip from ${target.payment.studentName}`}
+                    style={{ maxHeight: '260px', margin: '0 auto', borderRadius: '8px' }}
+                    onError={() => setSlipFailed(true)}
+                  />
+                )}
+                <a
+                  href={getReceiptImageUrl(target.payment.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginTop: '8px' }}
+                >
+                  Open full size
+                </a>
+              </div>
+            )}
+
+            {target.action === 'approve' ? (
+              <div className="form-field">
+                <label htmlFor="received-amount">Amount received (LKR)</label>
+                <input
+                  id="received-amount"
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  step="0.01"
+                  value={receivedAmount}
+                  onChange={(e) => {
+                    setReceivedAmount(e.target.value);
+                    setAmountError('');
+                  }}
+                  className={amountError ? 'input-error' : ''}
+                  autoFocus
+                />
+                {amountError ? (
+                  <p className="field-error">{amountError}</p>
+                ) : (
+                  <p className="field-help">
+                    The student entered {formatCurrency(target.payment.amount)}. Enter the amount the slip
+                    actually shows.
+                    {differsFromClaim && ' The student will be told about the difference.'}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="muted">
+                The student will be asked to check their reference and slip, then submit it again.
+              </p>
+            )}
 
             <Alert type="error" message={confirmError} />
 
             <div className="flex-between" style={{ marginTop: '18px' }}>
-              <button type="button" className="btn btn-secondary" disabled={isConfirming} onClick={closeConfirmModal}>
+              <button type="button" className="btn btn-secondary" disabled={isConfirming} onClick={closeModal}>
                 Cancel
               </button>
               <button
                 type="button"
-                className={confirmTarget.action === 'approve' ? 'btn btn-primary' : 'btn btn-danger'}
+                className={target.action === 'approve' ? 'btn btn-primary' : 'btn btn-danger'}
                 disabled={isConfirming}
                 onClick={handleConfirm}
               >
                 {isConfirming
                   ? 'Please wait...'
-                  : confirmTarget.action === 'approve'
-                    ? 'Confirm Approve'
-                    : 'Confirm Reject'}
+                  : target.action === 'approve'
+                    ? `Approve ${received > 0 ? formatCurrency(received) : ''}`.trim()
+                    : 'Reject slip'}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 // Entry point: checks DB, then starts listening
 const config = require('../../shared/server/src/config/env');
 const { verifyDatabaseConnection } = require('../../shared/server/src/config/db');
+const { reportPendingUpdates } = require('../../shared/server/src/utils/schemaFeatures');
 const { startRolloverScheduler } = require('../../S Vithushan/server/src/modules/admin/yearlyRollover');
 const app = require('./app');
 
@@ -24,6 +25,9 @@ async function start() {
     // eslint-disable-next-line no-console
     console.log(`[startup] Brilliant Institute API listening on port ${config.port} (${config.env})`);
   });
+
+  // tells the developer (not the users) if sql/update_database.sql still needs running
+  reportPendingUpdates().catch(() => {});
 
   // checks once shortly after boot, then daily - see yearlyRollover.js
   startRolloverScheduler();

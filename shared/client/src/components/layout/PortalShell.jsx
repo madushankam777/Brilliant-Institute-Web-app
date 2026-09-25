@@ -56,7 +56,7 @@ function PortalShell({ navItems, children }) {
             className={({ isActive }) => `portal-tabbar-link${isActive ? ' active' : ''}`}
           >
             <Icon name={item.icon} size={20} />
-            <span>{item.label}</span>
+            <span>{item.shortLabel || item.label}</span>
           </NavLink>
         ))}
 

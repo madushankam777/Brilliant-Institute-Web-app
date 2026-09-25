@@ -1,10 +1,11 @@
-// Lets code check whether an optional migration has been applied, so pages
-// keep working on an older database instead of failing outright. Results are
-// cached briefly, so running the migration takes effect without a restart.
+// Checks whether optional database updates have been applied, so features
+// switch on by themselves once sql/update_database.sql has been run.
+// Results are cached for 30 seconds, so no restart is needed afterwards.
 const { pool } = require('../config/db');
 const ApiError = require('./ApiError');
 
 const CACHE_MS = 30 * 1000;
+const UPDATE_FILE = 'sql/update_database.sql';
 const cache = new Map();
 
 async function cached(key, lookup) {
@@ -37,22 +38,53 @@ function hasColumn(table, column) {
   });
 }
 
-// Re-registration needs its own table plus the new users columns.
 async function hasReregistration() {
   return (await hasTable('student_reregistration_keys')) && (await hasColumn('users', 'reregistered_for_year'));
 }
 
-// The payout transfer workflow needs the new tutor_payouts columns.
 function hasPayoutTracking() {
   return hasColumn('tutor_payouts', 'status');
 }
 
-const MIGRATION_MESSAGE =
-  'This action needs a one-time database update. In MySQL Workbench, connect as root and run ' +
-  'sql/migration_student_reregistration_and_payouts.sql, then try again.';
-
-function migrationRequired() {
-  return new ApiError(503, MIGRATION_MESSAGE);
+function hasClassStartDate() {
+  return hasColumn('classes', 'start_date');
 }
 
-module.exports = { hasTable, hasColumn, hasReregistration, hasPayoutTracking, migrationRequired, MIGRATION_MESSAGE };
+// cancelled class days and extra classes
+function hasClassEvents() {
+  return hasTable('class_events');
+}
+
+// Setup steps belong in the server log - users only see a short message.
+function migrationRequired() {
+  console.warn(`[setup] This action needs the database update. Run ${UPDATE_FILE} once as root in MySQL Workbench.`);
+  return new ApiError(503, 'This feature is not available yet. Please contact your system administrator.');
+}
+
+// Printed once at startup so the developer knows what is still switched off.
+async function reportPendingUpdates() {
+  const missing = [];
+  if (!(await hasReregistration())) missing.push('student re-registration');
+  if (!(await hasPayoutTracking())) missing.push('payout tracking');
+  if (!(await hasClassStartDate())) missing.push('class start dates');
+  if (!(await hasClassEvents())) missing.push('cancelled and extra classes');
+
+  if (missing.length > 0) {
+    console.warn(
+      `[setup] Database update pending (${missing.join(', ')}). ` +
+        `Run ${UPDATE_FILE} once as root in MySQL Workbench.`
+    );
+  }
+  return missing;
+}
+
+module.exports = {
+  hasTable,
+  hasColumn,
+  hasReregistration,
+  hasPayoutTracking,
+  hasClassStartDate,
+  hasClassEvents,
+  migrationRequired,
+  reportPendingUpdates,
+};

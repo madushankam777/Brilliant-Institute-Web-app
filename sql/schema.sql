@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS classes (
   day_of_week   VARCHAR(20)    NULL,
   start_time    TIME           NULL,
   end_time      TIME           NULL,
+  start_date    DATE           NULL,
   capacity      SMALLINT UNSIGNED NOT NULL DEFAULT 20,
   fee           DECIMAL(10,2)  NOT NULL DEFAULT 0.00,
   status        ENUM('ACTIVE', 'CANCELLED') NOT NULL DEFAULT 'ACTIVE',
@@ -284,6 +285,24 @@ CREATE TABLE IF NOT EXISTS payment_settings (
   updated_at          DATETIME NULL,
   CONSTRAINT chk_payment_settings_singleton CHECK (id = 1),
   CONSTRAINT fk_payment_settings_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One cancelled day of a weekly class, or one extra class on a given day
+CREATE TABLE IF NOT EXISTS class_events (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  class_id    INT UNSIGNED NOT NULL,
+  event_date  DATE NOT NULL,
+  type        ENUM('CANCELLED', 'EXTRA') NOT NULL,
+  start_time  TIME NULL,
+  end_time    TIME NULL,
+  venue       VARCHAR(150) NULL,
+  note        VARCHAR(255) NULL,
+  created_by  INT UNSIGNED NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_class_events_date (event_date),
+  KEY idx_class_events_class (class_id),
+  CONSTRAINT fk_class_events_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_class_events_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS notification_log (

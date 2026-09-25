@@ -115,6 +115,11 @@ const config = {
     ),
   },
 
+  // Google Calendar's public holiday calendar (Sri Lanka by default)
+  holidays: {
+    calendarId: process.env.HOLIDAY_CALENDAR_ID || 'en.lk#holiday@group.v.calendar.google.com',
+  },
+
   paymentGateway: {
     providerName: process.env.PAYMENT_GATEWAY_PROVIDER_NAME || 'mock-gateway',
     apiKey: process.env.PAYMENT_GATEWAY_API_KEY || '',
@@ -151,11 +156,6 @@ const config = {
     apiBaseUrl: (process.env.PAYOUT_API_BASE_URL || '').replace(/\/+$/, ''),
     apiKey: process.env.PAYOUT_API_KEY || '',
     currency: process.env.PAYOUT_CURRENCY || 'LKR',
-    // The institute's own account the money leaves from. Printed on the
-    // transfer file so the right account is debited at the bank.
-    sourceBankName: process.env.PAYOUT_SOURCE_BANK_NAME || '',
-    sourceAccountNumber: process.env.PAYOUT_SOURCE_ACCOUNT_NUMBER || '',
-    sourceAccountHolder: process.env.PAYOUT_SOURCE_ACCOUNT_HOLDER || '',
   },
 };
 

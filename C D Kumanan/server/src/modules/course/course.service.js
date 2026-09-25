@@ -4,6 +4,11 @@ const { recordAuditEvent } = require('../../../../../shared/server/src/utils/aud
 const { toSafeClass, toSafeTutorProfile } = require('../../../../../shared/server/src/utils/sanitize');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const repository = require('./course.repository');
+const holidayCalendar = require('./holidayCalendar');
+const {
+  hasClassEvents,
+  migrationRequired,
+} = require('../../../../../shared/server/src/utils/schemaFeatures');
 
 async function browseClasses(filters) {
   const rows = await repository.listActiveClasses(filters);
@@ -50,8 +55,53 @@ function assertOwnsClass(user, classRow) {
   }
 }
 
-// check for schedule clash
-async function checkScheduleConflicts({ tutorId, venue, dayOfWeek, startTime, endTime, excludeClassId }) {
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// "15:00:00" -> "3:00 PM"
+function formatTime(time) {
+  const [hours, minutes] = String(time).split(':').map(Number);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+function todayDateString() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+async function assertValidStartDate(startDate, dayOfWeek) {
+  if (!startDate) return;
+  if (startDate < todayDateString()) {
+    throw ApiError.badRequest('The first class date cannot be in the past.');
+  }
+  const weekday = DAY_NAMES[new Date(`${startDate}T00:00:00`).getDay()];
+  if (weekday !== dayOfWeek) {
+    throw ApiError.badRequest(`The first class date is a ${weekday}, but the class is set for ${dayOfWeek}.`);
+  }
+  const [holiday] = await holidayCalendar.getHolidays(startDate, startDate);
+  if (holiday) {
+    throw ApiError.badRequest(`That day is a public holiday (${holiday.name}). Pick another first class date.`);
+  }
+}
+
+// A tutor or a venue can only hold one class at a time.
+async function assertNoScheduleConflicts({ tutorId, venue, dayOfWeek, startTime, endTime, excludeClassId }) {
+  const tutorClash = await repository.findConflictingTutorClass({
+    tutorId,
+    dayOfWeek,
+    startTime,
+    endTime,
+    excludeClassId,
+  });
+  if (tutorClash) {
+    throw ApiError.conflict(
+      `${tutorClash.tutor_name} already teaches "${tutorClash.subject}" on ${dayOfWeek} from ` +
+        `${formatTime(tutorClash.start_time)} to ${formatTime(tutorClash.end_time)}. Pick a different time.`
+    );
+  }
+
   const venueClash = await repository.findConflictingVenueClass({
     venue,
     dayOfWeek,
@@ -61,25 +111,10 @@ async function checkScheduleConflicts({ tutorId, venue, dayOfWeek, startTime, en
   });
   if (venueClash) {
     throw ApiError.conflict(
-      `This venue is already booked for "${venueClash.subject}" on ${dayOfWeek} ` +
-        `${venueClash.start_time}-${venueClash.end_time}. Choose a different venue, day, or time.`
+      `${venue} is already booked for "${venueClash.subject}" on ${dayOfWeek} from ` +
+        `${formatTime(venueClash.start_time)} to ${formatTime(venueClash.end_time)}. Choose a different venue or time.`
     );
   }
-
-  const tutorClash = await repository.findConflictingTutorClass({
-    tutorId,
-    dayOfWeek,
-    startTime,
-    endTime,
-    excludeClassId,
-  });
-  if (tutorClash) {
-    return [
-      `You already have a class scheduled on ${dayOfWeek} ${tutorClash.start_time}-${tutorClash.end_time} ` +
-        `at ${tutorClash.venue} (${tutorClash.subject}).`,
-    ];
-  }
-  return [];
 }
 
 // pick the tutor for a new class
@@ -99,7 +134,8 @@ async function resolveTutorForNewClass(actingUser, requestedTutorId) {
 
 async function createClass(actingUser, data) {
   const tutorId = await resolveTutorForNewClass(actingUser, data.tutorId);
-  const warnings = await checkScheduleConflicts({ tutorId, ...data });
+  await assertValidStartDate(data.startDate, data.dayOfWeek);
+  await assertNoScheduleConflicts({ tutorId, ...data });
 
   const classId = await repository.createClass({ ...data, tutorId });
   await recordAuditEvent({
@@ -111,7 +147,7 @@ async function createClass(actingUser, data) {
   });
 
   const created = await repository.findClassWithTutorAndCount(classId);
-  return { classData: toSafeClass(created), warnings };
+  return { classData: toSafeClass(created) };
 }
 
 // Which edits a student actually needs to hear about. Cosmetic edits
@@ -166,7 +202,7 @@ async function updateClass(tutorUser, classId, data) {
     throw ApiError.badRequest('A cancelled class cannot be edited.');
   }
 
-  const warnings = await checkScheduleConflicts({
+  await assertNoScheduleConflicts({
     tutorId: existing.tutor_id,
     ...data,
     excludeClassId: classId,
@@ -193,7 +229,7 @@ async function updateClass(tutorUser, classId, data) {
   }
 
   const updated = await repository.findClassWithTutorAndCount(classId);
-  return { classData: toSafeClass(updated), warnings, notifiedCount };
+  return { classData: toSafeClass(updated), notifiedCount };
 }
 
 async function cancelClass(tutorUser, classId) {
@@ -326,7 +362,231 @@ async function listMyCourses(studentUser) {
   }));
 }
 
+// --- Cancelled days and extra classes ---
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December'];
+
+function weekdayOf(dateString) {
+  return DAY_NAMES[new Date(`${dateString}T00:00:00`).getDay()];
+}
+
+// "2026-09-22" -> "Tuesday, 22 September 2026"
+function formatDate(dateString) {
+  const date = new Date(`${dateString}T00:00:00`);
+  return `${DAY_NAMES[date.getDay()]}, ${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function toSafeClassEvent(row) {
+  const isExtra = row.type === 'EXTRA';
+  return {
+    id: row.id,
+    classId: row.class_id,
+    date: row.event_date,
+    type: row.type,
+    startTime: isExtra ? row.start_time : row.class_start_time,
+    endTime: isExtra ? row.end_time : row.class_end_time,
+    venue: isExtra ? row.venue : row.class_venue,
+    note: row.note,
+    subject: row.subject,
+    level: row.level,
+    tutorId: row.tutor_id,
+    tutorName: row.tutor_name,
+    createdByName: row.created_by_name,
+    createdAt: row.created_at,
+  };
+}
+
+async function requireClassEvents() {
+  if (!(await hasClassEvents())) throw migrationRequired();
+}
+
+// Students only see changes to their own classes; staff see everything
+// (tutors need the whole picture to find a free room for an extra class).
+async function listClassEvents(user, fromDate, toDate) {
+  if (!(await hasClassEvents())) return [];
+  const studentId = user.role === ROLES.STUDENT_PARENT ? user.id : null;
+  const rows = await repository.listClassEvents({ fromDate, toDate, studentId });
+  return rows.map(toSafeClassEvent);
+}
+
+async function findActiveOwnedClass(user, classId) {
+  const classRow = await repository.findClassById(classId);
+  assertOwnsClass(user, classRow);
+  if (classRow.status !== 'ACTIVE') {
+    throw ApiError.badRequest('This class has been cancelled.');
+  }
+  return classRow;
+}
+
+async function cancelClassDay(user, classId, { date, note }) {
+  await requireClassEvents();
+  const classRow = await findActiveOwnedClass(user, classId);
+
+  if (date < todayDateString()) {
+    throw ApiError.badRequest('You cannot cancel a class in the past.');
+  }
+  if (weekdayOf(date) !== classRow.day_of_week) {
+    throw ApiError.badRequest(`"${classRow.subject}" runs on ${classRow.day_of_week}s, not on ${formatDate(date)}.`);
+  }
+  if (classRow.start_date && date < classRow.start_date) {
+    throw ApiError.badRequest('This class has not started yet on that date.');
+  }
+  const [holiday] = await holidayCalendar.getHolidays(date, date);
+  if (holiday) {
+    throw ApiError.badRequest(`${formatDate(date)} is a public holiday (${holiday.name}), so there is no class anyway.`);
+  }
+  if (await repository.findCancelledDay(classId, date)) {
+    throw ApiError.conflict('This class is already cancelled on that day.');
+  }
+
+  const eventId = await repository.createClassEvent({
+    classId,
+    eventDate: date,
+    type: 'CANCELLED',
+    note,
+    createdBy: user.id,
+  });
+  await recordAuditEvent({
+    actorId: user.id,
+    action: 'CLASS_DAY_CANCELLED',
+    entityType: 'class',
+    entityId: classId,
+    details: { date, eventId },
+  });
+
+  const reason = note ? ` Reason: ${note}` : '';
+  const notifiedCount = await notifyEnrolledStudents(
+    classId,
+    `"${classRow.subject}" on ${formatDate(date)} is cancelled.${reason}`,
+    user.id
+  );
+
+  const event = await repository.findClassEvent(eventId);
+  return { event: toSafeClassEvent(event), notifiedCount };
+}
+
+// A room or a tutor can only hold one class at a time on that day,
+// counting weekly classes and other extra classes.
+async function assertExtraClassSlotFree({ date, startTime, endTime, venue, tutorId }) {
+  const slot = { eventDate: date, startTime, endTime, venue, tutorId };
+  const clash =
+    (await repository.findBusyWeeklyClass({ ...slot, dayOfWeek: weekdayOf(date) })) ||
+    (await repository.findBusyExtraClass(slot));
+  if (!clash) return;
+
+  const time = `${formatTime(clash.start_time)} - ${formatTime(clash.end_time)}`;
+  if (clash.venue === venue) {
+    throw ApiError.conflict(
+      `${venue} is booked for "${clash.subject}" (${clash.tutor_name}) from ${time} that day. ` +
+        'Check the calendar and pick another time or hall.'
+    );
+  }
+  throw ApiError.conflict(`${clash.tutor_name} already teaches "${clash.subject}" from ${time} that day.`);
+}
+
+async function addExtraClass(user, classId, { date, startTime, endTime, venue, note }) {
+  await requireClassEvents();
+  const classRow = await findActiveOwnedClass(user, classId);
+  const room = venue || classRow.venue;
+
+  if (date < todayDateString()) {
+    throw ApiError.badRequest('An extra class cannot be in the past.');
+  }
+  const [holiday] = await holidayCalendar.getHolidays(date, date);
+  if (holiday) {
+    throw ApiError.badRequest(`${formatDate(date)} is a public holiday (${holiday.name}). Pick another day.`);
+  }
+  await assertExtraClassSlotFree({ date, startTime, endTime, venue: room, tutorId: classRow.tutor_id });
+
+  const eventId = await repository.createClassEvent({
+    classId,
+    eventDate: date,
+    type: 'EXTRA',
+    startTime,
+    endTime,
+    venue: room,
+    note,
+    createdBy: user.id,
+  });
+  await recordAuditEvent({
+    actorId: user.id,
+    action: 'EXTRA_CLASS_ADDED',
+    entityType: 'class',
+    entityId: classId,
+    details: { date, startTime, endTime, venue: room, eventId },
+  });
+
+  const notifiedCount = await notifyEnrolledStudents(
+    classId,
+    `Extra class for "${classRow.subject}" on ${formatDate(date)}, ` +
+      `${formatTime(startTime)} - ${formatTime(endTime)} at ${room}.${note ? ` ${note}` : ''}`,
+    user.id
+  );
+
+  const event = await repository.findClassEvent(eventId);
+  return { event: toSafeClassEvent(event), notifiedCount };
+}
+
+// Restore a cancelled day, or remove an extra class
+async function deleteClassEvent(user, eventId) {
+  await requireClassEvents();
+  const event = await repository.findClassEvent(eventId);
+  if (!event) {
+    throw ApiError.notFound('This class change was not found.');
+  }
+  assertOwnsClass(user, { tutor_id: event.tutor_id });
+  if (event.event_date < todayDateString()) {
+    throw ApiError.badRequest('Past class changes cannot be undone.');
+  }
+
+  await repository.deleteClassEvent(eventId);
+  const restored = event.type === 'CANCELLED';
+  await recordAuditEvent({
+    actorId: user.id,
+    action: restored ? 'CLASS_DAY_RESTORED' : 'EXTRA_CLASS_REMOVED',
+    entityType: 'class',
+    entityId: event.class_id,
+    details: { date: event.event_date, eventId },
+  });
+
+  const message = restored
+    ? `"${event.subject}" on ${formatDate(event.event_date)} is back on as usual.`
+    : `The extra class for "${event.subject}" on ${formatDate(event.event_date)} has been cancelled.`;
+  const notifiedCount = await notifyEnrolledStudents(event.class_id, message, user.id);
+
+  return { restored, notifiedCount };
+}
+
+// Weekly timetable: a tutor's classes, or the classes a student attends.
+// Anyone can see their own; only Admin can look up someone else's.
+async function getTimetable(viewer, userId) {
+  const targetId = userId || viewer.id;
+  if (targetId !== viewer.id && viewer.role !== ROLES.ADMIN) {
+    throw ApiError.forbidden('You can only view your own timetable.');
+  }
+
+  const person = await repository.findPersonForTimetable(targetId);
+  if (!person) {
+    throw ApiError.notFound('User not found.');
+  }
+
+  let rows = [];
+  if (person.role === ROLES.TUTOR) rows = await repository.listTimetableForTutor(person.id);
+  if (person.role === ROLES.STUDENT_PARENT) rows = await repository.listTimetableForStudent(person.id);
+
+  return {
+    person: { id: person.id, fullName: person.full_name, role: person.role, grade: person.grade },
+    classes: rows.map(toSafeClass),
+  };
+}
+
 module.exports = {
+  listClassEvents,
+  cancelClassDay,
+  addExtraClass,
+  deleteClassEvent,
+  getTimetable,
   browseClasses,
   listTutors,
   getTutorProfile,

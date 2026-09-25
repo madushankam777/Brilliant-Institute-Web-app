@@ -14,6 +14,27 @@ const config = require('../../../../../shared/server/src/config/env');
 // gateway timeout error
 class GatewayUnavailableError extends Error {}
 
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+
+// 25000 -> "LKR 25,000.00"
+function formatLkr(amount) {
+  return `LKR ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function parseDetails(details) {
+  if (!details) return {};
+  return typeof details === 'string' ? JSON.parse(details) : details;
+}
+
+function todayDateString() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 // bank transfer closes on the last day of each month
 function lastDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -337,8 +358,7 @@ async function editBankTransferPayment(studentUser, paymentId, { bankReference, 
 async function listPendingBankTransfers() {
   const rows = await repository.listPendingBankTransfers();
   return rows.map((row) => {
-    const details =
-      typeof row.payment_details === 'string' ? JSON.parse(row.payment_details) : row.payment_details;
+    const details = parseDetails(row.payment_details);
     return {
       id: row.id,
       enrollmentId: row.enrollment_id,
@@ -346,6 +366,7 @@ async function listPendingBankTransfers() {
       studentEmail: row.student_email,
       subject: row.subject,
       amount: Number(row.amount),
+      outstandingBalance: Number(row.current_balance),
       bankReference: details.bankReference,
       hasReceiptImage: Boolean(details.receiptImagePath),
       createdAt: row.created_at,
@@ -364,7 +385,9 @@ async function findPendingBankTransferOrThrow(paymentId) {
   return payment;
 }
 
-async function approveBankTransferPayment(adminUser, paymentId) {
+// Admin checks the slip and enters the amount actually received. That amount
+// (not the one the student typed) moves the balance and counts as revenue.
+async function approveBankTransferPayment(adminUser, paymentId, { amount } = {}) {
   const outcome = await withTransaction(async (connection) => {
     const payment = await repository.findPaymentByIdForUpdate(paymentId, connection);
     if (!payment || payment.payment_method !== 'BANK_TRANSFER' || payment.status !== PAYMENT_STATUS.PENDING) {
@@ -372,11 +395,30 @@ async function approveBankTransferPayment(adminUser, paymentId) {
     }
 
     const enrollment = await repository.findEnrollmentByIdForUpdate(payment.enrollment_id, connection);
-    const balanceAfter = Number(enrollment.balance) - Number(payment.amount);
+    const claimedAmount = Number(payment.amount);
+    const hasAmount = amount !== undefined && amount !== null && amount !== '';
+    const receivedAmount = roundMoney(hasAmount ? Number(amount) : claimedAmount);
+    const balanceBefore = Number(enrollment.balance);
 
-    await repository.markPaymentSuccessful(
+    if (!(receivedAmount > 0)) {
+      throw ApiError.badRequest('Enter the amount shown on the bank slip.');
+    }
+    if (receivedAmount > balanceBefore) {
+      throw ApiError.badRequest(
+        `The amount cannot be more than the outstanding balance of ${formatLkr(balanceBefore)}.`
+      );
+    }
+
+    const balanceAfter = roundMoney(balanceBefore - receivedAmount);
+    await repository.approveBankTransfer(
       payment.id,
-      { gatewayTransactionId: `BANKXFER-${payment.id}`, balanceAfter },
+      {
+        amount: receivedAmount,
+        balanceBefore,
+        balanceAfter,
+        gatewayTransactionId: `BANKXFER-${payment.id}`,
+        paymentDetails: { ...parseDetails(payment.payment_details), claimedAmount, receivedAmount },
+      },
       connection
     );
     await repository.updateEnrollmentBalance(payment.enrollment_id, balanceAfter, connection);
@@ -384,7 +426,7 @@ async function approveBankTransferPayment(adminUser, paymentId) {
     const receiptNumber = buildReceiptNumber(payment.id);
     await repository.createReceipt(payment.id, receiptNumber, connection);
 
-    return { subject: enrollment.subject, receiptNumber };
+    return { subject: enrollment.subject, receiptNumber, claimedAmount, receivedAmount };
   });
 
   await recordAuditEvent({
@@ -392,17 +434,24 @@ async function approveBankTransferPayment(adminUser, paymentId) {
     action: 'BANK_TRANSFER_APPROVED',
     entityType: 'payment',
     entityId: paymentId,
-    details: { receiptNumber: outcome.receiptNumber },
+    details: {
+      receiptNumber: outcome.receiptNumber,
+      claimedAmount: outcome.claimedAmount,
+      receivedAmount: outcome.receivedAmount,
+    },
   });
 
   const payment = await repository.findPaymentById(paymentId);
+  const message =
+    outcome.receivedAmount === outcome.claimedAmount
+      ? `Your bank transfer of ${formatLkr(outcome.receivedAmount)} for ${outcome.subject} was approved.`
+      : `Your bank transfer for ${outcome.subject} was approved for ${formatLkr(outcome.receivedAmount)} ` +
+        `(you entered ${formatLkr(outcome.claimedAmount)}).`;
 
-  // the student isn't watching the admin's screen for this - they only
-  // find out their balance moved if we tell them
   await repository.createNotification({
     recipientId: payment.student_id,
     type: 'PAYMENT_APPROVED',
-    message: `Your bank transfer of LKR ${Number(payment.amount).toFixed(2)} for ${outcome.subject} was approved. Receipt: ${outcome.receiptNumber}.`,
+    message: `${message} Receipt: ${outcome.receiptNumber}.`,
     sentBy: adminUser.id,
   });
 
@@ -588,23 +637,69 @@ async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, acc
   };
 }
 
-// How admin is told payouts will actually be sent on this install.
-async function getPayoutMethodStatus() {
-  const method = payoutGateway.describe();
-  if (!(await schema.hasPayoutTracking())) {
-    return {
-      ...method,
-      ready: false,
-      migrationPending: true,
-      reason:
-        'Payouts are saved as ledger records only until the one-time database update is run ' +
-        '(sql/migration_student_reregistration_and_payouts.sql, as root in MySQL Workbench).',
-    };
-  }
-  return method;
+// --- Tutor payouts ---------------------------------------------------------
+
+const PAYOUT_METHODS = ['BANK_TRANSFER', 'BANK_FILE', 'PAYOUT_API'];
+
+// What the Pay Tutors page can offer on this install.
+async function getPayoutOptions() {
+  const tracking = await schema.hasPayoutTracking();
+  const settings = await repository.getPaymentSettings();
+  return {
+    bulkFileAvailable: tracking,
+    apiAvailable: tracking && payoutGateway.isApiConfigured(),
+    apiName: config.payouts.providerName || 'payout provider',
+    // the institute's own account (Payment Settings) - where the money leaves from
+    sourceAccount:
+      settings && settings.bank_account_number
+        ? {
+            bankName: settings.bank_name,
+            accountName: settings.bank_account_name,
+            accountNumber: settings.bank_account_number,
+            branch: settings.bank_branch,
+          }
+        : null,
+  };
 }
 
-async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
+// Admin needs the full account number to make the transfer, so it is shown
+// only on request and every look is written to the audit log.
+async function getTutorPayoutAccount(adminUser, tutorId) {
+  const tutor = await repository.findActiveTutorById(tutorId);
+  if (!tutor) {
+    throw ApiError.notFound('Tutor not found.');
+  }
+  const bank = await repository.findBankDetails(tutorId);
+
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'TUTOR_BANK_DETAILS_VIEWED',
+    entityType: 'user',
+    entityId: tutorId,
+  });
+
+  return {
+    bankName: bank ? bank.bank_name : null,
+    accountHolder: bank ? bank.bank_account_holder : null,
+    accountNumber: bank ? bank.bank_account_number : null,
+    branch: bank ? bank.bank_branch : null,
+  };
+}
+
+function payoutNotification({ method, amount, periodLabel, destination, reference }) {
+  const what = `${formatLkr(amount)}${periodLabel ? ` (${periodLabel})` : ''}`;
+  if (method === 'BANK_TRANSFER') {
+    return `You have been paid ${what} to ${destination}. Bank reference: ${reference}.`;
+  }
+  if (method === 'PAYOUT_API') {
+    return `${what} has been sent to ${destination}.`;
+  }
+  return `A payout of ${what} has been approved and will reach ${destination} with the next bank transfer.`;
+}
+
+// method: BANK_TRANSFER (already paid from the bank - needs the bank reference),
+// BANK_FILE (queue for the bulk file) or PAYOUT_API (send through the provider).
+async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method, bankReference, transferDate }) {
   if (!(amount > 0)) {
     throw ApiError.badRequest('Payout amount must be greater than zero.');
   }
@@ -613,8 +708,6 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
     throw ApiError.badRequest('Please select a valid, active Tutor.');
   }
 
-  // Money cannot be sent to an account that isn't there. Refusing here is
-  // better than writing a payout row that will never reach anyone.
   const bank = await repository.findBankDetails(tutorId);
   if (!bank || !bank.bank_account_number) {
     throw ApiError.badRequest(
@@ -622,44 +715,66 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
     );
   }
 
-  // The destination is copied onto the payout row, so the ledger still shows
-  // where the money went after the tutor later changes their details. Only
-  // the last 4 digits are kept - the full number stays with its owner.
-  const destination = `to ${bank.bank_name || 'account'} ${maskAccountNumber(bank.bank_account_number)}`;
-  const noteWithDestination = [note && note.trim(), destination].filter(Boolean).join(' - ').slice(0, 255);
-
   const tracking = await schema.hasPayoutTracking();
-  const usingApi = tracking && payoutGateway.isApiConfigured();
+  // older clients send no method - they always queued the payout
+  const payoutMethod = PAYOUT_METHODS.includes(method) ? method : 'BANK_FILE';
+
+  if (payoutMethod === 'BANK_TRANSFER' && !bankReference) {
+    throw ApiError.badRequest('Enter the reference number the bank gave for this transfer.');
+  }
+  if (payoutMethod === 'BANK_TRANSFER' && transferDate && transferDate > todayDateString()) {
+    throw ApiError.badRequest('The transfer date cannot be in the future.');
+  }
+  if (payoutMethod === 'PAYOUT_API' && !(tracking && payoutGateway.isApiConfigured())) {
+    throw ApiError.badRequest('Online payouts are not set up. Pay by bank transfer instead.');
+  }
+
+  const destination = `${bank.bank_name || 'bank account'} ${maskAccountNumber(bank.bank_account_number)}`;
+  // null means "now"; an earlier date keeps the real transfer day
+  const settledAt = payoutMethod === 'BANK_TRANSFER' && transferDate && transferDate !== todayDateString()
+    ? `${transferDate} 00:00:00`
+    : null;
+
+  // before the database update there is no reference column, so it goes in the note
+  const noteParts = [note && note.trim()];
+  if (!tracking) {
+    noteParts.push(payoutMethod === 'BANK_TRANSFER' ? `Ref ${bankReference}` : null, `to ${destination}`);
+  }
+  const fullNote = noteParts.filter(Boolean).join(' - ').slice(0, 255);
+
   const payoutId = await repository.createTutorPayout({
     tutorId,
     amount,
-    note: noteWithDestination,
+    note: fullNote,
     periodLabel,
     paidBy: adminUser.id,
-    // QUEUED means "instructed, not yet confirmed by the bank". Nothing is
-    // ever marked SENT until the provider or the bank actually confirms it.
-    status: 'QUEUED',
-    method: usingApi ? 'PAYOUT_API' : 'BANK_FILE',
+    status: payoutMethod === 'BANK_TRANSFER' ? 'SENT' : 'QUEUED',
+    method: payoutMethod,
     bankName: bank.bank_name,
     bankAccountHolder: bank.bank_account_holder,
     bankAccountLast4: payoutGateway.last4(bank.bank_account_number),
     bankBranch: bank.bank_branch,
+    providerReference: payoutMethod === 'BANK_TRANSFER' ? bankReference : null,
+    settledAt,
   });
 
-  let transferError = null;
-  if (usingApi) {
+  let status = tracking ? (payoutMethod === 'BANK_TRANSFER' ? 'SENT' : 'QUEUED') : 'RECORDED';
+  let failureReason = null;
+
+  if (payoutMethod === 'PAYOUT_API') {
     try {
       const { reference } = await payoutGateway.sendTransfer({
         payoutId,
         amount,
-        currency: config.payouts.currency,
         bank,
         reference: `PAYOUT-${payoutId}`,
       });
       await repository.markPayoutSent(payoutId, reference);
+      status = 'SENT';
     } catch (error) {
-      transferError = error.message;
+      failureReason = error.message;
       await repository.markPayoutFailed(payoutId, error.message);
+      status = 'FAILED';
     }
   }
 
@@ -668,50 +783,38 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel }) {
     action: 'TUTOR_PAID',
     entityType: 'tutor_payout',
     entityId: payoutId,
-    details: {
-      tutorId,
-      amount,
-      method: usingApi ? 'PAYOUT_API' : 'BANK_FILE',
-      outcome: transferError ? 'FAILED' : usingApi ? 'SENT' : 'QUEUED',
-    },
+    details: { tutorId, amount, method: payoutMethod, outcome: status, bankReference: bankReference || null },
   });
 
-  // Don't tell a tutor they have been paid when the transfer failed.
-  if (!transferError) {
+  // never tell a tutor they were paid when the transfer failed
+  if (status !== 'FAILED') {
     await repository.createNotification({
       recipientId: tutorId,
       type: 'PAYOUT_RECORDED',
-      message:
-        `A payout of LKR ${Number(amount).toFixed(2)}${periodLabel ? ` (${periodLabel})` : ''} ` +
-        `has been ${!tracking ? 'recorded' : usingApi ? 'sent' : 'approved'} ${destination}.` +
-        (tracking && !usingApi ? ' It will reach you once the bank processes the transfer.' : ''),
+      message: payoutNotification({ method: payoutMethod, amount, periodLabel, destination, reference: bankReference }),
       sentBy: adminUser.id,
     });
   }
 
-  const status = !tracking ? 'RECORDED' : transferError ? 'FAILED' : usingApi ? 'SENT' : 'QUEUED';
   return {
     id: payoutId,
     tutorId,
     tutorName: tutor.full_name,
     amount,
-    note,
     periodLabel,
+    method: payoutMethod,
     status,
-    failureReason: transferError,
+    failureReason,
   };
 }
 
-// --- Bank transfer file -------------------------------------------------
-// What corporate online banking expects: one file listing every account to
-// credit. The bank moves the money; this system records the instruction and
-// the confirmation.
+// --- Bulk bank file ------------------------------------------------------
+// Queued payouts are exported as one bulk-credit file for corporate online
+// banking. The bank moves the money; admin then marks each one paid.
 
 async function getPayoutBatch() {
   const rows = await repository.listPayoutsAwaitingTransfer();
-  const method = payoutGateway.describe();
   return {
-    method,
     count: rows.length,
     total: rows.reduce((sum, row) => sum + Number(row.amount), 0),
     payouts: rows.map((row) => ({
@@ -720,7 +823,6 @@ async function getPayoutBatch() {
       tutorName: row.tutor_name,
       amount: Number(row.amount),
       periodLabel: row.period_label,
-      // never the full number, even to admin
       bankName: row.bank_name,
       accountLast4: payoutGateway.last4(row.bank_account_number),
       hasAccount: Boolean(row.bank_account_number),
@@ -732,12 +834,6 @@ async function getPayoutBatch() {
 
 async function exportPayoutFile(adminUser) {
   if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
-  if (!payoutGateway.isBankFileConfigured()) {
-    throw ApiError.badRequest(
-      'The institute payout account is not set. Add PAYOUT_SOURCE_BANK_NAME and ' +
-        'PAYOUT_SOURCE_ACCOUNT_NUMBER to server/.env - that is the account the money leaves from.'
-    );
-  }
 
   const rows = await repository.listPayoutsAwaitingTransfer();
   if (rows.length === 0) {
@@ -762,20 +858,24 @@ async function exportPayoutFile(adminUser) {
     details: { count: file.rowCount, total: file.total, payoutIds: includedIds },
   });
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  return { ...file, filename: `tutor-payouts-${stamp}.csv` };
+  return { ...file, filename: `tutor-payouts-${todayDateString()}.csv` };
 }
 
-// Admin confirms, from the bank's own confirmation, that a payout landed.
-async function confirmPayoutSettled(adminUser, payoutId, providerReference) {
+// Admin confirms, from the bank's own confirmation, that a queued payout landed.
+async function confirmPayoutSettled(adminUser, payoutId, { providerReference, transferDate }) {
   if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
   const payout = await repository.findTutorPayoutById(payoutId);
   if (!payout) {
     throw ApiError.notFound('Payout not found.');
   }
-  const updated = await repository.markPayoutSent(payoutId, providerReference);
+  if (transferDate && transferDate > todayDateString()) {
+    throw ApiError.badRequest('The transfer date cannot be in the future.');
+  }
+
+  const settledAt = transferDate && transferDate !== todayDateString() ? `${transferDate} 00:00:00` : null;
+  const updated = await repository.markPayoutSent(payoutId, providerReference, settledAt);
   if (!updated) {
-    throw ApiError.badRequest('Only a queued or failed payout can be marked as sent.');
+    throw ApiError.badRequest('Only a payout that is waiting or failed can be marked as paid.');
   }
 
   await recordAuditEvent({
@@ -783,15 +883,20 @@ async function confirmPayoutSettled(adminUser, payoutId, providerReference) {
     action: 'PAYOUT_SETTLED',
     entityType: 'tutor_payout',
     entityId: payoutId,
-    details: { providerReference: providerReference || null },
+    details: { providerReference },
   });
 
+  const destination = `${payout.bank_name || 'bank account'}${payout.bank_account_last4 ? ` •••• ${payout.bank_account_last4}` : ''}`;
   await repository.createNotification({
     recipientId: payout.tutor_id,
     type: 'PAYOUT_RECORDED',
-    message:
-      `Your payout of LKR ${Number(payout.amount).toFixed(2)}` +
-      `${payout.period_label ? ` (${payout.period_label})` : ''} has been transferred to your bank account.`,
+    message: payoutNotification({
+      method: 'BANK_TRANSFER',
+      amount: payout.amount,
+      periodLabel: payout.period_label,
+      destination,
+      reference: providerReference,
+    }),
     sentBy: adminUser.id,
   });
 
@@ -826,10 +931,15 @@ async function listTutorPayouts() {
     repository.sumPayoutsByTutor(),
   ]);
 
-  // total paid per tutor
   const totalsByTutor = {};
+  const summaryByTutor = {};
   totals.forEach((row) => {
     totalsByTutor[row.tutor_id] = Number(row.total_paid);
+    summaryByTutor[row.tutor_id] = {
+      totalPaid: Number(row.total_paid),
+      paidThisMonth: Number(row.month_paid),
+      lastPaidAt: row.last_paid_at,
+    };
   });
 
   return {
@@ -842,7 +952,6 @@ async function listTutorPayouts() {
       periodLabel: row.period_label,
       paidByName: row.paid_by_name,
       paidAt: row.paid_at,
-      // where it is in the transfer, not just that a row exists
       status: row.status || 'RECORDED',
       method: row.method,
       bankName: row.bank_name,
@@ -853,6 +962,7 @@ async function listTutorPayouts() {
       settledAt: row.settled_at,
     })),
     totalsByTutor,
+    summaryByTutor,
   };
 }
 
@@ -1069,7 +1179,8 @@ module.exports = {
   updatePaymentSettings,
   payTutor,
   listTutorPayouts,
-  getPayoutMethodStatus,
+  getPayoutOptions,
+  getTutorPayoutAccount,
   getPayoutBatch,
   exportPayoutFile,
   confirmPayoutSettled,

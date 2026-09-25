@@ -19,6 +19,24 @@ const deleteEnrollmentRecordRules = [
 
 const tutorIdParamRules = [param('tutorId').isInt({ min: 1 }).withMessage('Invalid tutor id.')];
 
+const timetableUserIdRules = [param('userId').isInt({ min: 1 }).withMessage('Invalid user id.')];
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// a date range of at most about a year
+const holidayQueryRules = [
+  query('from').matches(DATE_REGEX).withMessage('Give a start date (YYYY-MM-DD).'),
+  query('to')
+    .matches(DATE_REGEX)
+    .withMessage('Give an end date (YYYY-MM-DD).')
+    .bail()
+    .custom((to, { req }) => {
+      const days = (new Date(to) - new Date(req.query.from)) / (24 * 60 * 60 * 1000);
+      return days >= 0 && days <= 400;
+    })
+    .withMessage('The end date must be after the start date and within about a year of it.'),
+];
+
 const browseQueryRules = [
   query('search').optional({ checkFalsy: true }).trim().isLength({ max: 150 }),
   query('subjectArea').optional({ checkFalsy: true }).isIn(SUBJECT_AREAS),
@@ -44,14 +62,54 @@ const classBodyRules = [
   body('tutorId').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Invalid tutor id.'),
 ];
 
-const createClassRules = [...classBodyRules];
+const createClassRules = [
+  ...classBodyRules,
+  body('startDate')
+    .optional({ checkFalsy: true })
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('Pick the first class date on the calendar.')
+    .bail()
+    .isISO8601({ strict: true })
+    .withMessage('Pick the first class date on the calendar.'),
+];
 const updateClassRules = [...classIdParamRules, ...classBodyRules];
 
+const eventDateRule = body('date')
+  .matches(DATE_REGEX)
+  .withMessage('Pick a date on the calendar.')
+  .bail()
+  .isISO8601({ strict: true })
+  .withMessage('Pick a date on the calendar.');
+const eventNoteRule = body('note').optional({ checkFalsy: true }).trim().isLength({ max: 255 })
+  .withMessage('Keep the note under 255 characters.');
+
+const cancelDayRules = [...classIdParamRules, eventDateRule, eventNoteRule];
+
+const extraClassRules = [
+  ...classIdParamRules,
+  eventDateRule,
+  body('startTime').matches(TIME_REGEX).withMessage('Start time must be in HH:MM format.'),
+  body('endTime')
+    .matches(TIME_REGEX)
+    .withMessage('End time must be in HH:MM format.')
+    .custom((value, { req }) => !req.body.startTime || value > req.body.startTime)
+    .withMessage('End time must be after the start time.'),
+  body('venue').optional({ checkFalsy: true }).trim().isLength({ max: 150 }),
+  eventNoteRule,
+];
+
+const eventIdParamRules = [param('eventId').isInt({ min: 1 }).withMessage('Invalid id.')];
+
 module.exports = {
+  cancelDayRules,
+  extraClassRules,
+  eventIdParamRules,
   classIdParamRules,
   enrollmentIdParamRules,
   deleteEnrollmentRecordRules,
   tutorIdParamRules,
+  timetableUserIdRules,
+  holidayQueryRules,
   browseQueryRules,
   createClassRules,
   updateClassRules,

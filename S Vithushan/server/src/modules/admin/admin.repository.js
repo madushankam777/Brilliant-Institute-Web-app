@@ -36,6 +36,28 @@ async function getRevenueTrend() {
   return rows.map((row) => ({ month: row.month, total: Number(row.total) }));
 }
 
+// --- Revenue report ---
+
+async function getDatabaseToday() {
+  const [[row]] = await pool.query('SELECT CURDATE() AS today');
+  return row.today;
+}
+
+// Formats come from this fixed list, never from the request.
+const REVENUE_BUCKET_FORMATS = { day: '%Y-%m-%d', month: '%Y-%m', year: '%Y' };
+
+async function sumRevenueByBucket(bucket, fromDate, toDate) {
+  const format = REVENUE_BUCKET_FORMATS[bucket];
+  const [rows] = await pool.execute(
+    `SELECT DATE_FORMAT(paid_at, '${format}') AS bucket, SUM(amount) AS total, COUNT(*) AS payment_count
+     FROM payments
+     WHERE status = 'SUCCESSFUL' AND paid_at >= ? AND paid_at < ?
+     GROUP BY bucket`,
+    [fromDate, toDate]
+  );
+  return rows;
+}
+
 async function listRecentActivity(limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const [rows] = await pool.query(
@@ -228,14 +250,106 @@ async function listClassesForTutor(tutorId) {
 
 // --- Student re-registration (yearly grade roll-over) -----------------------
 
-async function createReregistrationKey({ keyCode, studentId, fromGrade, toGrade, academicYear, expiresAt, createdBy }) {
-  const [result] = await pool.execute(
+async function withTransaction(work) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await work(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+function placeholdersFor(values) {
+  return values.map(() => '?').join(', ');
+}
+
+async function createReregistrationKey(
+  { keyCode, studentId, fromGrade, toGrade, academicYear, expiresAt, createdBy },
+  executor = pool
+) {
+  const [result] = await executor.execute(
     `INSERT INTO student_reregistration_keys
        (key_code, student_id, from_grade, to_grade, academic_year, status, expires_at, created_by, created_at)
      VALUES (?, ?, ?, ?, ?, 'UNUSED', ?, ?, NOW())`,
     [keyCode, studentId, fromGrade || null, toGrade, academicYear, expiresAt || null, createdBy]
   );
   return result.insertId;
+}
+
+// Every active student, with the classes they attend (used for search).
+async function listStudentsForReregistration() {
+  const [rows] = await pool.execute(
+    `SELECT u.id, u.full_name, u.email, u.student_code, u.grade,
+            GROUP_CONCAT(DISTINCT c.subject ORDER BY c.subject SEPARATOR ', ') AS class_names
+     FROM users u
+     LEFT JOIN enrollments e ON e.student_id = u.id AND e.status = 'ACTIVE'
+     LEFT JOIN classes c ON c.id = e.class_id AND c.status = 'ACTIVE'
+     WHERE u.role = 'STUDENT_PARENT' AND u.status = 'ACTIVE'
+     GROUP BY u.id
+     ORDER BY u.full_name ASC`
+  );
+  return rows;
+}
+
+async function listClassesWithStudentCounts() {
+  const [rows] = await pool.execute(
+    `SELECT c.id, c.subject, c.level, t.full_name AS tutor_name, COUNT(u.id) AS student_count
+     FROM classes c
+     JOIN users t ON t.id = c.tutor_id
+     LEFT JOIN enrollments e ON e.class_id = c.id AND e.status = 'ACTIVE'
+     LEFT JOIN users u ON u.id = e.student_id AND u.status = 'ACTIVE' AND u.role = 'STUDENT_PARENT'
+     WHERE c.status = 'ACTIVE'
+     GROUP BY c.id, t.full_name
+     ORDER BY c.subject ASC`
+  );
+  return rows;
+}
+
+async function listActiveStudentIdsInClass(classId) {
+  const [rows] = await pool.execute(
+    `SELECT DISTINCT u.id
+     FROM enrollments e
+     JOIN users u ON u.id = e.student_id
+     WHERE e.class_id = ? AND e.status = 'ACTIVE' AND u.status = 'ACTIVE' AND u.role = 'STUDENT_PARENT'`,
+    [classId]
+  );
+  return rows.map((row) => row.id);
+}
+
+async function listActiveStudentIdsInGrade(grade) {
+  const [rows] = await pool.execute(
+    `SELECT id FROM users WHERE grade = ? AND status = 'ACTIVE' AND role = 'STUDENT_PARENT'`,
+    [grade]
+  );
+  return rows.map((row) => row.id);
+}
+
+async function listActiveStudentsByIds(studentIds) {
+  if (studentIds.length === 0) return [];
+  const [rows] = await pool.execute(
+    `SELECT id, full_name, student_code, grade FROM users
+     WHERE id IN (${placeholdersFor(studentIds)}) AND status = 'ACTIVE' AND role = 'STUDENT_PARENT'
+     ORDER BY full_name ASC`,
+    studentIds
+  );
+  return rows;
+}
+
+// Students who already hold a live (unused or used) key for that year.
+async function findStudentIdsWithKey(studentIds, academicYear) {
+  if (studentIds.length === 0) return [];
+  const [rows] = await pool.execute(
+    `SELECT DISTINCT student_id FROM student_reregistration_keys
+     WHERE academic_year = ? AND status IN ('UNUSED', 'USED') AND student_id IN (${placeholdersFor(studentIds)})`,
+    [academicYear, ...studentIds]
+  );
+  return rows.map((row) => row.student_id);
 }
 
 async function findReregistrationKeyById(keyId) {
@@ -286,7 +400,10 @@ async function listReregistrationKeys(academicYear) {
   const [rows] = await pool.execute(
     `SELECT k.*, s.full_name AS student_name, s.email AS student_email,
             s.student_code, s.grade AS current_grade, s.status AS student_status,
-            a.full_name AS created_by_name
+            a.full_name AS created_by_name,
+            (SELECT GROUP_CONCAT(DISTINCT c.subject ORDER BY c.subject SEPARATOR ', ')
+             FROM enrollments e JOIN classes c ON c.id = e.class_id
+             WHERE e.student_id = k.student_id AND e.status = 'ACTIVE') AS class_names
      FROM student_reregistration_keys k
      JOIN users s ON s.id = k.student_id
      JOIN users a ON a.id = k.created_by
@@ -473,13 +590,13 @@ async function logNotification({ recipientId, channel, type, message, sentBy }) 
   );
 }
 
-// notification bell - personal reminders sent to this user
+// notification bell - only what is due; scheduled reminders wait for their time
 async function listNotificationsForUser(userId, limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 30;
   const [rows] = await pool.query(
     `SELECT id, type, message, sent_at
      FROM notification_log
-     WHERE recipient_id = ?
+     WHERE recipient_id = ? AND sent_at <= NOW()
      ORDER BY sent_at DESC
      LIMIT ${safeLimit}`,
     [userId]
@@ -487,9 +604,84 @@ async function listNotificationsForUser(userId, limit) {
   return rows;
 }
 
+// --- Scheduled reminders (tutor) ---
+// One reminder = one notification_log row per recipient, all sharing the same
+// message and send time. Rows with a future sent_at stay hidden until then.
+
+async function createScheduledNotifications(recipientIds, { type, message, sentBy, sendAt }) {
+  if (recipientIds.length === 0) return;
+  const rowsSql = recipientIds.map(() => `(?, 'EMAIL', ?, ?, ?, ?)`).join(', ');
+  const params = [];
+  recipientIds.forEach((recipientId) => params.push(recipientId, type, message, sentBy, sendAt));
+  await pool.execute(
+    `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
+     VALUES ${rowsSql}`,
+    params
+  );
+}
+
+async function listRemindersByTutor(tutorId, messagePrefix) {
+  const [rows] = await pool.execute(
+    `SELECT MIN(id) AS id, message, sent_at, COUNT(*) AS recipient_count,
+            MAX(sent_at > NOW()) AS is_upcoming, MAX(recipient_id = sent_by) AS is_personal
+     FROM notification_log
+     WHERE sent_by = ? AND type = 'CLASS_REMINDER' AND message LIKE ?
+       AND sent_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+     GROUP BY message, sent_at
+     ORDER BY sent_at ASC
+     LIMIT 100`,
+    [tutorId, `${messagePrefix}%`]
+  );
+  return rows;
+}
+
+async function findReminderRow(reminderId, tutorId) {
+  const [rows] = await pool.execute(
+    `SELECT id, message, sent_at, sent_at > NOW() AS is_upcoming
+     FROM notification_log
+     WHERE id = ? AND sent_by = ? AND type = 'CLASS_REMINDER'
+     LIMIT 1`,
+    [reminderId, tutorId]
+  );
+  return rows[0] || null;
+}
+
+async function countUpcomingReminder({ tutorId, message, sendAt }) {
+  const [rows] = await pool.execute(
+    `SELECT COUNT(*) AS total FROM notification_log
+     WHERE sent_by = ? AND type = 'CLASS_REMINDER' AND message = ? AND sent_at = ?`,
+    [tutorId, message, sendAt]
+  );
+  return Number(rows[0].total);
+}
+
+// Cancelling removes every copy of the reminder that has not gone out yet.
+async function deleteUpcomingReminder({ tutorId, message, sentAt }) {
+  const [result] = await pool.execute(
+    `DELETE FROM notification_log
+     WHERE sent_by = ? AND type = 'CLASS_REMINDER' AND message = ? AND sent_at = ? AND sent_at > NOW()`,
+    [tutorId, message, sentAt]
+  );
+  return result.affectedRows;
+}
+
 module.exports = {
   getCoreCounts,
   getRevenueTrend,
+  getDatabaseToday,
+  sumRevenueByBucket,
+  withTransaction,
+  listStudentsForReregistration,
+  listClassesWithStudentCounts,
+  listActiveStudentIdsInClass,
+  listActiveStudentIdsInGrade,
+  listActiveStudentsByIds,
+  findStudentIdsWithKey,
+  createScheduledNotifications,
+  listRemindersByTutor,
+  findReminderRow,
+  countUpcomingReminder,
+  deleteUpcomingReminder,
   listRecentActivity,
   listUsers,
   createUser,

@@ -37,6 +37,15 @@ const PATHS = {
   edit: 'M4 20.5h4L19.5 9a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16.5v4ZM14 6.5l3.5 3.5',
   trash: 'M4.5 7.5h15M9.5 7.5V5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2.5M18 7.5 17.2 19a2 2 0 0 1-2 1.9H8.8a2 2 0 0 1-2-1.9L6 7.5',
   alertTriangle: 'M12 4.5 2.5 20h19L12 4.5ZM12 10v4.5M12 17.5h.01',
+  chevronRight: 'm9 5 7 7-7 7',
+  refresh: 'M20 11a8 8 0 0 0-14.8-4M4 4v3.5h3.5M4 13a8 8 0 0 0 14.8 4M20 20v-3.5h-3.5',
+  grid: 'M4 5h16v15H4V5ZM4 10h16M9.3 5v15M14.7 5v15',
+  copy: 'M9 9h11v11H9V9ZM15 9V4H4v11h5',
+  download: 'M12 4v11M7 10.5l5 4.5 5-4.5M5 20h14',
+  bank: 'M3 9.5 12 4l9 5.5M5 10.5v7.5M9.7 10.5v7.5M14.3 10.5v7.5M19 10.5v7.5M3 20.5h18',
+  calendarDays:
+    'M4 8h16M7 3v4M17 3v4M6 5.5h12A2 2 0 0 1 20 7.5v11A2 2 0 0 1 18 20.5H6A2 2 0 0 1 4 18.5v-11A2 2 0 0 1 6 5.5ZM8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01',
+  external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
 };
 
 function Icon({ name, size = 20, strokeWidth = 1.8, className = '' }) {

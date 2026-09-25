@@ -20,7 +20,10 @@ const {
   sendRemindersRules,
   reminderCandidatesQueryRules,
   tutorMessageRules,
-  generateReregistrationKeyRules,
+  generateReregistrationKeysRules,
+  revenueQueryRules,
+  scheduleReminderRules,
+  reminderIdParamRules,
   reregistrationKeyIdParamRules,
   reregistrationKeyQueryRules,
   redeemReregistrationKeyRules,
@@ -86,10 +89,28 @@ router.post(
   controller.sendTutorMessage
 );
 
+// --- Tutor only: reminders scheduled for a date and time ---
+router.get('/tutor/reminders', authorize(ROLES.TUTOR), controller.listMyReminders);
+router.post(
+  '/tutor/reminders',
+  authorize(ROLES.TUTOR),
+  scheduleReminderRules,
+  validateRequest,
+  controller.scheduleReminder
+);
+router.delete(
+  '/tutor/reminders/:reminderId',
+  authorize(ROLES.TUTOR),
+  reminderIdParamRules,
+  validateRequest,
+  controller.cancelReminder
+);
+
 // --- Admin only: everything below ---
 router.use('/admin', authorize(ROLES.ADMIN));
 
 router.get('/admin/dashboard', controller.getDashboardStats);
+router.get('/admin/revenue', revenueQueryRules, validateRequest, controller.getRevenueReport);
 
 router.get('/admin/users', listUsersQueryRules, validateRequest, controller.listUsers);
 router.post('/admin/users', createUserRules, validateRequest, controller.createUser);
@@ -127,11 +148,12 @@ router.get(
   controller.downloadTutorKeyDocument
 );
 
+router.get('/admin/reregistration/options', controller.getReregistrationOptions);
 router.post(
   '/admin/reregistration-keys',
-  generateReregistrationKeyRules,
+  generateReregistrationKeysRules,
   validateRequest,
-  controller.generateReregistrationKey
+  controller.generateReregistrationKeys
 );
 router.get(
   '/admin/reregistration-keys',

@@ -3,11 +3,23 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchMyAttendanceHistory } from '../api/attendanceApi';
 import { fetchMyBalances, fetchMyBankDetails } from '../api/paymentApi';
+import { fetchMyTimetable } from '../api/courseApi';
+import { fetchMyStudents, fetchMyReminders } from '../api/adminApi';
+import { useUpcomingHolidays } from '../hooks/useHolidays';
+import { useUpcomingClassEvents } from '../hooks/useClassEvents';
 import Icon from '../../../shared/client/src/components/common/Icon';
 import StatCard from '../../../shared/client/src/components/common/StatCard';
+import LoadingSpinner from '../../../shared/client/src/components/common/LoadingSpinner';
+import WeeklyTimetable from '../../../shared/client/src/components/common/WeeklyTimetable';
 import Footer from '../../../shared/client/src/components/layout/Footer';
 import PortalShell from '../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../shared/client/src/components/layout/navItems';
+import {
+  describeNextClass,
+  findNextClass,
+  occurrencesOn,
+  todayKey,
+} from '../../../shared/client/src/utils/schedule';
 import heroMediaImg from '../../../shared/client/src/assets/hero-media.png';
 
 const FEATURES = [
@@ -56,25 +68,42 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// "Next class" stat card, shared by the student and tutor dashboards
+// (skips holidays and cancelled days, counts extra classes)
+function NextClassCard({ classes, holidays, events }) {
+  const next = findNextClass(classes, new Date(), holidays, events);
+  return (
+    <StatCard
+      icon="clock"
+      label="Next Class"
+      value={next ? describeNextClass(next) : '-'}
+      sub={next ? next.classItem.subject : 'Nothing in the next two weeks'}
+      tone={next && next.isToday ? 'warning' : 'default'}
+      small
+    />
+  );
+}
+
 function StudentDashboard({ user }) {
   const [summaryByClass, setSummaryByClass] = useState([]);
   const [balances, setBalances] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const holidays = useUpcomingHolidays();
+  const events = useUpcomingClassEvents();
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([fetchMyAttendanceHistory(), fetchMyBalances()])
-      .then(([attendance, balanceList]) => {
+    // loaded independently - one failure doesn't blank the whole dashboard
+    Promise.allSettled([fetchMyAttendanceHistory(), fetchMyBalances(), fetchMyTimetable()]).then(
+      ([attendance, balanceList, timetable]) => {
         if (!isMounted) return;
-        setSummaryByClass(attendance.summaryByClass || []);
-        setBalances(balanceList || []);
-      })
-      .catch(() => {
-        /* Dashboard degrades gracefully - the dedicated pages surface the real error. */
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+        if (attendance.status === 'fulfilled') setSummaryByClass(attendance.value.summaryByClass || []);
+        if (balanceList.status === 'fulfilled') setBalances(balanceList.value || []);
+        if (timetable.status === 'fulfilled') setClasses(timetable.value.classes || []);
+        setIsLoading(false);
+      }
+    );
     return () => {
       isMounted = false;
     };
@@ -92,33 +121,54 @@ function StudentDashboard({ user }) {
         <p className="muted">Here&apos;s a snapshot of your classes, attendance and fees.</p>
       </div>
 
-      {!isLoading && (
-        <div className="stat-grid">
-          <StatCard
-            icon="book"
-            label="Enrolled Classes"
-            value={balances.length || summaryByClass.length}
-            to="/courses/my-courses"
-          />
-          <StatCard
-            icon="calendar"
-            label="Attendance Rate"
-            value={overallRate === null ? '-' : `${overallRate}%`}
-            sub={overallRate === null ? 'No sessions yet' : overallRate >= 80 ? 'On track' : 'Needs attention'}
-            tone={overallRate !== null && overallRate < 80 ? 'warning' : 'success'}
-            to="/attendance/history"
-          />
-          <StatCard
-            icon="wallet"
-            label="Pending Fees"
-            value={formatCurrency(pendingFees)}
-            tone={pendingFees > 0 ? 'warning' : 'success'}
-            to="/payments"
-          />
-        </div>
+      {isLoading ? (
+        <LoadingSpinner label="Loading your dashboard..." />
+      ) : (
+        <>
+          <div className="stat-grid">
+            <StatCard
+              icon="book"
+              label="Enrolled Classes"
+              value={classes.length || balances.length}
+              to="/courses/my-courses"
+            />
+            <StatCard
+              icon="calendar"
+              label="Attendance Rate"
+              value={overallRate === null ? '-' : `${overallRate}%`}
+              sub={overallRate === null ? 'No sessions yet' : overallRate >= 80 ? 'On track' : 'Needs attention'}
+              tone={overallRate !== null && overallRate < 80 ? 'warning' : 'success'}
+              to="/attendance/history"
+            />
+            <StatCard
+              icon="wallet"
+              label="Pending Fees"
+              value={formatCurrency(pendingFees)}
+              tone={pendingFees > 0 ? 'warning' : 'success'}
+              to="/payments"
+            />
+            <NextClassCard classes={classes} holidays={holidays} events={events} />
+          </div>
+
+          <div className="card">
+            <div className="flex-between" style={{ marginBottom: '12px' }}>
+              <h2 style={{ margin: 0 }}>My Weekly Timetable</h2>
+              <Link to="/calendar" className="btn btn-secondary btn-sm">
+                Open Calendar
+              </Link>
+            </div>
+            <WeeklyTimetable
+              classes={classes}
+              holidays={holidays}
+              events={events}
+              showTutor
+              emptyMessage="You're not enrolled in any classes yet - browse classes to get started."
+            />
+          </div>
+        </>
       )}
 
-      <div className="summary-grid">
+      <div className="summary-grid quick-links">
         <Link to="/courses/classes" className="card link-card">
           <div className="feature-icon-box">
             <Icon name="search" size={22} />
@@ -237,21 +287,123 @@ function BankDetailsPrompt({ onDismiss }) {
   );
 }
 
+function formatReminderTime(sendAt) {
+  return new Date(sendAt.replace(' ', 'T')).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function TutorDashboard({ user }) {
   const { needsBankDetails, dismiss } = useBankDetailsPrompt();
+  const [classes, setClasses] = useState([]);
+  const [studentCount, setStudentCount] = useState(0);
+  const [reminders, setReminders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const holidays = useUpcomingHolidays();
+  const events = useUpcomingClassEvents();
+
+  useEffect(() => {
+    let isMounted = true;
+    Promise.allSettled([fetchMyTimetable(), fetchMyStudents(), fetchMyReminders()]).then(
+      ([timetable, students, reminderList]) => {
+        if (!isMounted) return;
+        if (timetable.status === 'fulfilled') setClasses(timetable.value.classes || []);
+        if (students.status === 'fulfilled') setStudentCount((students.value || []).length);
+        if (reminderList.status === 'fulfilled') {
+          setReminders((reminderList.value || []).filter((item) => item.status === 'SCHEDULED'));
+        }
+        setIsLoading(false);
+      }
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const today = todayKey();
+  const todayHoliday = holidays[today];
+  const classesToday = todayHoliday
+    ? 0
+    : occurrencesOn(classes, events, today).filter((item) => item.kind !== 'cancelled').length;
+  let classesTodayNote = classesToday > 0 ? 'Mark attendance when you start' : 'No classes today';
+  if (todayHoliday) classesTodayNote = `Public holiday - ${todayHoliday}`;
 
   return (
     <div className="page">
       {needsBankDetails && <BankDetailsPrompt onDismiss={dismiss} />}
       <div className="page-header">
         <h1>Good day, {user.fullName.split(' ')[0]}!</h1>
-        <p className="muted">Open a class to take attendance for today&apos;s session.</p>
+        <p className="muted">Your week at a glance - open a class to take attendance for today&apos;s session.</p>
       </div>
 
-      <div className="summary-grid">
+      {isLoading ? (
+        <LoadingSpinner label="Loading your dashboard..." />
+      ) : (
+        <>
+          <div className="stat-grid">
+            <StatCard icon="book" label="My Classes" value={classes.length} to="/courses/manage" />
+            <StatCard icon="users" label="My Students" value={studentCount} to="/students/mine" />
+            <StatCard
+              icon="calendar"
+              label="Classes Today"
+              value={classesToday}
+              sub={classesTodayNote}
+              tone={todayHoliday ? 'danger' : classesToday > 0 ? 'success' : 'default'}
+              to="/attendance/classes"
+            />
+            <NextClassCard classes={classes} holidays={holidays} events={events} />
+          </div>
+
+          <div className="card">
+            <div className="flex-between" style={{ marginBottom: '12px' }}>
+              <h2 style={{ margin: 0 }}>My Weekly Timetable</h2>
+              <Link to="/calendar" className="btn btn-secondary btn-sm">
+                Open Calendar
+              </Link>
+            </div>
+            <WeeklyTimetable
+              classes={classes}
+              holidays={holidays}
+              events={events}
+              emptyMessage="No classes have been assigned to you yet." />
+          </div>
+
+          <div className="card">
+            <div className="flex-between" style={{ marginBottom: '8px' }}>
+              <h2 style={{ margin: 0 }}>Upcoming Reminders</h2>
+              <Link to="/reminders" className="btn btn-primary btn-sm">
+                <Icon name="plus" size={14} /> New reminder
+              </Link>
+            </div>
+            {reminders.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                No reminders scheduled. Set one for yourself or your students for any date and time.
+              </p>
+            ) : (
+              reminders.slice(0, 3).map((reminder) => (
+                <div key={reminder.id} className="order-line">
+                  <div>
+                    <div className="order-line-title">{reminder.message}</div>
+                    <div className="order-line-sub">
+                      {reminder.isPersonal ? 'Only you' : `${reminder.recipientCount} student(s)`}
+                    </div>
+                  </div>
+                  <span className="badge badge-warning">{formatReminderTime(reminder.sendAt)}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      <div className="summary-grid quick-links">
         <Link to="/attendance/classes" className="card link-card">
           <div className="feature-icon-box">
-            <Icon name="calendar" size={22} />
+            <Icon name="checkCircle" size={22} />
           </div>
           <h2>Mark Attendance</h2>
           <p className="muted">Open a class session and record who attended.</p>
@@ -269,6 +421,13 @@ function TutorDashboard({ user }) {
           </div>
           <h2>My Students</h2>
           <p className="muted">See every student enrolled across your classes.</p>
+        </Link>
+        <Link to="/reminders" className="card link-card">
+          <div className="feature-icon-box">
+            <Icon name="clock" size={22} />
+          </div>
+          <h2>Reminders</h2>
+          <p className="muted">Schedule a reminder for a date and time - for you or your students.</p>
         </Link>
         <Link to="/notify" className="card link-card">
           <div className="feature-icon-box">

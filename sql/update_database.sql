@@ -1,6 +1,8 @@
--- Student yearly re-registration + real bank payouts for tutors.
--- Run this as root in MySQL Workbench: the app's own DB user has no DDL rights.
--- Safe to run more than once - every step checks before it changes anything.
+-- Database update: student re-registration, tutor payout tracking, class
+-- start dates, and cancelled / extra class days.
+-- Run this once as root in MySQL Workbench (the app's own DB user has no
+-- rights to change tables). Safe to run more than once - every step checks
+-- first, and no stored procedure or DELIMITER is needed.
 
 USE brilliant_institute;
 
@@ -33,53 +35,67 @@ CREATE TABLE IF NOT EXISTS yearly_rollover_log (
   UNIQUE KEY uq_rollover_year (academic_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- MySQL 8 has no "ADD COLUMN IF NOT EXISTS", so each column is checked first.
-DROP PROCEDURE IF EXISTS add_column_if_missing;
-DELIMITER $$
-CREATE PROCEDURE add_column_if_missing(
-  IN target_table VARCHAR(64),
-  IN target_column VARCHAR(64),
-  IN column_definition TEXT
-)
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = target_table AND COLUMN_NAME = target_column
-  ) THEN
-    SET @ddl = CONCAT('ALTER TABLE `', target_table, '` ADD COLUMN `', target_column, '` ', column_definition);
-    PREPARE stmt FROM @ddl;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
-  END IF;
-END$$
-DELIMITER ;
+-- One cancelled day of a weekly class, or one extra class on a given day
+CREATE TABLE IF NOT EXISTS class_events (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  class_id    INT UNSIGNED NOT NULL,
+  event_date  DATE NOT NULL,
+  type        ENUM('CANCELLED', 'EXTRA') NOT NULL,
+  start_time  TIME NULL,
+  end_time    TIME NULL,
+  venue       VARCHAR(150) NULL,
+  note        VARCHAR(255) NULL,
+  created_by  INT UNSIGNED NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_class_events_date (event_date),
+  KEY idx_class_events_class (class_id),
+  CONSTRAINT fk_class_events_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_class_events_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- users: has this student confirmed next year, and when did they leave
-CALL add_column_if_missing('users', 'reregistered_for_year', 'SMALLINT UNSIGNED NULL AFTER grade');
-CALL add_column_if_missing('users', 'left_at', 'DATETIME NULL AFTER reregistered_for_year');
+-- New columns. MySQL 8 has no "ADD COLUMN IF NOT EXISTS", so each one checks
+-- information_schema first and runs a harmless SELECT if it already exists.
+
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE users ADD COLUMN reregistered_for_year SMALLINT UNSIGNED NULL AFTER grade', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'reregistered_for_year');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE users ADD COLUMN left_at DATETIME NULL AFTER reregistered_for_year', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'left_at');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- payouts made before this update get the plain 'RECORDED' status
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE tutor_payouts
+     ADD COLUMN status ENUM(''RECORDED'', ''QUEUED'', ''SENT'', ''FAILED'') NOT NULL DEFAULT ''RECORDED'' AFTER amount,
+     ADD COLUMN method VARCHAR(30) NOT NULL DEFAULT ''MANUAL'' AFTER status,
+     ADD COLUMN bank_name VARCHAR(100) NULL AFTER method,
+     ADD COLUMN bank_account_holder VARCHAR(150) NULL AFTER bank_name,
+     ADD COLUMN bank_account_last4 CHAR(4) NULL AFTER bank_account_holder,
+     ADD COLUMN bank_branch VARCHAR(100) NULL AFTER bank_account_last4,
+     ADD COLUMN provider_reference VARCHAR(100) NULL AFTER bank_branch,
+     ADD COLUMN failure_reason VARCHAR(255) NULL AFTER provider_reference,
+     ADD COLUMN exported_at DATETIME NULL AFTER failure_reason,
+     ADD COLUMN settled_at DATETIME NULL AFTER exported_at', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tutor_payouts' AND COLUMN_NAME = 'status');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE classes ADD COLUMN start_date DATE NULL AFTER end_time', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'classes' AND COLUMN_NAME = 'start_date');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- 'LEFT' is set by the January roll-over; login already requires 'ACTIVE'
 ALTER TABLE users
   MODIFY COLUMN status ENUM('ACTIVE', 'SUSPENDED', 'DELETED', 'LEFT') NOT NULL DEFAULT 'ACTIVE';
 
--- tutor_payouts: where the money went, and whether it actually arrived
-CALL add_column_if_missing('tutor_payouts', 'status',
-  "ENUM('RECORDED', 'QUEUED', 'SENT', 'FAILED') NOT NULL DEFAULT 'RECORDED' AFTER amount");
-CALL add_column_if_missing('tutor_payouts', 'method',
-  "VARCHAR(30) NOT NULL DEFAULT 'MANUAL' AFTER status");
-CALL add_column_if_missing('tutor_payouts', 'bank_name', 'VARCHAR(100) NULL AFTER method');
-CALL add_column_if_missing('tutor_payouts', 'bank_account_holder', 'VARCHAR(150) NULL AFTER bank_name');
-CALL add_column_if_missing('tutor_payouts', 'bank_account_last4', 'CHAR(4) NULL AFTER bank_account_holder');
-CALL add_column_if_missing('tutor_payouts', 'bank_branch', 'VARCHAR(100) NULL AFTER bank_account_last4');
-CALL add_column_if_missing('tutor_payouts', 'provider_reference', 'VARCHAR(100) NULL AFTER bank_branch');
-CALL add_column_if_missing('tutor_payouts', 'failure_reason', 'VARCHAR(255) NULL AFTER provider_reference');
-CALL add_column_if_missing('tutor_payouts', 'exported_at', 'DATETIME NULL AFTER failure_reason');
-CALL add_column_if_missing('tutor_payouts', 'settled_at', 'DATETIME NULL AFTER exported_at');
-
-DROP PROCEDURE IF EXISTS add_column_if_missing;
-
--- Bell notifications are not emails; 'IN_APP' says so instead of
--- borrowing the EMAIL channel for them.
+-- Bell notifications are not emails
 ALTER TABLE notification_log
   MODIFY COLUMN channel ENUM('EMAIL', 'SMS', 'IN_APP') NOT NULL;
 
@@ -88,8 +104,4 @@ ALTER TABLE notification_log
                           'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_SUBMITTED', 'PAYOUT_RECORDED',
                           'REREGISTRATION', 'ACCOUNT_CLOSED') NOT NULL;
 
--- Payouts recorded before this migration predate the transfer workflow, so
--- they stay RECORDED rather than being claimed as sent to a bank.
-UPDATE tutor_payouts SET status = 'RECORDED' WHERE status IS NULL;
-
-SELECT 'migration complete' AS result;
+SELECT 'database update complete' AS result;

@@ -1,5 +1,6 @@
 // Course module - all database queries
 const { pool } = require('../../../../../shared/server/src/config/db');
+const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
 const ACTIVE_CLASS_WITH_TUTOR_SELECT = `
   SELECT c.*, t.full_name AS tutor_name, t.profile_picture_path AS tutor_profile_picture,
@@ -7,6 +8,8 @@ const ACTIVE_CLASS_WITH_TUTOR_SELECT = `
   FROM classes c
   JOIN users t ON t.id = c.tutor_id
 `;
+
+const WEEK_ORDER = `FIELD(c.day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')`;
 
 async function listActiveClasses({ search, subjectArea, level, dayOfWeek }) {
   const clauses = [`c.status = 'ACTIVE'`];
@@ -101,6 +104,31 @@ async function listAllClasses() {
 }
 
 async function createClass(data) {
+  // start_date only exists once the database update has been run
+  if (await schema.hasClassStartDate()) {
+    const [result] = await pool.execute(
+      `INSERT INTO classes
+         (subject, subject_area, description, level, tutor_id, venue, day_of_week,
+          start_time, end_time, start_date, capacity, fee, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', NOW())`,
+      [
+        data.subject,
+        data.subjectArea,
+        data.description || null,
+        data.level || null,
+        data.tutorId,
+        data.venue,
+        data.dayOfWeek,
+        data.startTime,
+        data.endTime,
+        data.startDate || null,
+        data.capacity,
+        data.fee,
+      ]
+    );
+    return result.insertId;
+  }
+
   const [result] = await pool.execute(
     `INSERT INTO classes
        (subject, subject_area, description, level, tutor_id, venue, day_of_week,
@@ -186,14 +214,140 @@ async function findConflictingVenueClass({ venue, dayOfWeek, startTime, endTime,
 
 async function findConflictingTutorClass({ tutorId, dayOfWeek, startTime, endTime, excludeClassId }) {
   const [rows] = await pool.execute(
-    `SELECT id, subject, venue, start_time, end_time FROM classes
-     WHERE status = 'ACTIVE' AND tutor_id = ? AND day_of_week = ?
-       AND start_time < ? AND end_time > ?
-       AND id != ?
+    `SELECT c.id, c.subject, c.venue, c.start_time, c.end_time, t.full_name AS tutor_name
+     FROM classes c
+     JOIN users t ON t.id = c.tutor_id
+     WHERE c.status = 'ACTIVE' AND c.tutor_id = ? AND c.day_of_week = ?
+       AND c.start_time < ? AND c.end_time > ?
+       AND c.id != ?
      LIMIT 1`,
     [tutorId, dayOfWeek, endTime, startTime, excludeClassId || 0]
   );
   return rows[0] || null;
+}
+
+// --- Cancelled days and extra classes (class_events) ---
+
+const EVENT_SELECT = `
+  SELECT ev.id, ev.class_id, ev.event_date, ev.type, ev.start_time, ev.end_time, ev.venue, ev.note,
+         ev.created_at, c.subject, c.level, c.tutor_id, c.venue AS class_venue,
+         c.start_time AS class_start_time, c.end_time AS class_end_time,
+         t.full_name AS tutor_name, u.full_name AS created_by_name
+  FROM class_events ev
+  JOIN classes c ON c.id = ev.class_id
+  JOIN users t ON t.id = c.tutor_id
+  JOIN users u ON u.id = ev.created_by
+`;
+
+// studentId narrows the list to classes that student attends
+async function listClassEvents({ fromDate, toDate, studentId }) {
+  const params = [];
+  let join = '';
+  if (studentId) {
+    join = `JOIN enrollments en ON en.class_id = c.id AND en.student_id = ? AND en.status = 'ACTIVE'`;
+    params.push(studentId);
+  }
+  params.push(fromDate, toDate);
+  const [rows] = await pool.execute(
+    `${EVENT_SELECT} ${join}
+     WHERE ev.event_date BETWEEN ? AND ? AND c.status = 'ACTIVE'
+     ORDER BY ev.event_date, COALESCE(ev.start_time, c.start_time)`,
+    params
+  );
+  return rows;
+}
+
+async function findClassEvent(eventId) {
+  const [rows] = await pool.execute(`${EVENT_SELECT} WHERE ev.id = ? LIMIT 1`, [eventId]);
+  return rows[0] || null;
+}
+
+async function findCancelledDay(classId, eventDate) {
+  const [rows] = await pool.execute(
+    `SELECT id FROM class_events WHERE class_id = ? AND event_date = ? AND type = 'CANCELLED' LIMIT 1`,
+    [classId, eventDate]
+  );
+  return rows[0] || null;
+}
+
+async function createClassEvent({ classId, eventDate, type, startTime, endTime, venue, note, createdBy }) {
+  const [result] = await pool.execute(
+    `INSERT INTO class_events (class_id, event_date, type, start_time, end_time, venue, note, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+    [classId, eventDate, type, startTime || null, endTime || null, venue || null, note || null, createdBy]
+  );
+  return result.insertId;
+}
+
+async function deleteClassEvent(eventId) {
+  await pool.execute(`DELETE FROM class_events WHERE id = ?`, [eventId]);
+}
+
+// A weekly class that meets at that time on that date, in the same room or
+// with the same tutor (a class cancelled for that date doesn't count).
+async function findBusyWeeklyClass({ eventDate, dayOfWeek, startTime, endTime, venue, tutorId }) {
+  const [rows] = await pool.execute(
+    `SELECT c.subject, c.venue, c.start_time, c.end_time, c.tutor_id, t.full_name AS tutor_name
+     FROM classes c
+     JOIN users t ON t.id = c.tutor_id
+     WHERE c.status = 'ACTIVE' AND c.day_of_week = ?
+       AND c.start_time < ? AND c.end_time > ?
+       AND (c.venue = ? OR c.tutor_id = ?)
+       AND NOT EXISTS (
+         SELECT 1 FROM class_events x
+         WHERE x.class_id = c.id AND x.event_date = ? AND x.type = 'CANCELLED'
+       )
+     LIMIT 1`,
+    [dayOfWeek, endTime, startTime, venue, tutorId, eventDate]
+  );
+  return rows[0] || null;
+}
+
+// An extra class already booked at that time, in the same room or with the same tutor.
+async function findBusyExtraClass({ eventDate, startTime, endTime, venue, tutorId }) {
+  const [rows] = await pool.execute(
+    `SELECT c.subject, ev.venue, ev.start_time, ev.end_time, c.tutor_id, t.full_name AS tutor_name
+     FROM class_events ev
+     JOIN classes c ON c.id = ev.class_id
+     JOIN users t ON t.id = c.tutor_id
+     WHERE ev.type = 'EXTRA' AND ev.event_date = ?
+       AND ev.start_time < ? AND ev.end_time > ?
+       AND (ev.venue = ? OR c.tutor_id = ?)
+     LIMIT 1`,
+    [eventDate, endTime, startTime, venue, tutorId]
+  );
+  return rows[0] || null;
+}
+
+// --- Timetables ---
+
+async function findPersonForTimetable(userId) {
+  const [rows] = await pool.execute(
+    `SELECT id, full_name, role, grade FROM users WHERE id = ? AND status != 'DELETED' LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
+async function listTimetableForTutor(tutorId) {
+  const [rows] = await pool.execute(
+    `${ACTIVE_CLASS_WITH_TUTOR_SELECT}
+     WHERE c.status = 'ACTIVE' AND c.tutor_id = ?
+     ORDER BY ${WEEK_ORDER}, c.start_time`,
+    [tutorId]
+  );
+  return rows;
+}
+
+async function listTimetableForStudent(studentId) {
+  const [rows] = await pool.execute(
+    `${ACTIVE_CLASS_WITH_TUTOR_SELECT}
+     JOIN enrollments en ON en.class_id = c.id AND en.student_id = ? AND en.status = 'ACTIVE'
+     WHERE c.status = 'ACTIVE'
+     ORDER BY ${WEEK_ORDER}, c.start_time`,
+    [studentId]
+  );
+  return rows;
 }
 
 async function findEnrollment(studentId, classId) {
@@ -275,6 +429,16 @@ module.exports = {
   createNotification,
   findConflictingVenueClass,
   findConflictingTutorClass,
+  listClassEvents,
+  findClassEvent,
+  findCancelledDay,
+  createClassEvent,
+  deleteClassEvent,
+  findBusyWeeklyClass,
+  findBusyExtraClass,
+  findPersonForTimetable,
+  listTimetableForTutor,
+  listTimetableForStudent,
   findEnrollment,
   createEnrollment,
   reactivateEnrollment,

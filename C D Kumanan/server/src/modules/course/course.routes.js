@@ -9,6 +9,11 @@ const {
   enrollmentIdParamRules,
   deleteEnrollmentRecordRules,
   tutorIdParamRules,
+  timetableUserIdRules,
+  holidayQueryRules,
+  cancelDayRules,
+  extraClassRules,
+  eventIdParamRules,
   browseQueryRules,
   createClassRules,
   updateClassRules,
@@ -17,6 +22,43 @@ const {
 const router = express.Router();
 
 router.use(authenticate);
+
+// --- Public holidays (Google Calendar), for every calendar on the site ---
+router.get('/holidays', holidayQueryRules, validateRequest, controller.listHolidays);
+
+// --- Cancelled days and extra classes ---
+router.get('/events', holidayQueryRules, validateRequest, controller.listClassEvents);
+router.post(
+  '/classes/:classId/cancel-day',
+  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  cancelDayRules,
+  validateRequest,
+  controller.cancelClassDay
+);
+router.post(
+  '/classes/:classId/extra',
+  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  extraClassRules,
+  validateRequest,
+  controller.addExtraClass
+);
+router.delete(
+  '/events/:eventId',
+  authorize(ROLES.TUTOR, ROLES.ADMIN),
+  eventIdParamRules,
+  validateRequest,
+  controller.deleteClassEvent
+);
+
+// --- Weekly timetable: your own, or (Admin) anyone's ---
+router.get('/timetable/me', controller.getMyTimetable);
+router.get(
+  '/timetable/:userId',
+  authorize(ROLES.ADMIN),
+  timetableUserIdRules,
+  validateRequest,
+  controller.getUserTimetable
+);
 
 // --- Browse (any logged-in role) ---
 router.get('/classes', browseQueryRules, validateRequest, controller.browseClasses);

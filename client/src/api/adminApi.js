@@ -5,6 +5,12 @@ export async function fetchDashboardStats() {
   return response.data.data.stats;
 }
 
+// period: daily | monthly | yearly | fiveYears
+export async function fetchRevenueReport(period) {
+  const response = await httpClient.get('/admin/revenue', { params: { period } });
+  return response.data.data.report;
+}
+
 export async function fetchUsers(filters = {}) {
   const params = {};
   if (filters.search) params.search = filters.search;
@@ -88,6 +94,21 @@ export async function sendTutorMessage(payload) {
   return response.data;
 }
 
+// tutor reminders scheduled for a date and time
+export async function fetchMyReminders() {
+  const response = await httpClient.get('/tutor/reminders');
+  return response.data.data.reminders;
+}
+
+export async function scheduleReminder(payload) {
+  const response = await httpClient.post('/tutor/reminders', payload);
+  return response.data;
+}
+
+export async function cancelReminder(reminderId) {
+  await httpClient.delete(`/tutor/reminders/${reminderId}`);
+}
+
 // notification bell - announcements
 export async function fetchMyAnnouncements() {
   const response = await httpClient.get('/announcements');
@@ -131,18 +152,24 @@ export async function sendReminders({ type, studentIds }) {
 }
 
 // --- Student re-registration ---
-// The key code comes back only from this call; no later listing includes it.
-export async function generateReregistrationKey(payload) {
+// students, classes and grades to pick from
+export async function fetchReregistrationOptions() {
+  const response = await httpClient.get('/admin/reregistration/options');
+  return response.data.data.options;
+}
+
+// payload: { mode: 'STUDENTS' | 'CLASS' | 'GRADE', studentIds?, classId?, grade?, toGrade?, academicYear }
+// Key codes come back only from this call; no later listing includes them.
+export async function generateReregistrationKeys(payload) {
   const response = await httpClient.post('/admin/reregistration-keys', payload);
-  return response.data.data.key;
+  return response.data.data.result;
 }
 
 export async function fetchReregistrationKeys(academicYear) {
   const response = await httpClient.get('/admin/reregistration-keys', {
     params: academicYear ? { academicYear } : {},
   });
-  // ready is false until the database update for re-registration has been run
-  return { keys: response.data.data.keys, ready: response.data.data.ready !== false };
+  return response.data.data.keys;
 }
 
 export async function revokeReregistrationKey(keyId) {

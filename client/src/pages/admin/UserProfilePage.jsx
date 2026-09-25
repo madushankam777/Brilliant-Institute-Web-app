@@ -2,9 +2,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchUserProfile, getTutorKeyDocumentUrl } from '../../api/adminApi';
+import { fetchUserTimetable } from '../../api/courseApi';
+import { useUpcomingHolidays } from '../../hooks/useHolidays';
+import { useUpcomingClassEvents } from '../../hooks/useClassEvents';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
+import WeeklyTimetable from '../../../../shared/client/src/components/common/WeeklyTimetable';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 
@@ -22,6 +26,9 @@ function UserProfilePage() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [timetableClasses, setTimetableClasses] = useState(null);
+  const holidays = useUpcomingHolidays();
+  const events = useUpcomingClassEvents();
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -29,6 +36,12 @@ function UserProfilePage() {
     try {
       const data = await fetchUserProfile(userId);
       setUser(data);
+      // tutors and students also get their weekly timetable
+      if (data.role !== 'ADMIN') {
+        fetchUserTimetable(data.id)
+          .then((timetable) => setTimetableClasses(timetable.classes))
+          .catch(() => setTimetableClasses([]));
+      }
     } catch (error) {
       setLoadError(error.message);
     } finally {
@@ -130,6 +143,32 @@ function UserProfilePage() {
             </div>
           )}
         </div>
+
+        {user.role !== 'ADMIN' && (
+          <div className="card">
+            <div className="flex-between" style={{ marginBottom: '12px' }}>
+              <h2 style={{ margin: 0 }}>Weekly Timetable</h2>
+              <Link to={`/admin/timetables?user=${user.id}`} className="btn btn-secondary btn-sm">
+                Open in Timetables
+              </Link>
+            </div>
+            {timetableClasses === null ? (
+              <LoadingSpinner label="Loading timetable..." />
+            ) : (
+              <WeeklyTimetable
+                classes={timetableClasses}
+                holidays={holidays}
+                events={events}
+                showTutor={user.role !== 'TUTOR'}
+                emptyMessage={
+                  user.role === 'TUTOR'
+                    ? 'This tutor has no classes assigned yet.'
+                    : 'This student is not enrolled in any classes yet.'
+                }
+              />
+            )}
+          </div>
+        )}
 
         {/* Admin-only: the vetting documents captured when this tutor's
             enrollment key was issued. Tutors never see these. */}

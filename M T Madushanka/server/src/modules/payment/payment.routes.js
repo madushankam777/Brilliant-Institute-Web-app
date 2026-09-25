@@ -11,6 +11,8 @@ const {
   bankTransferRules,
   editBankTransferRules,
   paymentIdParamRules,
+  approveBankTransferRules,
+  tutorIdParamRules,
   payTutorRules,
   confirmPayoutRules,
   failPayoutRules,
@@ -106,7 +108,7 @@ router.get(
 router.patch(
   '/admin/:paymentId/approve',
   authorize(ROLES.ADMIN),
-  paymentIdParamRules,
+  approveBankTransferRules,
   validateRequest,
   controller.approveBankTransferPayment
 );
@@ -129,6 +131,14 @@ router.get(
 );
 
 router.get('/admin/tutors', authorize(ROLES.ADMIN), controller.listActiveTutors);
+// full account number for making the transfer - every request is audit-logged
+router.get(
+  '/admin/tutors/:tutorId/payout-account',
+  authorize(ROLES.ADMIN),
+  tutorIdParamRules,
+  validateRequest,
+  controller.getTutorPayoutAccount
+);
 router.put(
   '/admin/tutors/:tutorId/bank-details',
   authorize(ROLES.ADMIN),
@@ -145,8 +155,8 @@ router.post(
   controller.payTutor
 );
 
-// --- Admin: getting payout money to real bank accounts ---
-router.get('/admin/payouts/method', authorize(ROLES.ADMIN), controller.getPayoutMethodStatus);
+// --- Admin: paying tutors from the institute's bank ---
+router.get('/admin/payouts/options', authorize(ROLES.ADMIN), controller.getPayoutOptions);
 router.get('/admin/payouts/batch', authorize(ROLES.ADMIN), controller.getPayoutBatch);
 router.post('/admin/payouts/export', authorize(ROLES.ADMIN), controller.exportPayoutFile);
 router.patch(

@@ -22,16 +22,19 @@ function errorHandler(err, req, res, next) {
     console.error(`[error] ${req.method} ${req.originalUrl} ->`, err);
   }
 
-  // A missing table/column means the code is ahead of the database - say so
-  // plainly instead of a generic failure, so an admin knows what to fix.
+  // A missing table/column means the database update has not been run yet.
   const isSchemaOutOfDate = err && (err.code === 'ER_NO_SUCH_TABLE' || err.code === 'ER_BAD_FIELD_ERROR');
+  if (isSchemaOutOfDate) {
+    // eslint-disable-next-line no-console
+    console.warn('[setup] Run sql/update_database.sql once as root in MySQL Workbench.');
+  }
 
   const responseBody = {
     success: false,
     message: isKnownError
       ? err.message
       : isSchemaOutOfDate
-        ? 'This feature needs a database update. Ask the administrator to run the latest SQL migration in the sql/ folder.'
+        ? 'This feature is not available yet. Please contact your system administrator.'
         : 'Something went wrong. Please try again later.',
   };
 

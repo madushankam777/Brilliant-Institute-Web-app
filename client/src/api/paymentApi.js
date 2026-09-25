@@ -110,8 +110,9 @@ export async function fetchRecentPayments() {
   return response.data.data.payments;
 }
 
-export async function approveBankTransfer(paymentId) {
-  const response = await httpClient.patch(`/payments/admin/${paymentId}/approve`);
+// amount = what the slip actually shows; this is what goes into revenue
+export async function approveBankTransfer(paymentId, amount) {
+  const response = await httpClient.patch(`/payments/admin/${paymentId}/approve`, { amount });
   return response.data.data.payment;
 }
 
@@ -120,18 +121,22 @@ export async function rejectBankTransfer(paymentId) {
   return response.data.data.payment;
 }
 
-// tutor picker list - the payment module's own list (not Course Management's
-// public /courses/tutors), so bank payout details can safely ride along for
-// Admin only instead of being exposed on a route any logged-in role can hit
 // admin filling in a tutor's payout account from the Pay Tutors screen
 export async function updateTutorBankDetailsAsAdmin(tutorId, details) {
   const response = await httpClient.put(`/payments/admin/tutors/${tutorId}/bank-details`, details);
   return response.data.data.bankDetails;
 }
 
+// tutors with masked bank details (admin only)
 export async function fetchAllTutors() {
   const response = await httpClient.get('/payments/admin/tutors');
   return response.data.data.tutors;
+}
+
+// the full account number, needed to make the transfer (audit-logged)
+export async function fetchTutorPayoutAccount(tutorId) {
+  const response = await httpClient.get(`/payments/admin/tutors/${tutorId}/payout-account`);
+  return response.data.data.account;
 }
 
 export async function fetchTutorPayouts() {
@@ -139,14 +144,10 @@ export async function fetchTutorPayouts() {
   return response.data.data;
 }
 
-export async function payTutor({ tutorId, amount, note, periodLabel }) {
-  const response = await httpClient.post('/payments/admin/tutor-payouts', {
-    tutorId,
-    amount,
-    note,
-    periodLabel,
-  });
-  return response.data.data.payout;
+// method: BANK_TRANSFER (needs bankReference) | BANK_FILE | PAYOUT_API
+export async function payTutor(payload) {
+  const response = await httpClient.post('/payments/admin/tutor-payouts', payload);
+  return { payout: response.data.data.payout, message: response.data.message };
 }
 
 // tutor's own profile - payout bank details
@@ -177,10 +178,11 @@ export async function updatePaymentSettings(payload) {
   return response.data.data.settings;
 }
 
-// --- Tutor payouts: getting the money to real bank accounts ---
-export async function fetchPayoutMethod() {
-  const response = await httpClient.get('/payments/admin/payouts/method');
-  return response.data.data.method;
+// --- Tutor payouts ---
+// { bulkFileAvailable, apiAvailable, apiName, sourceAccount }
+export async function fetchPayoutOptions() {
+  const response = await httpClient.get('/payments/admin/payouts/options');
+  return response.data.data.options;
 }
 
 export async function fetchPayoutBatch() {
@@ -204,9 +206,10 @@ export async function exportPayoutFile() {
   };
 }
 
-export async function confirmPayoutSettled(payoutId, providerReference) {
+export async function confirmPayoutSettled(payoutId, { providerReference, transferDate }) {
   const response = await httpClient.patch(`/payments/admin/payouts/${payoutId}/settled`, {
     providerReference,
+    transferDate,
   });
   return response.data.data.result;
 }

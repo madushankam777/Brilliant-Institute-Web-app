@@ -9,6 +9,34 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { stats } });
 });
 
+const getRevenueReport = asyncHandler(async (req, res) => {
+  const report = await service.getRevenueReport(req.query.period || 'monthly');
+  res.status(200).json({ success: true, data: { report } });
+});
+
+// --- Tutor: scheduled reminders ---
+const listMyReminders = asyncHandler(async (req, res) => {
+  const reminders = await service.listMyReminders(req.user);
+  res.status(200).json({ success: true, data: { reminders } });
+});
+
+const scheduleReminder = asyncHandler(async (req, res) => {
+  const result = await service.scheduleReminder(req.user, req.body);
+  res.status(201).json({
+    success: true,
+    message:
+      req.body.audience === 'SELF'
+        ? 'Reminder set. It will appear in your notifications at that time.'
+        : `Reminder set for ${result.recipientCount} student(s).`,
+    data: { result },
+  });
+});
+
+const cancelReminder = asyncHandler(async (req, res) => {
+  await service.cancelReminder(req.user, Number(req.params.reminderId));
+  res.status(200).json({ success: true, message: 'Reminder cancelled.' });
+});
+
 const listUsers = asyncHandler(async (req, res) => {
   const { search, role, status } = req.query;
   const users = await service.listUsers({ search, role, status });
@@ -181,21 +209,28 @@ const sendTutorMessage = asyncHandler(async (req, res) => {
 });
 
 // --- Student re-registration ---
-// The code is returned here and nowhere else; admin reads it out to the
-// student, and no later listing includes it.
-const generateReregistrationKey = asyncHandler(async (req, res) => {
-  const key = await service.generateReregistrationKey(req.user, req.body);
+const getReregistrationOptions = asyncHandler(async (req, res) => {
+  const options = await service.getReregistrationOptions();
+  res.status(200).json({ success: true, data: { options } });
+});
+
+// Key codes are returned here and nowhere else - no later listing includes them.
+const generateReregistrationKeys = asyncHandler(async (req, res) => {
+  const result = await service.generateReregistrationKeys(req.user, req.body);
+  const issued = result.issued.length;
   res.status(201).json({
     success: true,
-    message: `Re-registration key created for ${key.studentName}.`,
-    data: { key },
+    message:
+      issued > 0
+        ? `${issued} key(s) created for ${result.academicYear}.`
+        : 'No new keys were needed - see the notes below.',
+    data: { result },
   });
 });
 
 const listReregistrationKeys = asyncHandler(async (req, res) => {
   const keys = await service.listReregistrationKeys(req.query.academicYear);
-  const ready = await service.isReregistrationReady();
-  res.status(200).json({ success: true, data: { keys, ready } });
+  res.status(200).json({ success: true, data: { keys } });
 });
 
 const revokeReregistrationKey = asyncHandler(async (req, res) => {
@@ -236,9 +271,14 @@ const runYearlyRollover = asyncHandler(async (req, res) => {
 
 module.exports = {
   getDashboardStats,
+  getRevenueReport,
+  listMyReminders,
+  scheduleReminder,
+  cancelReminder,
   previewYearlyRollover,
   runYearlyRollover,
-  generateReregistrationKey,
+  getReregistrationOptions,
+  generateReregistrationKeys,
   listReregistrationKeys,
   revokeReregistrationKey,
   redeemReregistrationKey,

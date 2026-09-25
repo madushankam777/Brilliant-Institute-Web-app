@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 
-// dashboard stat card - pass "to" to make it a link
-function StatCard({ icon, label, value, sub, tone = 'default', to }) {
+// dashboard stat card - pass "to" to make it a link, small for text values
+function StatCard({ icon, label, value, sub, tone = 'default', to, small = false }) {
   const iconClass = tone === 'default' ? 'stat-icon-box' : `stat-icon-box ${tone}`;
   const content = (
     <>
@@ -12,8 +12,8 @@ function StatCard({ icon, label, value, sub, tone = 'default', to }) {
           <Icon name={icon} size={18} />
         </span>
       </div>
-      <div className="stat-value">{value}</div>
-      {sub && <div className={`stat-sub ${tone === 'default' ? 'muted' : ''}`}>{sub}</div>}
+      <div className={small ? 'stat-value stat-value-sm' : 'stat-value'}>{value}</div>
+      {sub && <div className={`stat-sub ${tone === 'default' ? 'muted' : tone}`}>{sub}</div>}
     </>
   );
 

@@ -82,6 +82,7 @@ function toSafeClass(row) {
     dayOfWeek: row.day_of_week,
     startTime: row.start_time,
     endTime: row.end_time,
+    startDate: row.start_date || null,
     capacity: row.capacity,
     enrolledCount: row.enrolled_count === undefined ? undefined : Number(row.enrolled_count),
     spotsLeft:
@@ -166,20 +167,30 @@ function toSafeTutorKey(row, { includeCode = false } = {}) {
 }
 
 const NOTIFICATION_TYPE_LABELS = {
-  FEE_DUE: 'Fee Due Reminder',
-  LOW_ATTENDANCE: 'Low Attendance Alert',
-  CLASS_REMINDER: 'Class Reminder',
-  ANNOUNCEMENT: 'Announcement',
+  FEE_DUE: 'Fee Reminder',
+  LOW_ATTENDANCE: 'Attendance Alert',
+  CLASS_REMINDER: 'Class Update',
+  ANNOUNCEMENT: 'Message',
+  PAYMENT_APPROVED: 'Payment Approved',
+  PAYMENT_REJECTED: 'Payment Rejected',
+  PAYMENT_SUBMITTED: 'Payment To Verify',
+  PAYOUT_RECORDED: 'Payout',
+  REREGISTRATION: 'Re-registration',
+  ACCOUNT_CLOSED: 'Account',
 };
 
-// notification bell - personal reminder
+// Scheduled reminders are CLASS_REMINDER rows whose message starts with this.
+const REMINDER_PREFIX = 'Reminder: ';
+
+// notification bell - one personal notification
 function toSafeNotification(row) {
   if (!row) return null;
+  const isReminder = row.type === 'CLASS_REMINDER' && String(row.message).startsWith(REMINDER_PREFIX);
   return {
     id: row.id,
-    type: row.type,
-    title: NOTIFICATION_TYPE_LABELS[row.type] || 'Notification',
-    message: row.message,
+    type: isReminder ? 'REMINDER' : row.type,
+    title: isReminder ? 'Reminder' : NOTIFICATION_TYPE_LABELS[row.type] || 'Notification',
+    message: isReminder ? row.message.slice(REMINDER_PREFIX.length) : row.message,
     sentAt: row.sent_at,
   };
 }
@@ -206,4 +217,5 @@ module.exports = {
   toSafeAnnouncement,
   toSafeTutorKey,
   toSafeTutorProfile,
+  REMINDER_PREFIX,
 };

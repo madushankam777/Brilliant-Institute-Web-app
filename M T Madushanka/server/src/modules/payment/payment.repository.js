@@ -81,6 +81,22 @@ async function markPaymentSuccessful(
   );
 }
 
+// Approving a bank slip: the amount is what admin read off the slip, which
+// may differ from what the student typed in.
+async function approveBankTransfer(
+  paymentId,
+  { amount, balanceBefore, balanceAfter, gatewayTransactionId, paymentDetails },
+  executor = pool
+) {
+  await executor.execute(
+    `UPDATE payments
+     SET status = 'SUCCESSFUL', amount = ?, balance_before = ?, balance_after = ?,
+         gateway_transaction_id = ?, payment_details = ?, paid_at = NOW()
+     WHERE id = ?`,
+    [amount, balanceBefore, balanceAfter, gatewayTransactionId, JSON.stringify(paymentDetails || {}), paymentId]
+  );
+}
+
 async function markPaymentFailed(paymentId, { gatewayTransactionId }, executor = pool) {
   await executor.execute(
     `UPDATE payments SET status = 'FAILED', gateway_transaction_id = ? WHERE id = ?`,
@@ -135,7 +151,7 @@ async function findPaymentByIdForUpdate(paymentId, connection) {
 async function listPendingBankTransfers(executor = pool) {
   const [rows] = await executor.execute(
     `SELECT p.id, p.enrollment_id, p.amount, p.balance_before, p.payment_details, p.created_at,
-            u.full_name AS student_name, u.email AS student_email, c.subject
+            e.balance AS current_balance, u.full_name AS student_name, u.email AS student_email, c.subject
      FROM payments p
      JOIN enrollments e ON e.id = p.enrollment_id
      JOIN classes c ON c.id = e.class_id
@@ -258,9 +274,9 @@ async function findActiveTutorById(tutorId) {
   return rows[0] || null;
 }
 
-// The destination account is copied onto the payout row rather than read
-// back from the tutor later, so the ledger still shows where each transfer
-// actually went after the tutor changes their details.
+// The destination account is copied onto the payout row, so the history still
+// shows where the money went after the tutor changes their details.
+// settledAt is null for "now".
 async function createTutorPayout({
   tutorId,
   amount,
@@ -273,21 +289,25 @@ async function createTutorPayout({
   bankAccountHolder,
   bankAccountLast4,
   bankBranch,
+  providerReference,
+  settledAt,
 }) {
-  // older database without the transfer columns: record the ledger row only
+  // before the database update only the basic columns exist
   if (!(await schema.hasPayoutTracking())) {
     const [legacy] = await pool.execute(
       `INSERT INTO tutor_payouts (tutor_id, amount, note, period_label, paid_by, paid_at)
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [tutorId, amount, note || null, periodLabel || null, paidBy]
+       VALUES (?, ?, ?, ?, ?, COALESCE(?, NOW()))`,
+      [tutorId, amount, note || null, periodLabel || null, paidBy, settledAt || null]
     );
     return legacy.insertId;
   }
+
+  const isSettled = status === 'SENT';
   const [result] = await pool.execute(
     `INSERT INTO tutor_payouts
        (tutor_id, amount, status, method, bank_name, bank_account_holder, bank_account_last4,
-        bank_branch, note, period_label, paid_by, paid_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        bank_branch, provider_reference, settled_at, note, period_label, paid_by, paid_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, IF(?, COALESCE(?, NOW()), NULL), ?, ?, ?, NOW())`,
     [
       tutorId,
       amount,
@@ -297,6 +317,9 @@ async function createTutorPayout({
       bankAccountHolder || null,
       bankAccountLast4 || null,
       bankBranch || null,
+      providerReference || null,
+      isSettled ? 1 : 0,
+      settledAt || null,
       note || null,
       periodLabel || null,
       paidBy,
@@ -344,12 +367,12 @@ async function markPayoutsExported(payoutIds) {
   return result.affectedRows;
 }
 
-async function markPayoutSent(payoutId, providerReference) {
+async function markPayoutSent(payoutId, providerReference, settledAt) {
   const [result] = await pool.execute(
     `UPDATE tutor_payouts
-     SET status = 'SENT', provider_reference = ?, failure_reason = NULL, settled_at = NOW()
+     SET status = 'SENT', provider_reference = ?, failure_reason = NULL, settled_at = COALESCE(?, NOW())
      WHERE id = ? AND status IN ('QUEUED', 'FAILED')`,
-    [providerReference || null, payoutId]
+    [providerReference || null, settledAt || null, payoutId]
   );
   return result.affectedRows > 0;
 }
@@ -388,10 +411,19 @@ async function listTutorPayouts() {
   return rows;
 }
 
+// Per tutor: total paid, paid this month, and the last payment date.
+// Queued and failed payouts have not reached the tutor, so they don't count.
 async function sumPayoutsByTutor() {
+  const tracking = await schema.hasPayoutTracking();
+  const paidOn = tracking ? 'COALESCE(settled_at, paid_at)' : 'paid_at';
+  const statusFilter = tracking ? `WHERE status IN ('SENT', 'RECORDED')` : '';
   const [rows] = await pool.execute(
-    `SELECT tutor_id, COALESCE(SUM(amount), 0) AS total_paid
+    `SELECT tutor_id,
+            COALESCE(SUM(amount), 0) AS total_paid,
+            COALESCE(SUM(CASE WHEN ${paidOn} >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN amount ELSE 0 END), 0) AS month_paid,
+            MAX(${paidOn}) AS last_paid_at
      FROM tutor_payouts
+     ${statusFilter}
      GROUP BY tutor_id`
   );
   return rows;
@@ -443,6 +475,7 @@ module.exports = {
   updateEnrollmentBalance,
   createPendingPayment,
   markPaymentSuccessful,
+  approveBankTransfer,
   markPaymentFailed,
   updatePaymentDetails,
   updatePaymentMethodAndDetails,

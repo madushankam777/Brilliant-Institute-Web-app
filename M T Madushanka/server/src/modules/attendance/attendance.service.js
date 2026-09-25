@@ -34,8 +34,12 @@ async function listClassSessions(tutorUser, classId) {
   return { classSubject: classRow.subject, sessions };
 }
 
+// local date - toISOString() would give the UTC date, a day behind before 5:30 AM in Sri Lanka
 function todayDateString() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
 }
 
 // mark attendance btn - find or make today's session

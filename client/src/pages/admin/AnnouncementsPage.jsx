@@ -244,9 +244,12 @@ function AnnouncementsPage() {
 
                 <div className="form-field">
                   <label>Target Audience</label>
-                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                  <div className="choice-group" role="radiogroup">
                     {AUDIENCES.map((audience) => (
-                      <label key={audience.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 500 }}>
+                      <label
+                        key={audience.value}
+                        className={`choice-pill${form.targetAudience === audience.value ? ' is-checked' : ''}`}
+                      >
                         <input
                           type="radio"
                           name="targetAudience"

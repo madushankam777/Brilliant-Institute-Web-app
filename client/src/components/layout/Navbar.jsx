@@ -38,6 +38,29 @@ function timeAgo(isoDate) {
   return new Date(isoDate).toLocaleDateString();
 }
 
+// icon + small badge for each kind of personal notification
+const NOTIFICATION_STYLES = {
+  REMINDER: { icon: 'clock', badge: 'Reminder', tone: 'badge-warning' },
+  FEE_DUE: { icon: 'wallet', badge: 'Reminder', tone: 'badge-warning' },
+  LOW_ATTENDANCE: { icon: 'alertTriangle', badge: 'Alert', tone: 'badge-danger' },
+  CLASS_REMINDER: { icon: 'book', badge: null, tone: '' },
+  PAYMENT_APPROVED: { icon: 'checkCircle', badge: null, tone: '' },
+  PAYMENT_REJECTED: { icon: 'xCircle', badge: 'Action needed', tone: 'badge-danger' },
+  PAYMENT_SUBMITTED: { icon: 'wallet', badge: 'To verify', tone: 'badge-warning' },
+  PAYOUT_RECORDED: { icon: 'bank', badge: null, tone: '' },
+};
+
+const ANNOUNCEMENT_STYLE = { icon: 'megaphone', badge: null, tone: '' };
+const DEFAULT_STYLE = { icon: 'bell', badge: null, tone: '' };
+
+function styleFor(item) {
+  if (item.kind !== 'notification') return ANNOUNCEMENT_STYLE;
+  return NOTIFICATION_STYLES[item.type] || DEFAULT_STYLE;
+}
+
+const POLL_MS = 60 * 1000;
+const TOAST_MS = 8000;
+
 function Navbar() {
   const { user, isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
@@ -48,12 +71,16 @@ function Navbar() {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [lastSeenAt, setLastSeenAt] = useState(null);
   const [dismissedVersions, setDismissedVersions] = useState({});
+  const [toasts, setToasts] = useState([]);
   const notifRef = useRef(null);
+  // ids already shown, so only notifications that arrive later pop up as a toast
+  const knownIdsRef = useRef(null);
 
   const lastSeenKey = user ? `brilliant_notif_last_seen_${user.id}` : null;
   const dismissedKey = user ? `brilliant_notif_dismissed_${user.id}` : null;
+  const userId = user ? user.id : null;
 
-  // load bell notifications (announcements + personal reminders)
+  // load bell notifications (announcements + personal notifications)
   const loadNotifications = useCallback(async () => {
     try {
       const [announcementData, personalData] = await Promise.all([
@@ -62,10 +89,39 @@ function Navbar() {
       ]);
       setAnnouncements(announcementData);
       setPersonalNotifications(personalData);
+
+      if (knownIdsRef.current) {
+        const fresh = personalData.filter((item) => !knownIdsRef.current.has(item.id)).slice(0, 3);
+        if (fresh.length > 0) {
+          setToasts((previous) => [...fresh, ...previous].slice(0, 3));
+          fresh.forEach((item) => {
+            setTimeout(() => setToasts((previous) => previous.filter((toast) => toast.id !== item.id)), TOAST_MS);
+          });
+        }
+      }
+      knownIdsRef.current = new Set(personalData.map((item) => item.id));
     } catch {
       // fail silently, not critical
     }
   }, []);
+
+  // a different account starts with a clean slate
+  useEffect(() => {
+    knownIdsRef.current = null;
+    setToasts([]);
+  }, [userId]);
+
+  // check again every minute (and when the tab regains focus), so scheduled
+  // reminders show up at their time
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    const timer = setInterval(loadNotifications, POLL_MS);
+    window.addEventListener('focus', loadNotifications);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', loadNotifications);
+    };
+  }, [isLoggedIn, loadNotifications]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -107,6 +163,7 @@ function Navbar() {
     ...personalNotifications.map((item) => ({
       feedId: `notif:${item.id}`,
       kind: 'notification',
+      type: item.type,
       title: item.title,
       body: item.message,
       isUpdated: false,
@@ -339,9 +396,11 @@ function Navbar() {
                   visibleItems.map((item) => (
                     <div key={item.feedId} className="notification-item">
                       <div className="notification-item-title">
-                        <Icon name={item.kind === 'notification' ? 'alertTriangle' : 'bell'} size={14} />
+                        <Icon name={styleFor(item).icon} size={14} />
                         <span style={{ flex: 1 }}>{item.title}</span>
-                        {item.kind === 'notification' && <span className="badge badge-warning">Reminder</span>}
+                        {styleFor(item).badge && (
+                          <span className={`badge ${styleFor(item).tone}`}>{styleFor(item).badge}</span>
+                        )}
                         {item.isUpdated && <span className="badge">Updated</span>}
                         {item.priority === 'HIGH' && <span className="badge badge-danger">High</span>}
                         <button
@@ -364,6 +423,35 @@ function Navbar() {
               </div>
             )}
           </div>
+
+          {toasts.length > 0 && (
+            <div className="toast-stack" role="status" aria-live="polite">
+              {toasts.map((toast) => (
+                <div key={toast.id} className="toast">
+                  <Icon name={toast.type === 'REMINDER' ? 'clock' : 'bell'} size={18} />
+                  <button
+                    type="button"
+                    className="toast-main"
+                    onClick={() => {
+                      setToasts([]);
+                      if (!isNotifOpen) toggleNotifications();
+                    }}
+                  >
+                    <span className="toast-title">{toast.title}</span>
+                    <span className="toast-body">{toast.message}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="toast-close"
+                    aria-label="Close"
+                    onClick={() => setToasts((previous) => previous.filter((item) => item.id !== toast.id))}
+                  >
+                    <Icon name="x" size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <NavLink to="/profile" className="avatar-chip">
             <Avatar name={user.fullName} pictureUrl={user.profilePictureUrl} size={36} />
             <span className="avatar-chip-text">

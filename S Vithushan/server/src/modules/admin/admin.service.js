@@ -9,12 +9,23 @@ const {
   toSafeAnnouncement,
   toSafeTutorKey,
   toSafeNotification,
+  REMINDER_PREFIX,
 } = require('../../../../../shared/server/src/utils/sanitize');
 const { USER_STATUS, ROLES } = require('../../../../../shared/server/src/config/roles');
 const { GRADES, nextGrade, isFinalGrade } = require('../../../../../shared/server/src/config/grades');
 const gateway = require('./notificationGateway');
 const repository = require('./admin.repository');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
 
 async function createUser(adminUser, { fullName, email, password, role }) {
   const existing = await repository.findUserByEmail(email);
@@ -147,6 +158,81 @@ async function getDashboardStats() {
       details: typeof row.details === 'string' ? JSON.parse(row.details) : row.details,
       createdAt: row.created_at,
     })),
+  };
+}
+
+// --- Revenue report: daily / monthly / yearly / last 5 years ---
+
+// 'YYYY-MM-DD' plus n days (UTC maths, so no daylight-saving surprises)
+function addDays(dateString, days) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+}
+
+// 'YYYY-MM'; a month of 0 or less rolls back into the previous year
+function monthKey(year, month) {
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}`;
+}
+
+// [first day included, first day after] for a run of buckets
+function bucketRange(bucket, firstKey, lastKey) {
+  if (bucket === 'day') return [firstKey, addDays(lastKey, 1)];
+  if (bucket === 'month') {
+    const [year, month] = lastKey.split('-').map(Number);
+    return [`${firstKey}-01`, `${monthKey(year, month + 1)}-01`];
+  }
+  return [`${firstKey}-01-01`, `${Number(lastKey) + 1}-01-01`];
+}
+
+// The headline total is today / this month / this year / all 5 years;
+// the points are the bars of the chart around it.
+async function getRevenueReport(period) {
+  const today = await repository.getDatabaseToday();
+  const [year, month] = today.split('-').map(Number);
+
+  let bucket = 'month';
+  const keys = [];
+  let headlineKeys = [];
+
+  if (period === 'daily') {
+    bucket = 'day';
+    for (let offset = 29; offset >= 0; offset -= 1) keys.push(addDays(today, -offset));
+    headlineKeys = [today];
+  } else if (period === 'monthly') {
+    for (let offset = 11; offset >= 0; offset -= 1) keys.push(monthKey(year, month - offset));
+    headlineKeys = [monthKey(year, month)];
+  } else if (period === 'yearly') {
+    for (let m = 1; m <= month; m += 1) keys.push(monthKey(year, m));
+    headlineKeys = keys;
+  } else {
+    bucket = 'year';
+    for (let y = year - 4; y <= year; y += 1) keys.push(String(y));
+    headlineKeys = keys;
+  }
+
+  const [fromDate, toDate] = bucketRange(bucket, keys[0], keys[keys.length - 1]);
+  const rows = await repository.sumRevenueByBucket(bucket, fromDate, toDate);
+  const rowsByKey = new Map(rows.map((row) => [row.bucket, row]));
+
+  const points = keys.map((key) => {
+    const row = rowsByKey.get(key);
+    return {
+      key,
+      total: row ? roundMoney(Number(row.total)) : 0,
+      paymentCount: row ? Number(row.payment_count) : 0,
+    };
+  });
+  const headline = points.filter((point) => headlineKeys.includes(point.key));
+
+  return {
+    period,
+    bucket,
+    today,
+    total: roundMoney(headline.reduce((sum, point) => sum + point.total, 0)),
+    paymentCount: headline.reduce((sum, point) => sum + point.paymentCount, 0),
+    points,
   };
 }
 
@@ -286,9 +372,9 @@ function assertValidTargetGrade(targetGrade) {
 }
 
 // --- Student re-registration -------------------------------------------------
-// Each January the institute reopens: a student who re-registers moves up a
-// grade, one who doesn't is closed out. Admin issues a one-time key for a
-// student, reads it out to them, and the student types it in to confirm.
+// Each January a student who re-registered moves up a grade and one who did
+// not is closed out. Admin issues one-time keys (for chosen students, a whole
+// class or a whole grade) and the student types theirs in to confirm.
 
 const REREGISTRATION_KEY_VALID_DAYS = 120;
 
@@ -301,76 +387,147 @@ function currentAcademicYear() {
   return new Date().getFullYear();
 }
 
-async function generateReregistrationKey(adminUser, { studentId, toGrade, academicYear }) {
-  if (!(await schema.hasReregistration())) throw schema.migrationRequired();
-  const student = await repository.findUserById(studentId);
-  if (!student || student.role !== ROLES.STUDENT_PARENT) {
-    throw ApiError.badRequest('Please choose a student to re-register.');
-  }
-  if (student.status === USER_STATUS.DELETED) {
-    throw ApiError.badRequest('That account has been deleted.');
-  }
-
+function resolveAcademicYear(academicYear) {
   const thisYear = currentAcademicYear();
   const year = Number(academicYear) || thisYear + 1;
   if (year < thisYear || year > thisYear + 1) {
     throw ApiError.badRequest(`Keys can only be issued for ${thisYear} or ${thisYear + 1}.`);
   }
+  return year;
+}
 
-  // Default to one grade up. Admin can override for a student repeating a
-  // year or joining at a different level.
-  const resolvedGrade = toGrade || nextGrade(student.grade);
-  if (!resolvedGrade) {
-    throw ApiError.badRequest(
-      `${student.full_name} is in ${student.grade || 'the final grade'} and has finished - there is no grade above it.`
-    );
-  }
-  if (!GRADES.includes(resolvedGrade)) {
-    throw ApiError.badRequest('Please choose a valid grade.');
-  }
-
-  const keyCode = generateReregistrationKeyCode();
-  const expiresAt = new Date(Date.now() + REREGISTRATION_KEY_VALID_DAYS * 24 * 60 * 60 * 1000);
-  const keyId = await repository.createReregistrationKey({
-    keyCode,
-    studentId: student.id,
-    fromGrade: student.grade,
-    toGrade: resolvedGrade,
-    academicYear: year,
-    expiresAt,
-    createdBy: adminUser.id,
-  });
-
-  await recordAuditEvent({
-    actorId: adminUser.id,
-    action: 'REREGISTRATION_KEY_ISSUED',
-    entityType: 'student_reregistration_key',
-    entityId: keyId,
-    details: { studentId: student.id, toGrade: resolvedGrade, academicYear: year },
-  });
-
-  // The key itself never goes through the bell - it is read out to the student
-  // in person, the same way tutor enrollment keys are handed over.
-  await repository.logNotification({
-    recipientId: student.id,
-    channel: 'IN_APP',
-    type: 'REREGISTRATION',
-    message:
-      `Re-registration for ${year} is open. Ask the office for your key, then enter it on the ` +
-      `Re-register page to confirm your place in ${resolvedGrade}.`,
-    sentBy: adminUser.id,
-  });
-
+// What the Re-registration page lets admin pick from, with counts for search.
+async function getReregistrationOptions() {
+  const [students, classes] = await Promise.all([
+    repository.listStudentsForReregistration(),
+    repository.listClassesWithStudentCounts(),
+  ]);
   return {
-    id: keyId,
-    keyCode,
-    studentId: student.id,
-    studentName: student.full_name,
-    fromGrade: student.grade,
-    toGrade: resolvedGrade,
-    academicYear: year,
-    expiresAt,
+    students: students.map((row) => ({
+      id: row.id,
+      fullName: row.full_name,
+      email: row.email,
+      studentCode: row.student_code,
+      grade: row.grade,
+      classNames: row.class_names || '',
+    })),
+    classes: classes.map((row) => ({
+      id: row.id,
+      subject: row.subject,
+      level: row.level,
+      tutorName: row.tutor_name,
+      studentCount: Number(row.student_count),
+    })),
+    grades: GRADES.map((grade) => ({
+      grade,
+      studentCount: students.filter((student) => student.grade === grade).length,
+    })),
   };
+}
+
+// The student list is always worked out here, never trusted from the browser.
+async function findStudentsForKeys({ mode, studentIds, classId, grade }) {
+  let ids = [];
+  if (mode === 'CLASS') ids = await repository.listActiveStudentIdsInClass(classId);
+  else if (mode === 'GRADE') ids = await repository.listActiveStudentIdsInGrade(grade);
+  else ids = [...new Set((studentIds || []).map(Number))];
+  return repository.listActiveStudentsByIds(ids);
+}
+
+async function generateReregistrationKeys(adminUser, { mode, studentIds, classId, grade, toGrade, academicYear }) {
+  if (!(await schema.hasReregistration())) throw schema.migrationRequired();
+  assertValidTargetGrade(toGrade);
+  const year = resolveAcademicYear(academicYear);
+
+  const students = await findStudentsForKeys({ mode, studentIds, classId, grade });
+  if (students.length === 0) {
+    const emptyMessages = {
+      CLASS: 'No active students are enrolled in that class.',
+      GRADE: 'No active students are in that grade.',
+      STUDENTS: 'Choose at least one active student.',
+    };
+    throw ApiError.badRequest(emptyMessages[mode]);
+  }
+
+  const alreadyHasKey = new Set(
+    await repository.findStudentIdsWithKey(students.map((student) => student.id), year)
+  );
+  const expiresAt = new Date(Date.now() + REREGISTRATION_KEY_VALID_DAYS * DAY_MS);
+  const toIssue = [];
+  const skipped = [];
+
+  students.forEach((student) => {
+    // default is one grade up; admin can pick a grade for repeaters
+    const moveTo = toGrade || nextGrade(student.grade);
+    if (alreadyHasKey.has(student.id)) {
+      skipped.push({ studentId: student.id, studentName: student.full_name, reason: `Already has a key for ${year}.` });
+    } else if (!moveTo) {
+      skipped.push({
+        studentId: student.id,
+        studentName: student.full_name,
+        reason: student.grade
+          ? `Finished ${student.grade} - choose a grade to keep them.`
+          : 'No grade on record - choose a grade for them.',
+      });
+    } else {
+      toIssue.push({ student, moveTo, keyCode: generateReregistrationKeyCode() });
+    }
+  });
+
+  // All keys in a batch are saved together, so no code is ever lost halfway.
+  const issued = await repository.withTransaction(async (connection) => {
+    const saved = [];
+    for (const item of toIssue) {
+      const keyId = await repository.createReregistrationKey(
+        {
+          keyCode: item.keyCode,
+          studentId: item.student.id,
+          fromGrade: item.student.grade,
+          toGrade: item.moveTo,
+          academicYear: year,
+          expiresAt,
+          createdBy: adminUser.id,
+        },
+        connection
+      );
+      saved.push({
+        id: keyId,
+        keyCode: item.keyCode,
+        studentId: item.student.id,
+        studentName: item.student.full_name,
+        studentCode: item.student.student_code,
+        fromGrade: item.student.grade,
+        toGrade: item.moveTo,
+        academicYear: year,
+        expiresAt,
+      });
+    }
+    return saved;
+  });
+
+  // The key itself is handed over in person - the bell only says to ask for it.
+  for (const key of issued) {
+    await repository.logNotification({
+      recipientId: key.studentId,
+      channel: 'IN_APP',
+      type: 'REREGISTRATION',
+      message:
+        `Re-registration for ${year} is open. Ask the office for your key, then enter it on the ` +
+        `Re-register page to confirm your place in ${key.toGrade}.`,
+      sentBy: adminUser.id,
+    });
+  }
+
+  if (issued.length > 0) {
+    await recordAuditEvent({
+      actorId: adminUser.id,
+      action: 'REREGISTRATION_KEYS_ISSUED',
+      entityType: 'student_reregistration_key',
+      details: { mode, academicYear: year, issued: issued.length, skipped: skipped.length },
+    });
+  }
+
+  return { academicYear: year, issued, skipped };
 }
 
 // The code is shown once, when it is created, and never listed again.
@@ -383,6 +540,7 @@ function toSafeReregistrationKey(row) {
     studentCode: row.student_code,
     studentStatus: row.student_status,
     currentGrade: row.current_grade,
+    classNames: row.class_names || '',
     fromGrade: row.from_grade,
     toGrade: row.to_grade,
     academicYear: row.academic_year,
@@ -712,7 +870,126 @@ async function listMyNotifications(user) {
   return rows.map(toSafeNotification);
 }
 
+// --- Scheduled reminders (tutor) ---
+
+// "2026-10-12T15:30" -> a Date in the server's own time zone
+function parseLocalDateTime(value) {
+  const [datePart, timePart] = String(value).split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes, 0, 0);
+}
+
+function toMysqlDateTime(date) {
+  return (
+    `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ` +
+    `${pad2(date.getHours())}:${pad2(date.getMinutes())}:00`
+  );
+}
+
+// audience: SELF (only the tutor), CLASS (one of their classes) or ALL (all their students)
+async function scheduleReminder(tutorUser, { audience, classId, title, message, remindAt }) {
+  const sendAt = parseLocalDateTime(remindAt);
+  if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() <= Date.now()) {
+    throw ApiError.badRequest('Pick a date and time in the future.');
+  }
+  if (sendAt.getTime() > Date.now() + 366 * DAY_MS) {
+    throw ApiError.badRequest('Reminders can be set up to one year ahead.');
+  }
+
+  let recipientIds = [tutorUser.id];
+  let classSubject = null;
+  if (audience !== 'SELF') {
+    if (audience === 'CLASS') {
+      const myClasses = await repository.listClassesForTutor(tutorUser.id);
+      const chosen = myClasses.find((row) => row.id === Number(classId));
+      if (!chosen) {
+        throw ApiError.forbidden('You can only remind students in your own classes.');
+      }
+      classSubject = chosen.subject;
+    }
+    recipientIds = await repository.listStudentIdsForTutor(tutorUser.id, audience === 'CLASS' ? classId : undefined);
+    if (recipientIds.length === 0) {
+      throw ApiError.badRequest(
+        audience === 'CLASS' ? 'No students are enrolled in that class yet.' : 'No students are enrolled in your classes yet.'
+      );
+    }
+  }
+
+  const sender = await repository.findUserById(tutorUser.id);
+  const text = [title.trim(), (message || '').trim()].filter(Boolean).join(' - ');
+  const signature = audience === 'SELF' ? '' : ` (${classSubject ? `${classSubject}, ` : ''}from ${sender.full_name})`;
+  const fullMessage = `${REMINDER_PREFIX}${text}${signature}`.slice(0, 500);
+  const sendAtSql = toMysqlDateTime(sendAt);
+
+  const duplicates = await repository.countUpcomingReminder({
+    tutorId: tutorUser.id,
+    message: fullMessage,
+    sendAt: sendAtSql,
+  });
+  if (duplicates > 0) {
+    throw ApiError.conflict('You already have this reminder set for that time.');
+  }
+
+  await repository.createScheduledNotifications(recipientIds, {
+    type: 'CLASS_REMINDER',
+    message: fullMessage,
+    sentBy: tutorUser.id,
+    sendAt: sendAtSql,
+  });
+
+  await recordAuditEvent({
+    actorId: tutorUser.id,
+    action: 'REMINDER_SCHEDULED',
+    entityType: 'notification_batch',
+    details: { audience, classId: classId || null, recipientCount: recipientIds.length, sendAt: sendAtSql },
+  });
+
+  return { recipientCount: recipientIds.length, sendAt: sendAtSql };
+}
+
+async function listMyReminders(tutorUser) {
+  const rows = await repository.listRemindersByTutor(tutorUser.id, REMINDER_PREFIX);
+  return rows.map((row) => ({
+    id: row.id,
+    message: row.message.slice(REMINDER_PREFIX.length),
+    sendAt: row.sent_at,
+    recipientCount: Number(row.recipient_count),
+    isPersonal: Number(row.is_personal) === 1,
+    status: Number(row.is_upcoming) === 1 ? 'SCHEDULED' : 'SENT',
+  }));
+}
+
+async function cancelReminder(tutorUser, reminderId) {
+  const row = await repository.findReminderRow(reminderId, tutorUser.id);
+  if (!row || !String(row.message).startsWith(REMINDER_PREFIX)) {
+    throw ApiError.notFound('Reminder not found.');
+  }
+  if (Number(row.is_upcoming) !== 1) {
+    throw ApiError.badRequest('This reminder has already been sent.');
+  }
+
+  const removed = await repository.deleteUpcomingReminder({
+    tutorId: tutorUser.id,
+    message: row.message,
+    sentAt: row.sent_at,
+  });
+
+  await recordAuditEvent({
+    actorId: tutorUser.id,
+    action: 'REMINDER_CANCELLED',
+    entityType: 'notification_batch',
+    details: { removed },
+  });
+}
+
 module.exports = {
+  getRevenueReport,
+  getReregistrationOptions,
+  generateReregistrationKeys,
+  scheduleReminder,
+  listMyReminders,
+  cancelReminder,
   getDashboardStats,
   listUsers,
   createUser,
@@ -736,11 +1013,9 @@ module.exports = {
   listMyNotifications,
   listMyClassesForMessaging,
   sendTutorMessage,
-  generateReregistrationKey,
   listReregistrationKeys,
   revokeReregistrationKey,
   redeemReregistrationKey,
   getMyReregistrationStatus,
   currentAcademicYear,
-  isReregistrationReady: schema.hasReregistration,
 };

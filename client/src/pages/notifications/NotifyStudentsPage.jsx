@@ -1,8 +1,10 @@
 // Tutor: send a notice to their own students and/or Admin.
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchMyClassesForMessaging, sendTutorMessage } from '../../api/adminApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
+import Icon from '../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
@@ -88,12 +90,17 @@ function NotifyStudentsPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Notify Students</h1>
-          <p className="muted">
-            Send a notice straight to the notification bell of the students in your classes, the
-            institute office, or both.
-          </p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Notify Students</h1>
+            <p className="muted">
+              Send a notice straight to the notification bell of the students in your classes, the institute office,
+              or both. Want it to arrive later? Schedule a reminder instead.
+            </p>
+          </div>
+          <Link to="/reminders" className="btn btn-secondary">
+            <Icon name="clock" size={16} /> Scheduled Reminders
+          </Link>
         </div>
 
         <Alert type="error" message={loadError} />
@@ -108,11 +115,11 @@ function NotifyStudentsPage() {
             <form onSubmit={handleSubmit} noValidate>
               <div className="form-field">
                 <label>Send to</label>
-                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                <div className="choice-group" role="radiogroup">
                   {AUDIENCES.map((audience) => (
                     <label
                       key={audience.value}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 500 }}
+                      className={`choice-pill${form.audience === audience.value ? ' is-checked' : ''}`}
                     >
                       <input
                         type="radio"

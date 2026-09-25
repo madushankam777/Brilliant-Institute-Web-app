@@ -86,8 +86,16 @@ const reregistrationKeyIdParamRules = [
   param('keyId').isInt({ min: 1 }).withMessage('Invalid key id.'),
 ];
 
-const generateReregistrationKeyRules = [
-  body('studentId').isInt({ min: 1 }).withMessage('Please choose a student.'),
+// Keys for chosen students, one whole class, or one whole grade.
+const generateReregistrationKeysRules = [
+  body('mode').isIn(['STUDENTS', 'CLASS', 'GRADE']).withMessage('Choose who the keys are for.'),
+  body('studentIds')
+    .if(body('mode').equals('STUDENTS'))
+    .isArray({ min: 1, max: 500 })
+    .withMessage('Choose at least one student.'),
+  body('studentIds.*').optional().isInt({ min: 1 }).withMessage('Invalid student id.'),
+  body('classId').if(body('mode').equals('CLASS')).isInt({ min: 1 }).withMessage('Choose a class.'),
+  body('grade').if(body('mode').equals('GRADE')).isIn(GRADES).withMessage('Choose a grade.'),
   body('toGrade')
     .optional({ checkFalsy: true })
     .isIn(GRADES)
@@ -97,6 +105,29 @@ const generateReregistrationKeyRules = [
     .isInt({ min: 2000, max: 2100 })
     .withMessage('Please choose a valid year.'),
 ];
+
+const revenueQueryRules = [
+  query('period')
+    .optional({ checkFalsy: true })
+    .isIn(['daily', 'monthly', 'yearly', 'fiveYears'])
+    .withMessage('Choose daily, monthly, yearly or last 5 years.'),
+];
+
+const scheduleReminderRules = [
+  body('audience').isIn(['SELF', 'CLASS', 'ALL']).withMessage('Choose who gets this reminder.'),
+  body('classId').if(body('audience').equals('CLASS')).isInt({ min: 1 }).withMessage('Choose a class.'),
+  body('title').trim().isLength({ min: 3, max: 80 }).withMessage('Give the reminder a title (3-80 characters).'),
+  body('message')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ max: 300 })
+    .withMessage('Keep the message under 300 characters.'),
+  body('remindAt')
+    .matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+    .withMessage('Pick a date and a time.'),
+];
+
+const reminderIdParamRules = [param('reminderId').isInt({ min: 1 }).withMessage('Invalid reminder id.')];
 
 const reregistrationKeyQueryRules = [
   query('academicYear')
@@ -137,7 +168,10 @@ module.exports = {
   tutorMessageRules,
   rolloverQueryRules,
   runRolloverRules,
-  generateReregistrationKeyRules,
+  generateReregistrationKeysRules,
+  revenueQueryRules,
+  scheduleReminderRules,
+  reminderIdParamRules,
   reregistrationKeyIdParamRules,
   reregistrationKeyQueryRules,
   redeemReregistrationKeyRules,

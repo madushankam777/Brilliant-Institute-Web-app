@@ -8,7 +8,10 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import { formatLongDate, formatTimeRange, todayKey } from '../../../../shared/client/src/utils/schedule';
 import { useAuth } from '../../context/AuthContext';
+import ExtraClassModal from './ExtraClassModal';
+import CancelClassDayModal from './CancelClassDayModal';
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -26,6 +29,9 @@ function ManageClassesPage() {
   const [cancellingId, setCancellingId] = useState(null);
   const [confirmCancelId, setConfirmCancelId] = useState(null);
   const [openingAttendanceId, setOpeningAttendanceId] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  // { type: 'extra' | 'cancelDay', classItem } while a dialog is open
+  const [dialog, setDialog] = useState(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -58,6 +64,11 @@ function ManageClassesPage() {
     }
   }
 
+  function handleDialogSaved(message) {
+    setDialog(null);
+    setSuccessMessage(`${message} Enrolled students have been notified.`);
+  }
+
   async function handleMarkAttendance(classId) {
     setOpeningAttendanceId(classId);
     setErrorMessage('');
@@ -79,8 +90,8 @@ function ManageClassesPage() {
             <h1>{isAdmin ? 'Manage Classes' : 'My Classes'}</h1>
             <p className="muted">
               {isAdmin
-                ? 'Every class on the platform, across every Tutor - edit details or cancel a session series.'
-                : 'Manage the classes you teach - edit details or cancel a session series.'}
+                ? 'Every class on the platform, across every Tutor - edit details, add extra classes or cancel a date.'
+                : 'Manage the classes you teach - edit details, add extra classes or cancel a date.'}
             </p>
           </div>
           {isAdmin && (
@@ -91,6 +102,7 @@ function ManageClassesPage() {
         </div>
 
         <Alert type="error" message={errorMessage} />
+        <Alert type="success" message={successMessage} />
 
         {isLoading ? (
           <LoadingSpinner label="Loading your classes..." />
@@ -126,7 +138,13 @@ function ManageClassesPage() {
                       </td>
                       {isAdmin && <td>{classItem.tutorName}</td>}
                       <td>
-                        {classItem.dayOfWeek}, {classItem.startTime}-{classItem.endTime}
+                        {classItem.dayOfWeek}
+                        <div className="order-line-sub">
+                          {formatTimeRange(classItem.startTime, classItem.endTime)}
+                          {classItem.startDate && classItem.startDate > todayKey()
+                            ? ` · starts ${formatLongDate(classItem.startDate)}`
+                            : ''}
+                        </div>
                       </td>
                       <td>
                         {classItem.enrolledCount}/{classItem.capacity}
@@ -139,7 +157,7 @@ function ManageClassesPage() {
                       </td>
                       <td>
                         {classItem.status === 'ACTIVE' && (
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          <div className="class-row-actions">
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
@@ -149,7 +167,31 @@ function ManageClassesPage() {
                               <Icon name="calendar" size={14} />{' '}
                               {openingAttendanceId === classItem.id ? 'Opening...' : 'Mark Attendance'}
                             </button>
-                            <Link to={`/courses/manage/${classItem.id}/edit`} className="btn btn-secondary btn-sm">
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setSuccessMessage('');
+                                setDialog({ type: 'extra', classItem });
+                              }}
+                            >
+                              <Icon name="plus" size={14} /> Extra class
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setSuccessMessage('');
+                                setDialog({ type: 'cancelDay', classItem });
+                              }}
+                            >
+                              <Icon name="calendarDays" size={14} /> Cancel a date
+                            </button>
+                            <Link
+                              to={`/courses/manage/${classItem.id}/edit`}
+                              className="btn btn-secondary btn-sm"
+                              aria-label={`Edit ${classItem.subject}`}
+                            >
                               <Icon name="edit" size={14} />
                             </Link>
                             {confirmCancelId === classItem.id ? (
@@ -175,6 +217,8 @@ function ManageClassesPage() {
                                 type="button"
                                 className="btn btn-secondary btn-sm"
                                 onClick={() => setConfirmCancelId(classItem.id)}
+                                aria-label={`Cancel ${classItem.subject} for good`}
+                                title="Cancel the whole class"
                               >
                                 <Icon name="trash" size={14} />
                               </button>
@@ -190,6 +234,13 @@ function ManageClassesPage() {
           </div>
         )}
       </div>
+
+      {dialog && dialog.type === 'extra' && (
+        <ExtraClassModal classItem={dialog.classItem} onClose={() => setDialog(null)} onSaved={handleDialogSaved} />
+      )}
+      {dialog && dialog.type === 'cancelDay' && (
+        <CancelClassDayModal classItem={dialog.classItem} onClose={() => setDialog(null)} onSaved={handleDialogSaved} />
+      )}
     </PortalShell>
   );
 }

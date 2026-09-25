@@ -117,7 +117,7 @@ const listRecentPayments = asyncHandler(async (req, res) => {
 
 const approveBankTransferPayment = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
-  const payment = await service.approveBankTransferPayment(req.user, paymentId);
+  const payment = await service.approveBankTransferPayment(req.user, paymentId, { amount: req.body.amount });
   res.status(200).json({ success: true, message: 'Bank transfer approved.', data: { payment } });
 });
 
@@ -182,24 +182,35 @@ const updateMyBankDetails = asyncHandler(async (req, res) => {
 });
 
 const payTutor = asyncHandler(async (req, res) => {
-  const { tutorId, amount, note, periodLabel } = req.body;
-  const payout = await service.payTutor(req.user, { tutorId, amount, note, periodLabel });
+  const { tutorId, amount, note, periodLabel, method, bankReference, transferDate } = req.body;
+  const payout = await service.payTutor(req.user, {
+    tutorId,
+    amount,
+    note,
+    periodLabel,
+    method,
+    bankReference,
+    transferDate,
+  });
   const outcome = {
-    SENT: `Payout sent to ${payout.tutorName}.`,
-    QUEUED: `Payout for ${payout.tutorName} is queued - export the transfer file to send it.`,
+    SENT: `Payment to ${payout.tutorName} recorded. They have been notified.`,
+    QUEUED: `Payout for ${payout.tutorName} added to the next bank file.`,
     FAILED: `The transfer to ${payout.tutorName} failed: ${payout.failureReason}`,
   };
   res.status(201).json({
     success: true,
-    message: outcome[payout.status] || `Payout recorded for ${payout.tutorName}.`,
+    message: outcome[payout.status] || `Payment to ${payout.tutorName} recorded.`,
     data: { payout },
   });
 });
 
-// How payouts leave this install, so the screen can say so plainly rather
-// than implying money moved when it has not.
-const getPayoutMethodStatus = asyncHandler(async (req, res) => {
-  res.status(200).json({ success: true, data: { method: await service.getPayoutMethodStatus() } });
+const getPayoutOptions = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: { options: await service.getPayoutOptions() } });
+});
+
+const getTutorPayoutAccount = asyncHandler(async (req, res) => {
+  const account = await service.getTutorPayoutAccount(req.user, Number(req.params.tutorId));
+  res.status(200).json({ success: true, data: { account } });
 });
 
 const getPayoutBatch = asyncHandler(async (req, res) => {
@@ -218,12 +229,11 @@ const exportPayoutFile = asyncHandler(async (req, res) => {
 });
 
 const confirmPayoutSettled = asyncHandler(async (req, res) => {
-  const result = await service.confirmPayoutSettled(
-    req.user,
-    Number(req.params.payoutId),
-    req.body.providerReference
-  );
-  res.status(200).json({ success: true, message: 'Payout marked as transferred.', data: { result } });
+  const result = await service.confirmPayoutSettled(req.user, Number(req.params.payoutId), {
+    providerReference: req.body.providerReference,
+    transferDate: req.body.transferDate,
+  });
+  res.status(200).json({ success: true, message: 'Payout marked as paid. The tutor has been notified.', data: { result } });
 });
 
 const markPayoutFailed = asyncHandler(async (req, res) => {
@@ -307,7 +317,8 @@ module.exports = {
   updatePaymentSettings,
   payTutor,
   listTutorPayouts,
-  getPayoutMethodStatus,
+  getPayoutOptions,
+  getTutorPayoutAccount,
   getPayoutBatch,
   exportPayoutFile,
   confirmPayoutSettled,

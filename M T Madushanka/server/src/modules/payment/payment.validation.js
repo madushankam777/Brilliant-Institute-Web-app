@@ -76,6 +76,17 @@ const paymentIdParamRules = [
   param('paymentId').isInt({ min: 1 }).withMessage('Invalid payment id.'),
 ];
 
+// amount = what admin read off the slip (optional - defaults to what the student entered)
+const approveBankTransferRules = [
+  ...paymentIdParamRules,
+  body('amount')
+    .optional({ checkFalsy: true })
+    .isFloat({ gt: 0, max: 10000000 })
+    .withMessage('Enter the amount shown on the bank slip.'),
+];
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 // edit btn - bankReference is optional here since a student may only replace the receipt image
 const editBankTransferRules = [
   ...paymentIdParamRules,
@@ -90,14 +101,35 @@ const editBankTransferRules = [
 
 const payTutorRules = [
   body('tutorId').isInt({ min: 1 }).withMessage('Please select a Tutor.'),
-  body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number.'),
-  body('note').optional({ checkFalsy: true }).trim().isLength({ max: 255 }).withMessage('Note is too long.'),
+  body('amount').isFloat({ gt: 0, max: 10000000 }).withMessage('Amount must be a positive number.'),
+  body('note').optional({ checkFalsy: true }).trim().isLength({ max: 200 }).withMessage('Note is too long.'),
   body('periodLabel')
     .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 40 })
     .withMessage('Period label is too long.'),
+  body('method')
+    .optional({ checkFalsy: true })
+    .isIn(['BANK_TRANSFER', 'BANK_FILE', 'PAYOUT_API'])
+    .withMessage('Choose how this payout is made.'),
+  body('bankReference')
+    .if(body('method').equals('BANK_TRANSFER'))
+    .trim()
+    .isLength({ min: 3, max: 60 })
+    .withMessage('Enter the reference number the bank gave for this transfer.')
+    .bail()
+    .matches(BANK_REFERENCE_REGEX)
+    .withMessage('Reference can only contain letters, numbers, spaces, hyphens, and slashes.'),
+  body('transferDate')
+    .optional({ checkFalsy: true })
+    .matches(DATE_REGEX)
+    .withMessage('Pick the date of the transfer.')
+    .bail()
+    .isISO8601({ strict: true })
+    .withMessage('Pick the date of the transfer.'),
 ];
+
+const tutorIdParamRules = [param('tutorId').isInt({ min: 1 }).withMessage('Invalid tutor id.')];
 
 // tutor's own payout bank details - every field optional so a tutor can
 // save them one at a time, but whatever is sent must look like real data
@@ -150,10 +182,19 @@ const payoutIdParamRules = [
 const confirmPayoutRules = [
   param('payoutId').isInt({ min: 1 }).withMessage('Invalid payout id.'),
   body('providerReference')
-    .optional({ checkFalsy: true })
     .trim()
-    .isLength({ max: 100 })
-    .withMessage('That reference is too long.'),
+    .isLength({ min: 3, max: 60 })
+    .withMessage('Enter the reference number the bank gave for this transfer.')
+    .bail()
+    .matches(BANK_REFERENCE_REGEX)
+    .withMessage('Reference can only contain letters, numbers, spaces, hyphens, and slashes.'),
+  body('transferDate')
+    .optional({ checkFalsy: true })
+    .matches(DATE_REGEX)
+    .withMessage('Pick the date of the transfer.')
+    .bail()
+    .isISO8601({ strict: true })
+    .withMessage('Pick the date of the transfer.'),
 ];
 
 const failPayoutRules = [
@@ -169,6 +210,8 @@ const failPayoutRules = [
 
 module.exports = {
   payoutIdParamRules,
+  approveBankTransferRules,
+  tutorIdParamRules,
   confirmPayoutRules,
   failPayoutRules,
   makePaymentRules,

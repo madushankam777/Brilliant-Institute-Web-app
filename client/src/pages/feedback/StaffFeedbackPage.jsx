@@ -1,5 +1,5 @@
 // Tutor/Admin: view and respond to tickets addressed to them (FBC-03, FBC-04)
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchAllTickets, replyToTicket, resolveTicket } from '../../api/feedbackApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
@@ -45,6 +45,15 @@ function StaffFeedbackPage() {
   const [isReplying, setIsReplying] = useState(false);
   const [actionError, setActionError] = useState('');
   const [isResolving, setIsResolving] = useState(false);
+  const detailRef = useRef(null);
+
+  // on a phone the conversation sits below the list, so bring it into view
+  function openTicket(ticketId) {
+    setSelectedId(ticketId);
+    if (detailRef.current && window.innerWidth < 1024) {
+      detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -104,12 +113,13 @@ function StaffFeedbackPage() {
           <p className="muted">Conversations addressed to you - reply like a chat, and resolve once handled.</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
+        <div className="choice-group" style={{ marginBottom: '18px' }}>
           {FILTERS.map((item) => (
             <button
               key={item.key}
               type="button"
-              className={`btn btn-sm ${filter === item.key ? 'btn-primary' : 'btn-secondary'}`}
+              className={`choice-pill${filter === item.key ? ' is-checked' : ''}`}
+              aria-pressed={filter === item.key}
               onClick={() => {
                 setFilter(item.key);
                 setSelectedId(null);
@@ -133,7 +143,7 @@ function StaffFeedbackPage() {
                 <button
                   key={ticket.id}
                   type="button"
-                  onClick={() => setSelectedId(ticket.id)}
+                  onClick={() => openTicket(ticket.id)}
                   className="card"
                   style={{
                     textAlign: 'left',
@@ -153,7 +163,7 @@ function StaffFeedbackPage() {
               ))}
             </div>
 
-            <div className="card">
+            <div className="card" ref={detailRef} style={{ scrollMarginTop: '84px' }}>
               {!selectedTicket ? (
                 <p className="muted">Select a ticket to view its details.</p>
               ) : (
@@ -217,19 +227,9 @@ function StaffFeedbackPage() {
                           style={{ minHeight: '90px' }}
                         />
                       </div>
-                      <div className="flex-between">
-                        <button type="submit" className="btn btn-primary" disabled={isReplying || !replyText.trim()}>
-                          {isReplying ? 'Sending...' : 'Send Reply'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          disabled={isResolving}
-                          onClick={handleResolve}
-                        >
-                          {isResolving ? 'Resolving...' : 'Mark Problem Solved'}
-                        </button>
-                      </div>
+                      <button type="submit" className="btn btn-primary" disabled={isReplying || !replyText.trim()}>
+                        {isReplying ? 'Sending...' : 'Send Reply'}
+                      </button>
                     </form>
                   )}
                 </>

@@ -1,5 +1,5 @@
-// Admin: dashboard overview (ADM-01) - user/class/revenue/complaint
-// counts, a revenue trend line, and a live feed of recent audit events.
+// Admin: operations dashboard - key counts, revenue by period, recent payments
+// and a live feed of audit events.
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchDashboardStats } from '../../api/adminApi';
@@ -10,6 +10,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import StatCard from '../../../../shared/client/src/components/common/StatCard';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import RevenueCard from './RevenueCard';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -17,61 +18,44 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(amount);
 }
 
-function monthLabel(yyyyMm) {
-  const [year, month] = yyyyMm.split('-');
-  return new Date(Number(year), Number(month) - 1, 1).toLocaleString('en-US', { month: 'short' });
+function formatDateTime(value) {
+  if (!value) return '-';
+  return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
-// Small dependency-free line chart - consistent with this codebase's
-// approach of hand-rolled SVG (see Icon.jsx) instead of a charting library.
-function RevenueTrendChart({ points }) {
-  if (points.length === 0) {
-    return <p className="muted">No revenue recorded yet.</p>;
-  }
-  const width = 600;
-  const height = 180;
-  const padding = 24;
-  const maxValue = Math.max(...points.map((p) => p.total), 1);
-  const stepX = (width - padding * 2) / Math.max(points.length - 1, 1);
-
-  const coords = points.map((point, index) => ({
-    x: padding + index * stepX,
-    y: height - padding - (point.total / maxValue) * (height - padding * 2),
-    ...point,
-  }));
-  const path = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x},${c.y}`).join(' ');
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="Revenue trend over the last 6 months">
-      <path d={path} fill="none" stroke="var(--color-primary)" strokeWidth="2.5" />
-      {coords.map((c) => (
-        <circle key={c.month} cx={c.x} cy={c.y} r="4" fill="var(--color-primary)" />
-      ))}
-      {coords.map((c) => (
-        <text key={`${c.month}-label`} x={c.x} y={height - 4} fontSize="11" textAnchor="middle" fill="var(--color-muted)">
-          {monthLabel(c.month)}
-        </text>
-      ))}
-    </svg>
-  );
-}
+const ACTIVITY_LABELS = {
+  USER_REGISTERED: 'New user registered',
+  LOGIN_SUCCESS: 'Login',
+  PAYMENT_SUCCESSFUL: 'Payment received',
+  BANK_TRANSFER_SUBMITTED: 'Bank slip submitted',
+  BANK_TRANSFER_APPROVED: 'Bank slip approved',
+  BANK_TRANSFER_REJECTED: 'Bank slip rejected',
+  CLASS_CREATED: 'Class created',
+  CLASS_UPDATED: 'Class updated',
+  CLASS_CANCELLED: 'Class cancelled',
+  CLASS_ENROLLED: 'New enrolment',
+  FEEDBACK_SUBMITTED: 'New feedback submitted',
+  FEEDBACK_RESOLVED: 'Feedback resolved',
+  ANNOUNCEMENT_PUBLISHED: 'Announcement published',
+  USER_SUSPENDED: 'User suspended',
+  USER_ACTIVATED: 'User reactivated',
+  USER_CREATED_BY_ADMIN: 'Account created by admin',
+  REMINDERS_SENT: 'Reminders sent',
+  REMINDER_SCHEDULED: 'Reminder scheduled',
+  TUTOR_PAID: 'Tutor paid',
+  PAYOUT_SETTLED: 'Payout confirmed',
+  REREGISTRATION_KEYS_ISSUED: 'Re-registration keys issued',
+  REREGISTRATION_COMPLETED: 'Student re-registered',
+};
 
 function activityLabel(entry) {
-  const map = {
-    USER_REGISTERED: 'New user registered',
-    LOGIN_SUCCESS: 'Login',
-    PAYMENT_SUCCESSFUL: 'Payment received',
-    CLASS_CREATED: 'Class created',
-    CLASS_ENROLLED: 'New enrolment',
-    FEEDBACK_SUBMITTED: 'New feedback submitted',
-    FEEDBACK_RESOLVED: 'Feedback resolved',
-    ANNOUNCEMENT_PUBLISHED: 'Announcement published',
-    USER_SUSPENDED: 'User suspended',
-    USER_ACTIVATED: 'User reactivated',
-    USER_CREATED_BY_ADMIN: 'Account created by admin',
-    REMINDERS_SENT: 'Reminders sent',
-  };
-  return map[entry.action] || entry.action;
+  return ACTIVITY_LABELS[entry.action] || entry.action.replace(/_/g, ' ').toLowerCase();
 }
 
 const PAYMENT_STATUS_BADGE = {
@@ -85,6 +69,7 @@ const PAYMENT_METHOD_LABEL = {
   EZ_CASH: 'eZ Cash',
   MCASH: 'mCash',
   BANK_TRANSFER: 'Bank Transfer',
+  ONLINE: 'Online',
 };
 
 function AdminDashboardPage() {
@@ -100,8 +85,7 @@ function AdminDashboardPage() {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const data = await fetchDashboardStats();
-      setStats(data);
+      setStats(await fetchDashboardStats());
     } catch (error) {
       setErrorMessage(error.message);
     } finally {
@@ -136,11 +120,14 @@ function AdminDashboardPage() {
         <div className="flex-between page-header">
           <div>
             <h1>Operations Dashboard</h1>
-            <p className="muted">Brilliant Institute overall system health.</p>
+            <p className="muted">Brilliant Institute at a glance.</p>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <Link to="/admin/users" className="btn btn-secondary">
               <Icon name="users" size={16} /> Add User
+            </Link>
+            <Link to="/courses/manage/new" className="btn btn-secondary">
+              <Icon name="plus" size={16} /> New Class
             </Link>
             <Link to="/admin/announcements" className="btn btn-primary">
               <Icon name="megaphone" size={16} /> Create Announcement
@@ -159,7 +146,7 @@ function AdminDashboardPage() {
               <StatCard icon="book" label="Active Classes" value={stats.activeClasses} to="/courses/manage" />
               <StatCard
                 icon="wallet"
-                label="Monthly Revenue"
+                label="Revenue This Month"
                 value={formatCurrency(stats.monthlyRevenue)}
                 tone="success"
                 to="/admin/payments/verify"
@@ -173,59 +160,22 @@ function AdminDashboardPage() {
               />
             </div>
 
-            <div className="checkout-grid">
-              <div className="card">
-                <h2>Revenue Trend (6 Months)</h2>
-                <RevenueTrendChart points={stats.revenueTrend} />
-              </div>
-
-              <div className="card">
-                <h2>Live Audit Activity</h2>
-                {stats.recentActivity.length === 0 ? (
-                  <p className="muted">No activity recorded yet.</p>
-                ) : (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                      maxHeight: '520px',
-                      overflowY: 'auto',
-                      paddingRight: '4px',
-                    }}
-                  >
-                    {stats.recentActivity.map((entry) => (
-                      <div key={entry.id} style={{ borderBottom: '1px solid var(--color-border-soft)', paddingBottom: '10px' }}>
-                        <div className="flex-between">
-                          <span className="badge badge-neutral">{activityLabel(entry)}</span>
-                          <span className="muted" style={{ fontSize: '0.78rem' }}>{entry.createdAt}</span>
-                        </div>
-                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>By {entry.actorName}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <RevenueCard />
 
             <div className="card">
               <div className="flex-between">
-                <h2>Recent Payments</h2>
+                <h2 style={{ margin: 0 }}>Recent Payments</h2>
                 <Link to="/admin/payments/verify" className="btn btn-secondary btn-sm">
-                  Review Pending Bank Transfers
+                  Verify Bank Slips
                 </Link>
               </div>
-              <p className="muted" style={{ marginTop: '-8px', fontSize: '0.85rem' }}>
-                Every payment behind the Monthly Revenue figure above - card, eZ Cash, mCash, and bank
-                transfer, whatever its outcome.
-              </p>
               <Alert type="error" message={paymentsError} />
               {isLoadingPayments ? (
                 <LoadingSpinner label="Loading recent payments..." />
               ) : recentPayments.length === 0 ? (
-                <p className="muted">No payments recorded yet.</p>
+                <p className="muted" style={{ marginTop: '12px' }}>No payments recorded yet.</p>
               ) : (
-                <div className="table-scroll">
+                <div className="table-scroll" style={{ marginTop: '12px' }}>
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -249,11 +199,30 @@ function AdminDashboardPage() {
                               {payment.status}
                             </span>
                           </td>
-                          <td>{payment.paidAt || payment.createdAt}</td>
+                          <td>{formatDateTime(payment.paidAt || payment.createdAt)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+
+            <div className="card">
+              <h2>Live Audit Activity</h2>
+              {stats.recentActivity.length === 0 ? (
+                <p className="muted">No activity recorded yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {stats.recentActivity.map((entry) => (
+                    <div key={entry.id} style={{ borderBottom: '1px solid var(--color-border-soft)', paddingBottom: '10px' }}>
+                      <div className="flex-between">
+                        <span className="badge badge-neutral">{activityLabel(entry)}</span>
+                        <span className="muted" style={{ fontSize: '0.78rem' }}>{formatDateTime(entry.createdAt)}</span>
+                      </div>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>By {entry.actorName}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
