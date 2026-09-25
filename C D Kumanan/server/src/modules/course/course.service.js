@@ -3,6 +3,7 @@ const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { toSafeClass, toSafeTutorProfile } = require('../../../../../shared/server/src/utils/sanitize');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
+const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const repository = require('./course.repository');
 const holidayCalendar = require('./holidayCalendar');
 const {
@@ -362,6 +363,18 @@ async function listMyCourses(studentUser) {
   }));
 }
 
+// About page numbers; grades come back in school order
+async function getPublicOverview() {
+  const { counts, subjects, grades } = await repository.getPublicOverview();
+  return {
+    classCount: Number(counts.class_count),
+    tutorCount: Number(counts.tutor_count),
+    studentCount: Number(counts.student_count),
+    subjects,
+    grades: GRADES.filter((grade) => grades.includes(grade)),
+  };
+}
+
 // --- Cancelled days and extra classes ---
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -582,6 +595,7 @@ async function getTimetable(viewer, userId) {
 }
 
 module.exports = {
+  getPublicOverview,
   listClassEvents,
   cancelClassDay,
   addExtraClass,

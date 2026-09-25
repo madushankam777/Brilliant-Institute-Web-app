@@ -12,7 +12,6 @@ function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [fieldError, setFieldError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [devOnlyResetToken, setDevOnlyResetToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event) {
@@ -31,12 +30,8 @@ function ForgotPasswordPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await requestPasswordReset(email);
+      await requestPasswordReset(email);
       setSubmitted(true);
-      if (result.data && result.data.devOnlyResetToken) {
-        // dev mode only - no real email service yet
-        setDevOnlyResetToken(result.data.devOnlyResetToken);
-      }
     } catch (error) {
       const details = Array.isArray(error.details) ? error.details : [];
       const emailDetail = details.find((d) => d.field === 'email');
@@ -56,19 +51,10 @@ function ForgotPasswordPage() {
           </div>
           <h1>Check Your Email</h1>
           <p className="muted">
-            We&apos;ve sent a password reset link to your email address. Please check your inbox
-            and follow the instructions.
+            If an account exists for that email, we&apos;ve sent it a password reset link. It works
+            once and expires in 30 minutes. No email? Contact the office and they can give you a
+            reset link in person.
           </p>
-
-          {devOnlyResetToken && (
-            <div className="alert alert-info" style={{ textAlign: 'left' }}>
-              <span>
-                <strong>Development mode only:</strong> no email gateway is configured yet, so here
-                is your reset token directly -{' '}
-                <Link to={`/reset-password?token=${devOnlyResetToken}`}>reset your password</Link>.
-              </span>
-            </div>
-          )}
 
           <Link to="/login" className="btn btn-primary btn-block" style={{ marginTop: '18px' }}>
             Back to Login

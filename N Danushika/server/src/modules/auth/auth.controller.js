@@ -83,7 +83,9 @@ const removeProfilePicture = asyncHandler(async (req, res) => {
 // PUT /api/auth/password - change the logged-in user's own password.
 const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  await authService.changePassword(req.user.id, { currentPassword, newPassword });
+  const updatedUser = await authService.changePassword(req.user.id, { currentPassword, newPassword });
+  // keep this browser signed in; other sessions end with the old password
+  authService.refreshSession(res, updatedUser);
   res.status(200).json({ success: true, message: 'Password changed successfully.' });
 });
 
@@ -96,13 +98,11 @@ const getSession = asyncHandler(async (req, res) => {
 // POST /api/auth/forgot-password - send a password reset link.
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  const result = await authService.requestPasswordReset(email);
+  await authService.requestPasswordReset(email);
+  // same answer whether or not the email exists, and never the link itself
   res.status(200).json({
     success: true,
-    message:
-      'If an account exists for that email, a password reset link has been sent.',
-    // devOnlyResetToken only exists outside production - see auth.service.js.
-    data: result,
+    message: 'If an account exists for that email, a password reset link has been sent.',
   });
 });
 

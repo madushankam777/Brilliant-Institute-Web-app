@@ -35,6 +35,9 @@ const LIVE_PAYMENT_METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
+// Neither PayHere nor the demo simulator is on - bank transfer only.
+const BANK_ONLY_METHODS = [{ value: 'BANK_TRANSFER', label: 'Bank Transfer' }];
+
 // wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
@@ -102,7 +105,7 @@ function FeeBalancePage() {
 
   const [activeEnrollment, setActiveEnrollment] = useState(null);
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('CARD');
+  const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER');
   const [cardDetails, setCardDetails] = useState(emptyCardDetails);
   const [walletPhone, setWalletPhone] = useState('');
   const [bankReference, setBankReference] = useState('');
@@ -119,7 +122,11 @@ function FeeBalancePage() {
   // Set by the server: true once PayHere credentials are in place, false
   // while the project is running on the built-in simulator.
   const onlinePaymentsEnabled = Boolean(paymentSettings && paymentSettings.onlinePaymentsEnabled);
-  const methodTabs = onlinePaymentsEnabled ? LIVE_PAYMENT_METHODS : PAYMENT_METHODS;
+  const simulatorEnabled = Boolean(paymentSettings && paymentSettings.simulatorEnabled);
+  let methodTabs = BANK_ONLY_METHODS;
+  if (onlinePaymentsEnabled) methodTabs = LIVE_PAYMENT_METHODS;
+  else if (simulatorEnabled) methodTabs = PAYMENT_METHODS;
+  const defaultMethod = methodTabs[0].value;
 
   const loadBalances = useCallback(async () => {
     setIsLoading(true);
@@ -151,20 +158,16 @@ function FeeBalancePage() {
       });
   }, [loadBalances]);
 
-  // Settings arrive a moment after the balances do, so a checkout that was
-  // auto-opened may have defaulted to the simulator's Card tab. Once we know
-  // the real gateway is live, move it onto the online option.
+  // Settings arrive a moment after the balances do - keep the chosen method
+  // on one of the tabs that are actually available.
   useEffect(() => {
-    if (!onlinePaymentsEnabled) return;
-    setPaymentMethod((current) =>
-      current === 'CARD' || current === 'EZ_CASH' || current === 'MCASH' ? 'ONLINE' : current
-    );
-  }, [onlinePaymentsEnabled]);
+    setPaymentMethod((current) => (methodTabs.some((tab) => tab.value === current) ? current : defaultMethod));
+  }, [methodTabs, defaultMethod]);
 
   function startPayment(enrollment) {
     setActiveEnrollment(enrollment);
     setAmount(String(enrollment.balance));
-    setPaymentMethod(onlinePaymentsEnabled ? 'ONLINE' : 'CARD');
+    setPaymentMethod(defaultMethod);
     setCardDetails(emptyCardDetails);
     setWalletPhone('');
     setBankReference('');

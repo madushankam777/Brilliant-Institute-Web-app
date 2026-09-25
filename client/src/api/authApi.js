@@ -87,7 +87,7 @@ export async function changeMyPassword({ currentPassword, newPassword }) {
 /** CREATE - request a password-reset link (REG-05). */
 export async function requestPasswordReset(email) {
   const response = await httpClient.post('/auth/forgot-password', { email });
-  return response.data; // { success, message, data: { devOnlyResetToken? } }
+  return response.data; // { success, message }
 }
 
 /** UPDATE - complete a password reset using the emailed token (REG-05). */

@@ -497,7 +497,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section id="about" className="section section-bg-soft">
+      <section id="features" className="section section-bg-soft">
         <div className="container">
           <div className="section-heading">
             <span className="eyebrow">Tailored for Tuitions</span>
@@ -545,25 +545,7 @@ function HomePage() {
         </div>
       </section>
 
-      <Footer
-        linkGroups={[
-          {
-            heading: 'Account',
-            links: [
-              { label: 'Log in', to: '/login' },
-              { label: 'Register', to: '/register' },
-              { label: 'Forgot password', to: '/forgot-password' },
-            ],
-          },
-          {
-            heading: 'Platform',
-            links: [
-              { label: 'Attendance', to: null },
-              { label: 'Fee Payments', to: null },
-            ],
-          },
-        ]}
-      />
+      <Footer />
     </>
   );
 }

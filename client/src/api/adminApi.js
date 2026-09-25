@@ -201,3 +201,9 @@ export async function redeemReregistrationKey(keyCode) {
   const response = await httpClient.post('/reregistration/redeem', { keyCode });
   return response.data.data.result;
 }
+
+// one-time password reset link for a user - { resetPath, expiresInMinutes }
+export async function createPasswordResetLink(userId) {
+  const response = await httpClient.post(`/admin/users/${userId}/reset-link`);
+  return response.data.data;
+}

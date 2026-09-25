@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -8,11 +7,14 @@ const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { toSafeUser } = require('../../../../../shared/server/src/utils/sanitize');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { ROLES, SESSION_COOKIE_NAME } = require('../../../../../shared/server/src/config/roles');
-const { UPLOADS_ROOT_DIR } = require('../../../../../shared/server/src/middleware/upload');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
+const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
+const { passwordVersion } = require('../../../../../shared/server/src/utils/sessionToken');
 const repository = require('./auth.repository');
 
-const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
+// Same cost as real hashes, so a login for an unknown email takes as long
+// as one for a real account (no timing hint about which emails exist).
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', config.auth.bcryptSaltRounds);
 
 // ST0000001, ST0000002, ... - built from the row's own auto-increment id,
 // so it's only ever known once the INSERT has actually happened.
@@ -39,7 +41,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
       );
     }
     consumedKey = await repository.findValidTutorKeyByCode(normalizedKey);
-    if (!consumedKey) {
+    if (!consumedKey || !(await repository.claimTutorKey(consumedKey.id))) {
       throw ApiError.badRequest(
         'This enrollment key is invalid, already used, or has been revoked. Please contact the office.'
       );
@@ -55,14 +57,21 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
   }
 
   const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
-  const userId = await repository.createUser({
-    fullName,
-    email,
-    passwordHash,
-    phone,
-    role: targetRole,
-    grade: normalizedGrade,
-  });
+  let userId;
+  try {
+    userId = await repository.createUser({
+      fullName,
+      email,
+      passwordHash,
+      phone,
+      role: targetRole,
+      grade: normalizedGrade,
+    });
+  } catch (error) {
+    // give the key back if the account could not be created
+    if (consumedKey) await repository.releaseTutorKey(consumedKey.id);
+    throw error;
+  }
 
   if (targetRole === ROLES.STUDENT_PARENT) {
     await repository.setStudentCode(userId, buildStudentCode(userId));
@@ -84,12 +93,13 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
   return toSafeUser(user);
 }
 
-// Create a signed login token for this user.
+// Create a signed login token for this user. `pwv` ties the session to the
+// current password, so changing or resetting it logs out every other session.
 function signSessionToken(user) {
   return jwt.sign(
-    { sub: user.id, role: user.role, email: user.email },
+    { sub: user.id, role: user.role, email: user.email, pwv: passwordVersion(user.password_hash) },
     config.auth.jwtSecret,
-    { expiresIn: config.auth.jwtExpiresIn }
+    { expiresIn: config.auth.jwtExpiresIn, algorithm: 'HS256' }
   );
 }
 
@@ -170,6 +180,15 @@ function logout(res) {
   clearSessionCookie(res);
 }
 
+// Deletes an old upload, but never anything outside the uploads folder.
+function removeUploadedFile(publicPath) {
+  try {
+    fs.unlink(resolveUploadPath(publicPath), () => {});
+  } catch {
+    // path was outside the uploads folder - ignore it
+  }
+}
+
 // Get the logged-in user's own profile.
 async function getProfile(userId) {
   const user = await repository.findUserById(userId);
@@ -195,11 +214,7 @@ async function updateProfilePicture(userId, publicPath) {
   const user = await repository.updateProfilePicture(userId, publicPath);
 
   if (existing && existing.profile_picture_path && existing.profile_picture_path !== publicPath) {
-    const oldAbsolutePath = path.join(
-      UPLOADS_ROOT_DIR,
-      existing.profile_picture_path.replace(/^\/uploads\//, '')
-    );
-    fs.unlink(oldAbsolutePath, () => {});
+    removeUploadedFile(existing.profile_picture_path);
   }
 
   await recordAuditEvent({
@@ -220,12 +235,7 @@ async function removeProfilePicture(userId) {
   }
 
   const user = await repository.updateProfilePicture(userId, null);
-
-  const oldAbsolutePath = path.join(
-    UPLOADS_ROOT_DIR,
-    existing.profile_picture_path.replace(/^\/uploads\//, '')
-  );
-  fs.unlink(oldAbsolutePath, () => {});
+  removeUploadedFile(existing.profile_picture_path);
 
   await recordAuditEvent({
     actorId: userId,
@@ -238,6 +248,8 @@ async function removeProfilePicture(userId) {
 }
 
 // Change the logged-in user's own password (must know the current one).
+// Returns the user row with the new hash so the caller can re-issue this
+// browser's session (every other session stops working).
 async function changePassword(userId, { currentPassword, newPassword }) {
   const user = await repository.findUserById(userId);
   if (!user) {
@@ -251,12 +263,19 @@ async function changePassword(userId, { currentPassword, newPassword }) {
 
   const newHash = await bcrypt.hash(newPassword, config.auth.bcryptSaltRounds);
   await repository.updatePasswordHash(userId, newHash);
+  await repository.invalidateResetTokensForUser(userId);
   await recordAuditEvent({
     actorId: userId,
     action: 'PASSWORD_CHANGED',
     entityType: 'user',
     entityId: userId,
   });
+  return { ...user, password_hash: newHash };
+}
+
+// Re-issue the session cookie (after a password change)
+function refreshSession(res, userRow) {
+  attachSessionCookie(res, signSessionToken(userRow));
 }
 
 const RESET_TOKEN_BYTES = 32;
@@ -269,12 +288,8 @@ function hashResetToken(rawToken) {
 async function requestPasswordReset(email) {
   const user = await repository.findUserByEmail(email);
 
-  if (user) {
-    const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString('hex');
-    const tokenHash = hashResetToken(rawToken);
-    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
-
-    await repository.createPasswordResetToken(user.id, tokenHash, expiresAt);
+  if (user && user.status === 'ACTIVE') {
+    const rawToken = await createResetToken(user.id);
     await recordAuditEvent({
       actorId: user.id,
       action: 'PASSWORD_RESET_REQUESTED',
@@ -282,15 +297,23 @@ async function requestPasswordReset(email) {
       entityId: user.id,
     });
 
+    // The link must only ever reach the account owner, never this response.
+    // No email service is set up yet, so in development it goes to the
+    // server console; otherwise the office issues a link (Admin > user page).
     if (!config.isProduction) {
-      // Replace this with a real email/SMS send once a provider is chosen.
       // eslint-disable-next-line no-console
-      console.log(`[dev-only] Password reset token for ${email}: ${rawToken}`);
-      return { devOnlyResetToken: rawToken };
+      console.log(`[dev-only] Password reset link for ${email}: /reset-password?token=${rawToken}`);
     }
   }
+}
 
-  return {};
+// one-time reset token; only its hash is stored
+async function createResetToken(userId) {
+  const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString('hex');
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+  await repository.invalidateResetTokensForUser(userId);
+  await repository.createPasswordResetToken(userId, hashResetToken(rawToken), expiresAt);
+  return rawToken;
 }
 
 // Finish the "forgot password" flow by using the token to set a new password.
@@ -305,6 +328,9 @@ async function resetPasswordWithToken(rawToken, newPassword) {
   const newHash = await bcrypt.hash(newPassword, config.auth.bcryptSaltRounds);
   await repository.updatePasswordHash(resetToken.user_id, newHash);
   await repository.markResetTokenUsed(resetToken.id);
+  await repository.invalidateResetTokensForUser(resetToken.user_id);
+  // a new password also lifts any lockout from earlier failed logins
+  await repository.resetFailedLoginCounter(resetToken.user_id);
 
   await recordAuditEvent({
     actorId: resetToken.user_id,
@@ -323,6 +349,9 @@ module.exports = {
   updateProfilePicture,
   removeProfilePicture,
   changePassword,
+  refreshSession,
   requestPasswordReset,
+  createResetToken,
+  RESET_TOKEN_TTL_MINUTES,
   resetPasswordWithToken,
 };

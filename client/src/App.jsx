@@ -1,4 +1,5 @@
-import { Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/layout/Navbar';
 import ProtectedRoute from './components/layout/ProtectedRoute';
@@ -6,6 +7,9 @@ import NotFoundPage from '../../shared/client/src/pages/NotFoundPage';
 import CookieConsentBanner from '../../shared/client/src/components/common/CookieConsentBanner';
 
 import HomePage from './pages/HomePage';
+import AboutPage from './pages/public/AboutPage';
+import ContactPage from './pages/public/ContactPage';
+import LegalPage from './pages/public/LegalPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
@@ -47,10 +51,21 @@ import AnnouncementsPage from './pages/admin/AnnouncementsPage';
 import ReregistrationPage from './pages/admin/ReregistrationPage';
 import TimetablesPage from './pages/admin/TimetablesPage';
 import ReregisterPage from './pages/auth/ReregisterPage';
+import EnquiriesPage from './pages/admin/EnquiriesPage';
+
+// a new page starts at the top (links to #sections are left alone)
+function ScrollToTop() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (!hash) window.scrollTo(0, 0);
+  }, [pathname, hash]);
+  return null;
+}
 
 function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Navbar />
       <CookieConsentBanner />
       <main className="app-content">
@@ -61,6 +76,10 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy" element={<LegalPage type="privacy" />} />
+          <Route path="/terms" element={<LegalPage type="terms" />} />
 
           {/* Any logged-in user */}
           <Route element={<ProtectedRoute />}>
@@ -118,6 +137,7 @@ function App() {
             <Route path="/admin/payments/settings" element={<PaymentSettingsPage />} />
             <Route path="/admin/announcements" element={<AnnouncementsPage />} />
             <Route path="/admin/reregistration" element={<ReregistrationPage />} />
+            <Route path="/admin/enquiries" element={<EnquiriesPage />} />
           </Route>
 
           {/* Catch-all */}

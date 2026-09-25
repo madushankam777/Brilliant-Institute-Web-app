@@ -21,6 +21,9 @@ const {
 
 const router = express.Router();
 
+// public - no login needed (About page)
+router.get('/overview', controller.getPublicOverview);
+
 router.use(authenticate);
 
 // --- Public holidays (Google Calendar), for every calendar on the site ---

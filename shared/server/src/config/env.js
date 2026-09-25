@@ -105,7 +105,7 @@ const config = {
     authWindowMinutes: toInt(process.env.AUTH_RATE_LIMIT_WINDOW_MINUTES, 15),
     authMaxAttempts: toInt(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS, 8),
     apiWindowMinutes: toInt(process.env.API_RATE_LIMIT_WINDOW_MINUTES, 15),
-    apiMaxRequests: toInt(process.env.API_RATE_LIMIT_MAX_REQUESTS, 300),
+    apiMaxRequests: toInt(process.env.API_RATE_LIMIT_MAX_REQUESTS, 1500),
   },
 
   business: {
@@ -123,6 +123,10 @@ const config = {
   paymentGateway: {
     providerName: process.env.PAYMENT_GATEWAY_PROVIDER_NAME || 'mock-gateway',
     apiKey: process.env.PAYMENT_GATEWAY_API_KEY || '',
+    // The built-in card simulator marks fees as paid without any money
+    // moving, so it is off unless switched on for a demo - and never in
+    // production. Real online payments use PayHere.
+    simulatorAllowed: process.env.ALLOW_PAYMENT_SIMULATOR === 'true' && process.env.NODE_ENV !== 'production',
   },
 
   // PayHere - the live card / eZ Cash / mCash gateway. When merchantId and

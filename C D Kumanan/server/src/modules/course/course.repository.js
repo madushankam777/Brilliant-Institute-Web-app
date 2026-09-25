@@ -226,6 +226,22 @@ async function findConflictingTutorClass({ tutorId, dayOfWeek, startTime, endTim
   return rows[0] || null;
 }
 
+// Public numbers for the About page - counts only, no personal details.
+async function getPublicOverview() {
+  const [[counts]] = await pool.execute(
+    `SELECT
+       (SELECT COUNT(*) FROM classes WHERE status = 'ACTIVE') AS class_count,
+       (SELECT COUNT(DISTINCT tutor_id) FROM classes WHERE status = 'ACTIVE') AS tutor_count,
+       (SELECT COUNT(*) FROM users WHERE role = 'STUDENT_PARENT' AND status = 'ACTIVE') AS student_count`
+  );
+  const [subjects] = await pool.execute(
+    `SELECT DISTINCT subject_area FROM classes
+     WHERE status = 'ACTIVE' AND subject_area IS NOT NULL AND subject_area <> '' ORDER BY subject_area`
+  );
+  const [grades] = await pool.execute(`SELECT DISTINCT level FROM classes WHERE status = 'ACTIVE'`);
+  return { counts, subjects: subjects.map((row) => row.subject_area), grades: grades.map((row) => row.level) };
+}
+
 // --- Cancelled days and extra classes (class_events) ---
 
 const EVENT_SELECT = `
@@ -429,6 +445,7 @@ module.exports = {
   createNotification,
   findConflictingVenueClass,
   findConflictingTutorClass,
+  getPublicOverview,
   listClassEvents,
   findClassEvent,
   findCancelledDay,

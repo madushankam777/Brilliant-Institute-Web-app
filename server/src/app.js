@@ -18,6 +18,7 @@ const paymentRoutes = require('../../M T Madushanka/server/src/modules/payment/p
 const paymentController = require('../../M T Madushanka/server/src/modules/payment/payment.controller');
 const courseRoutes = require('../../C D Kumanan/server/src/modules/course/course.routes');
 const feedbackRoutes = require('../../H A S Hapuarachchi/server/src/modules/feedback/feedback.routes');
+const contactRoutes = require('../../H A S Hapuarachchi/server/src/modules/feedback/contact.routes');
 const adminRoutes = require('../../S Vithushan/server/src/modules/admin/admin.routes');
 
 const app = express();
@@ -39,7 +40,8 @@ app.use(
       ) {
         return callback(null, true);
       }
-      return callback(new Error('Not allowed by CORS'));
+      // no CORS headers - the browser blocks the page from reading the reply
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -56,7 +58,7 @@ app.use(
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     next();
   },
-  express.static(path.join(UPLOADS_ROOT_DIR, 'profile-pictures'))
+  express.static(path.join(UPLOADS_ROOT_DIR, 'profile-pictures'), { dotfiles: 'deny', index: false })
 );
 
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
@@ -84,6 +86,7 @@ app.use('/api/attendance', attendanceRoutes); // Attendance (M T Madushanka)
 app.use('/api/payments', paymentRoutes); // Payments (M T Madushanka)
 app.use('/api/courses', courseRoutes); // Course Management (C D Kumanan)
 app.use('/api/feedback', feedbackRoutes); // Feedback & Complaint (H A S Hapuarachchi)
+app.use('/api/contact', contactRoutes); // Contact Us form + Admin inbox (H A S Hapuarachchi)
 app.use('/api', adminRoutes); // Admin, Notifications & Announcements (S Vithushan) - /api/admin/* + /api/announcements
 
 app.use(notFoundHandler);

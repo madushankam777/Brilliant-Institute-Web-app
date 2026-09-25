@@ -9,6 +9,7 @@ import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
+import { formatLongDate, formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
 const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
 
@@ -130,9 +131,8 @@ function MarkAttendancePage() {
             <h1>Mark Attendance</h1>
             {sessionInfo && (
               <p className="muted">
-                {sessionInfo.subject} &middot; {sessionInfo.sessionDate} &middot; {sessionInfo.startTime}
-                {' - '}
-                {sessionInfo.endTime}
+                {sessionInfo.subject} &middot; {formatLongDate(String(sessionInfo.sessionDate).slice(0, 10))} &middot;{' '}
+                {formatTimeRange(sessionInfo.startTime, sessionInfo.endTime)}
               </p>
             )}
           </div>

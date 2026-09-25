@@ -120,6 +120,12 @@ router.get(
   validateRequest,
   controller.getUserProfile
 );
+router.post(
+  '/admin/users/:userId/reset-link',
+  userIdParamRules,
+  validateRequest,
+  controller.createPasswordResetLink
+);
 
 router.post(
   '/admin/tutor-keys',

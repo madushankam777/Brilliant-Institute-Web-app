@@ -1,5 +1,4 @@
 // Central 404 + error handler
-const config = require('../config/env');
 const ApiError = require('../utils/ApiError');
 
 function notFoundHandler(req, res) {
@@ -11,6 +10,13 @@ function notFoundHandler(req, res) {
 
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
+  // bad JSON, a body that is too big, etc. - the client's mistake, not a crash
+  if (!(err instanceof ApiError) && err && err.type && err.status >= 400 && err.status < 500) {
+    const message =
+      err.status === 413 ? 'The request is too large.' : 'The request could not be read. Please try again.';
+    return res.status(err.status).json({ success: false, message });
+  }
+
   const isKnownError = err instanceof ApiError;
   const statusCode = isKnownError ? err.statusCode : 500;
 
@@ -42,12 +48,8 @@ function errorHandler(err, req, res, next) {
     responseBody.details = err.details;
   }
 
-  // Only ever include a stack trace outside of production, for local
-  // debugging convenience.
-  if (!config.isProduction && !isKnownError) {
-    responseBody.stack = err.stack;
-  }
-
+  // Stack traces go to the server console only - never to the browser,
+  // even in development (a dev server can be reached through a tunnel).
   res.status(statusCode).json(responseBody);
 }
 

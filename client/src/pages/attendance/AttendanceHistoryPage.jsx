@@ -68,7 +68,7 @@ function AttendanceHistoryPage() {
               />
             ))}
 
-            <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="stat-grid stat-grid-3">
               <StatCard icon="calendar" label="Total Sessions" value={history.length} />
               <StatCard icon="checkCircle" label="Present Sessions" value={presentCount} tone="success" />
               <StatCard icon="xCircle" label="Absent Sessions" value={absentCount} tone="danger" />

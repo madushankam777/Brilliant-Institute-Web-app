@@ -238,6 +238,7 @@ function ProfilePage() {
               <input
                 ref={pictureInputRef}
                 type="file"
+                aria-label="Choose a profile photo"
                 accept="image/jpeg,image/png,image/webp"
                 style={{ display: 'none' }}
                 onChange={handlePictureSelected}

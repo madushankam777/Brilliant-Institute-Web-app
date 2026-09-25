@@ -2,6 +2,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const ApiError = require('../utils/ApiError');
+const { passwordVersion } = require('../utils/sessionToken');
 const { SESSION_COOKIE_NAME, USER_STATUS } = require('../config/roles');
 const { pool } = require('../config/db');
 
@@ -21,23 +22,31 @@ async function authenticate(req, res, next) {
     return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
   }
 
+  let account;
   try {
-    // check user is still active (not suspended)
-    const [rows] = await pool.execute('SELECT status FROM users WHERE id = ? LIMIT 1', [
-      payload.sub,
-    ]);
-    const currentStatus = rows[0] ? rows[0].status : null;
-    if (!currentStatus || currentStatus !== USER_STATUS.ACTIVE) {
-      return next(ApiError.unauthorized('Your account is no longer active. Please contact an administrator.'));
-    }
+    const [rows] = await pool.execute(
+      'SELECT id, role, email, status, password_hash FROM users WHERE id = ? LIMIT 1',
+      [payload.sub]
+    );
+    account = rows[0];
   } catch (error) {
     return next(error);
   }
 
+  // suspended, deleted or closed accounts lose access straight away
+  if (!account || account.status !== USER_STATUS.ACTIVE) {
+    return next(ApiError.unauthorized('Your account is no longer active. Please contact an administrator.'));
+  }
+  // the password changed since this session started
+  if (payload.pwv !== passwordVersion(account.password_hash)) {
+    return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
+  }
+
+  // role and email always come from the database, not the token
   req.user = {
-    id: payload.sub,
-    role: payload.role,
-    email: payload.email,
+    id: account.id,
+    role: account.role,
+    email: account.email,
   };
   return next();
 }

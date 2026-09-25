@@ -55,6 +55,12 @@ const getUserProfile = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { user } });
 });
 
+// one-time password reset link the office hands to the user in person
+const createPasswordResetLink = asyncHandler(async (req, res) => {
+  const data = await service.createPasswordResetLink(req.user, Number(req.params.userId));
+  res.status(201).json({ success: true, data });
+});
+
 const generateTutorKey = asyncHandler(async (req, res) => {
   const { intendedFor, idNumber } = req.body;
   const files = req.files || {};
@@ -286,6 +292,7 @@ module.exports = {
   listUsers,
   createUser,
   getUserProfile,
+  createPasswordResetLink,
   generateTutorKey,
   listTutorKeys,
   revokeTutorKey,

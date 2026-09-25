@@ -33,6 +33,12 @@ function TutorStudentHistoryPage() {
   useEffect(() => {
     let isMounted = true;
     async function load() {
+      // this page is opened from a class's attendance list, which adds the class
+      if (!classId) {
+        setErrorMessage('Open a student from a class attendance list to see their history.');
+        setIsLoading(false);
+        return;
+      }
       try {
         const data = await fetchStudentAttendanceHistory(studentId, classId);
         if (isMounted) setHistory(data.history);
@@ -73,7 +79,7 @@ function TutorStudentHistoryPage() {
           <LoadingSpinner label="Loading attendance history..." />
         ) : (
           <>
-            <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <div className="stat-grid stat-grid-2">
               <StatCard icon="checkCircle" label="Present / Late" value={presentCount} tone="success" />
               <StatCard icon="xCircle" label="Absent" value={absentCount} tone="danger" />
             </div>

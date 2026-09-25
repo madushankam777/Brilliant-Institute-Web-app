@@ -100,6 +100,14 @@ async function markResetTokenUsed(tokenId) {
   await pool.execute(`UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?`, [tokenId]);
 }
 
+// A new link (or a finished reset) cancels every older link for that user.
+async function invalidateResetTokensForUser(userId) {
+  await pool.execute(
+    `UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL`,
+    [userId]
+  );
+}
+
 // Find a tutor enrollment key by its code, but only if it's still usable -
 // same "valid means unused" shape as findValidResetTokenByHash above.
 async function findValidTutorKeyByCode(keyCode) {
@@ -119,6 +127,23 @@ async function markTutorKeyUsed(keyId, userId) {
   );
 }
 
+// Claims the key before the account is created, so two sign-ups racing
+// with the same key can't both get through. Returns false if already taken.
+async function claimTutorKey(keyId) {
+  const [result] = await pool.execute(
+    `UPDATE tutor_enrollment_keys SET status = 'USED', used_at = NOW() WHERE id = ? AND status = 'UNUSED'`,
+    [keyId]
+  );
+  return result.affectedRows === 1;
+}
+
+async function releaseTutorKey(keyId) {
+  await pool.execute(
+    `UPDATE tutor_enrollment_keys SET status = 'UNUSED', used_at = NULL WHERE id = ? AND used_by IS NULL`,
+    [keyId]
+  );
+}
+
 module.exports = {
   createUser,
   setStudentCode,
@@ -133,6 +158,9 @@ module.exports = {
   createPasswordResetToken,
   findValidResetTokenByHash,
   markResetTokenUsed,
+  invalidateResetTokensForUser,
   findValidTutorKeyByCode,
   markTutorKeyUsed,
+  claimTutorKey,
+  releaseTutorKey,
 };

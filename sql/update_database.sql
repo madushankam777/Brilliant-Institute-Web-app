@@ -1,5 +1,5 @@
 -- Database update: student re-registration, tutor payout tracking, class
--- start dates, and cancelled / extra class days.
+-- start dates, cancelled / extra class days and Contact Us messages.
 -- Run this once as root in MySQL Workbench (the app's own DB user has no
 -- rights to change tables). Safe to run more than once - every step checks
 -- first, and no stored procedure or DELIMITER is needed.
@@ -51,6 +51,22 @@ CREATE TABLE IF NOT EXISTS class_events (
   KEY idx_class_events_class (class_id),
   CONSTRAINT fk_class_events_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
   CONSTRAINT fk_class_events_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Messages sent from the public Contact Us page
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  full_name   VARCHAR(120) NOT NULL,
+  email       VARCHAR(190) NOT NULL,
+  phone       VARCHAR(30)  NULL,
+  topic       ENUM('ADMISSIONS', 'CLASSES', 'FEES', 'TECHNICAL', 'OTHER') NOT NULL DEFAULT 'OTHER',
+  message     TEXT NOT NULL,
+  status      ENUM('NEW', 'HANDLED') NOT NULL DEFAULT 'NEW',
+  handled_by  INT UNSIGNED NULL,
+  handled_at  DATETIME NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_contact_status (status, created_at),
+  CONSTRAINT fk_contact_handled_by FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- New columns. MySQL 8 has no "ADD COLUMN IF NOT EXISTS", so each one checks

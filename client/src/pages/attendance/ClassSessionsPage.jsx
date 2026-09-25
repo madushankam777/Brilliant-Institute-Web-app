@@ -10,6 +10,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
+import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
 function ClassSessionsPage() {
   const navigate = useNavigate();
@@ -94,7 +95,7 @@ function ClassSessionsPage() {
                     <tr key={classItem.id}>
                       <td>{classItem.subject}</td>
                       <td>
-                        {classItem.dayOfWeek} {classItem.startTime}-{classItem.endTime}
+                        {classItem.dayOfWeek}, {formatTimeRange(classItem.startTime, classItem.endTime)}
                       </td>
                       {isAdmin && <td>{classItem.tutorName}</td>}
                       <td>

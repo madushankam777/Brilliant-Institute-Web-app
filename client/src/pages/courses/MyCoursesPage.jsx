@@ -6,6 +6,7 @@ import LoadingSpinner from '../../../../shared/client/src/components/common/Load
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
@@ -147,7 +148,7 @@ function MyCoursesPage() {
                           </td>
                           <td>{course.tutorName}</td>
                           <td>
-                            {course.dayOfWeek}, {course.startTime}-{course.endTime}
+                            {course.dayOfWeek}, {formatTimeRange(course.startTime, course.endTime)}
                           </td>
                           <td>{formatCurrency(course.balance)}</td>
                           <td>

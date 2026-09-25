@@ -10,6 +10,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
 import { useAuth } from '../../context/AuthContext';
+import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
 const SUBJECT_AREAS = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Other'];
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -66,6 +67,7 @@ function BrowseClassesPage() {
               </span>
               <input
                 type="search"
+                aria-label="Search classes"
                 placeholder="Search classes by keyword or tutor..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -166,9 +168,7 @@ function BrowseClassesPage() {
                   </div>
 
                   <p className="muted" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                    <Icon name="calendar" size={14} /> {classItem.dayOfWeek}, {classItem.startTime}
-                    {' - '}
-                    {classItem.endTime}
+                    <Icon name="calendar" size={14} /> {classItem.dayOfWeek}, {formatTimeRange(classItem.startTime, classItem.endTime)}
                   </p>
                   <p className="muted" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
                     <Icon name="home" size={14} /> {classItem.venue}

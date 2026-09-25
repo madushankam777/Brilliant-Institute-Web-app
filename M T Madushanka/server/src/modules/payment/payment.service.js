@@ -262,7 +262,19 @@ async function finalizePendingPayment(studentUser, paymentId) {
   }
 }
 
+// The simulator only runs when switched on for a demo and PayHere is not set up.
+function isSimulatorEnabled() {
+  return config.paymentGateway.simulatorAllowed && !payhere.isConfigured();
+}
+
+function assertSimulatorEnabled() {
+  if (!isSimulatorEnabled()) {
+    throw ApiError.forbidden('Online card payments are not available. Please pay by bank transfer.');
+  }
+}
+
 async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, paymentDetails }) {
+  assertSimulatorEnabled();
   const paymentId = await createPendingPaymentRecord(studentUser, {
     enrollmentId,
     amount,
@@ -273,6 +285,7 @@ async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, p
 }
 
 async function retryPendingPayment(studentUser, paymentId) {
+  assertSimulatorEnabled();
   return finalizePendingPayment(studentUser, paymentId);
 }
 
@@ -552,6 +565,7 @@ async function getPaymentSettings() {
     // or fall back to the built-in simulator.
     onlinePaymentsEnabled: payhere.isConfigured(),
     onlinePaymentProvider: payhere.isConfigured() ? 'payhere' : null,
+    simulatorEnabled: isSimulatorEnabled(),
   };
 }
 
@@ -1053,6 +1067,9 @@ async function handlePayHereNotification(body) {
     // credit the student gets, so it has to match what we asked for.
     if (payhere.formatAmount(payment.amount) !== payhere.formatAmount(result.amount)) {
       return { status: 'amount-mismatch' };
+    }
+    if (result.currency !== config.payhere.currency) {
+      return { status: 'currency-mismatch' };
     }
 
     const storedDetails = {

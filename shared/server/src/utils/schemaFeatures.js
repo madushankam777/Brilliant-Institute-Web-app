@@ -68,6 +68,7 @@ async function reportPendingUpdates() {
   if (!(await hasPayoutTracking())) missing.push('payout tracking');
   if (!(await hasClassStartDate())) missing.push('class start dates');
   if (!(await hasClassEvents())) missing.push('cancelled and extra classes');
+  if (!(await hasTable('contact_messages'))) missing.push('contact us messages');
 
   if (missing.length > 0) {
     console.warn(

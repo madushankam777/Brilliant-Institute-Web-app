@@ -665,7 +665,20 @@ async function deleteUpcomingReminder({ tutorId, message, sentAt }) {
   return result.affectedRows;
 }
 
+// role of whoever last suspended this account (from the audit log)
+async function findLastSuspenderRole(userId) {
+  const [rows] = await pool.execute(
+    `SELECT u.role FROM audit_log a
+     JOIN users u ON u.id = a.actor_id
+     WHERE a.action = 'USER_SUSPENDED' AND a.entity_type = 'user' AND a.entity_id = ?
+     ORDER BY a.id DESC LIMIT 1`,
+    [userId]
+  );
+  return rows[0] ? rows[0].role : null;
+}
+
 module.exports = {
+  findLastSuspenderRole,
   getCoreCounts,
   getRevenueTrend,
   getDatabaseToday,

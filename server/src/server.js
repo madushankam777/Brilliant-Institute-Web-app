@@ -2,6 +2,7 @@
 const config = require('../../shared/server/src/config/env');
 const { verifyDatabaseConnection } = require('../../shared/server/src/config/db');
 const { reportPendingUpdates } = require('../../shared/server/src/utils/schemaFeatures');
+const { warnAboutDemoPasswords } = require('./startup/demoPasswordCheck');
 const { startRolloverScheduler } = require('../../S Vithushan/server/src/modules/admin/yearlyRollover');
 const app = require('./app');
 
@@ -28,6 +29,7 @@ async function start() {
 
   // tells the developer (not the users) if sql/update_database.sql still needs running
   reportPendingUpdates().catch(() => {});
+  warnAboutDemoPasswords().catch(() => {});
 
   // checks once shortly after boot, then daily - see yearlyRollover.js
   startRolloverScheduler();

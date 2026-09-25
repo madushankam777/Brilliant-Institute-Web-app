@@ -9,6 +9,7 @@ import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
+import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -121,7 +122,7 @@ function ClassDetailsPage() {
                     <tr>
                       <td>{classData.dayOfWeek}</td>
                       <td>
-                        {classData.startTime} - {classData.endTime}
+                        {formatTimeRange(classData.startTime, classData.endTime)}
                       </td>
                       <td>{classData.venue}</td>
                     </tr>

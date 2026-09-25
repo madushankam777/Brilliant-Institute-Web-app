@@ -13,6 +13,7 @@ export function getNavItems(role) {
       { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
       { to: '/admin/reregistration', label: 'Re-registration', icon: 'refresh' },
       { to: '/admin/feedback', label: 'Feedback', icon: 'chat' },
+      { to: '/admin/enquiries', label: 'Enquiries', icon: 'inbox' },
       { to: '/profile', label: 'My Profile', icon: 'user' },
     ];
   }

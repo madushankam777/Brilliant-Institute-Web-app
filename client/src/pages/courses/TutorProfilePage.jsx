@@ -10,6 +10,7 @@ import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
+import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -102,7 +103,7 @@ function TutorProfilePage() {
                   </div>
                   <h3 style={{ marginBottom: '4px' }}>{classItem.subject}</h3>
                   <p className="muted" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
-                    <Icon name="calendar" size={14} /> {classItem.dayOfWeek}, {classItem.startTime}-{classItem.endTime}
+                    <Icon name="calendar" size={14} /> {classItem.dayOfWeek}, {formatTimeRange(classItem.startTime, classItem.endTime)}
                   </p>
                   <div className="flex-between">
                     <div style={{ fontWeight: 700 }}>{formatCurrency(classItem.fee)}/month</div>

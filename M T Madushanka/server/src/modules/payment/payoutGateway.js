@@ -61,7 +61,12 @@ const FILE_COLUMNS = [
 ];
 
 function csvCell(value) {
-  const text = String(value === null || value === undefined ? '' : value);
+  let text = String(value === null || value === undefined ? '' : value);
+  // A cell starting with = + - @ is run as a formula by Excel. Names and bank
+  // details are typed by tutors, so neutralise them with a leading quote.
+  if (/^[=+\-@\t\r]/.test(text) && !/^-?\d+(\.\d+)?$/.test(text)) {
+    text = `'${text}`;
+  }
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

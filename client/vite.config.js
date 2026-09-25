@@ -21,6 +21,8 @@ const SECURITY_HEADERS = {
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self'",
+    // the Contact page shows a Google Map
+    "frame-src https://www.google.com https://maps.google.com",
     "form-action 'self' https://sandbox.payhere.lk https://www.payhere.lk",
     "frame-ancestors 'none'",
     "base-uri 'self'",
@@ -51,10 +53,12 @@ export default defineConfig({
     headers: DEV_HEADERS,
     // allow tunnel hostnames (Vite blocks unrecognized Host headers by default)
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
-    // Lets the dev server read shared/, which sits outside this app's own
-    // root (one level up: client -> repo root).
+    // The dev server may only read this app and shared/client - never the
+    // server code, the sql/ folder (it holds a database password) or uploads.
     fs: {
-      allow: [path.resolve(__dirname, '..')],
+      strict: true,
+      allow: [__dirname, path.resolve(__dirname, '../shared/client')],
+      deny: ['.env', '.env.*', '*.{crt,pem,key}', '**/*.sql', '**/uploads/**', '**/server/**'],
     },
     // Forward API/upload calls to the backend so the browser only ever talks
     // to this one origin - required for cookies (SameSite=strict) to work

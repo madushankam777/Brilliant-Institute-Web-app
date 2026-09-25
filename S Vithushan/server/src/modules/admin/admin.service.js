@@ -16,6 +16,7 @@ const { GRADES, nextGrade, isFinalGrade } = require('../../../../../shared/serve
 const gateway = require('./notificationGateway');
 const repository = require('./admin.repository');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
+const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -312,7 +313,7 @@ async function suspendUser(actingUser, userId, confirmName) {
 
 async function activateUser(actingUser, userId) {
   const targetUser = await repository.findUserById(userId);
-  if (!targetUser) {
+  if (!targetUser || targetUser.status === USER_STATUS.DELETED) {
     throw ApiError.notFound('User not found.');
   }
 
@@ -320,6 +321,17 @@ async function activateUser(actingUser, userId) {
 
   if (targetUser.status === USER_STATUS.ACTIVE) {
     throw ApiError.badRequest('This user is already active.');
+  }
+  // tutors may only undo a suspension - closed accounts and ones the
+  // office suspended are for an Admin to decide
+  if (actingUser.role === ROLES.TUTOR) {
+    if (targetUser.status !== USER_STATUS.SUSPENDED) {
+      throw ApiError.forbidden('Only an Administrator can reopen this account.');
+    }
+    const suspendedByRole = await repository.findLastSuspenderRole(userId);
+    if (suspendedByRole === ROLES.ADMIN) {
+      throw ApiError.forbidden('This account was suspended by the office. Please contact an Administrator.');
+    }
   }
 
   await repository.updateUserStatus(userId, USER_STATUS.ACTIVE);
@@ -355,6 +367,30 @@ async function deleteUser(actingUser, userId) {
     entityType: 'user',
     entityId: userId,
   });
+}
+
+// Admin: one-time reset link to give the user in person (there is no email
+// service, so a forgotten password is reset through the office)
+async function createPasswordResetLink(adminUser, userId) {
+  const targetUser = await repository.findUserById(userId);
+  if (!targetUser || targetUser.status === USER_STATUS.DELETED) {
+    throw ApiError.notFound('User not found.');
+  }
+  if (targetUser.status !== USER_STATUS.ACTIVE) {
+    throw ApiError.badRequest('Reactivate this account before resetting its password.');
+  }
+
+  const token = await authService.createResetToken(userId);
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'PASSWORD_RESET_LINK_ISSUED',
+    entityType: 'user',
+    entityId: userId,
+  });
+  return {
+    resetPath: `/reset-password?token=${token}`,
+    expiresInMinutes: authService.RESET_TOKEN_TTL_MINUTES,
+  };
 }
 
 async function listMyStudents(tutorUser) {
@@ -984,6 +1020,7 @@ async function cancelReminder(tutorUser, reminderId) {
 }
 
 module.exports = {
+  createPasswordResetLink,
   getRevenueReport,
   getReregistrationOptions,
   generateReregistrationKeys,

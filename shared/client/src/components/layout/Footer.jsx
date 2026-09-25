@@ -1,16 +1,36 @@
 import { Link } from 'react-router-dom';
 import Logo from '../common/Logo';
+import { INSTITUTE } from '../../constants/institute';
 
-function Footer({ linkGroups = [] }) {
+const DEFAULT_LINK_GROUPS = [
+  {
+    heading: 'Institute',
+    links: [
+      { label: 'About Us', to: '/about' },
+      { label: 'Contact Us', to: '/contact' },
+      { label: 'Classes', to: '/courses/classes' },
+    ],
+  },
+  {
+    heading: 'Account',
+    links: [
+      { label: 'Log in', to: '/login' },
+      { label: 'Register', to: '/register' },
+      { label: 'Forgot password', to: '/forgot-password' },
+    ],
+  },
+];
+
+function Footer({ linkGroups = DEFAULT_LINK_GROUPS }) {
   return (
-    <footer id="contact" className="site-footer">
+    <footer className="site-footer">
       <div className="container">
         <div className="footer-grid">
           <div className="footer-brand">
             <Logo dark />
             <p>
-              Transforming tuition class management with intelligent tools built for
-              forward-thinking administrators, tutors, and eager learners.
+              Classes for Grade 6 to A/L in Colombo, with attendance, fees and timetables in one secure place for
+              students, parents and tutors.
             </p>
           </div>
 
@@ -20,7 +40,7 @@ function Footer({ linkGroups = [] }) {
               <ul className="footer-list">
                 {group.links.map((link) => (
                   <li key={link.label}>
-                    {link.to ? <Link to={link.to}>{link.label}</Link> : <span>{link.label}</span>}
+                    <Link to={link.to}>{link.label}</Link>
                   </li>
                 ))}
               </ul>
@@ -31,13 +51,13 @@ function Footer({ linkGroups = [] }) {
             <h4 className="footer-heading">Contact</h4>
             <ul className="footer-list">
               <li>
-                <a href="mailto:support@brilliantinstitute.edu">support@brilliantinstitute.edu</a>
+                <a href={`mailto:${INSTITUTE.email}`}>{INSTITUTE.email}</a>
               </li>
               <li>
-                <a href="tel:0112347728">0112 347 728</a>
+                <a href={INSTITUTE.phoneHref}>{INSTITUTE.phone}</a>
               </li>
               <li>
-                <span>136, Sangamitha Mawatha, Colombo - 13</span>
+                <span>{INSTITUTE.address}</span>
               </li>
             </ul>
           </div>
@@ -46,8 +66,8 @@ function Footer({ linkGroups = [] }) {
         <div className="footer-bottom">
           <span>&copy; {new Date().getFullYear()} Brilliant Institute. All rights reserved.</span>
           <div className="footer-bottom-links">
-            <span>Privacy Policy</span>
-            <span>Terms of Service</span>
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/terms">Terms of Service</Link>
           </div>
         </div>
       </div>

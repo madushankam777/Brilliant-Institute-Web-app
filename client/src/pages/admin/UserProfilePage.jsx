@@ -11,6 +11,7 @@ import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import WeeklyTimetable from '../../../../shared/client/src/components/common/WeeklyTimetable';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import ResetLinkCard from './ResetLinkCard';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -143,6 +144,8 @@ function UserProfilePage() {
             </div>
           )}
         </div>
+
+        {user.status !== 'DELETED' && <ResetLinkCard user={user} />}
 
         {user.role !== 'ADMIN' && (
           <div className="card">
