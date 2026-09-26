@@ -592,12 +592,6 @@ function FeeBalancePage() {
                       </div>
                     )}
 
-                    {['CARD', 'EZ_CASH', 'MCASH'].includes(paymentMethod) && paymentSettings?.cardTestMode && (
-                      <p className="test-mode-note">
-                        <span className="badge badge-warning">Test mode</span> No real money is charged.
-                      </p>
-                    )}
-
                     {paymentMethod === 'BANK_TRANSFER' && !bankTransferAvailable && (
                       <Alert type="warning" message={bankTransferClosedMessage} />
                     )}

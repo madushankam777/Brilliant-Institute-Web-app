@@ -266,28 +266,27 @@ async function finalizePendingPayment(studentUser, paymentId) {
 // payment methods - the admin switches them on and off in Payment Settings
 const PAYMENT_METHOD_KEYS = ['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH'];
 
-function readEnabledMethods(row) {
-  if (!row || !row.enabled_methods) return ['BANK_TRANSFER'];
-  return String(row.enabled_methods)
-    .split(',')
-    .filter((method) => PAYMENT_METHOD_KEYS.includes(method));
+// switched-on methods (bank transfer only until the admin changes it)
+async function loadEnabledMethods() {
+  const saved = await repository.findEnabledMethods();
+  if (!saved) return ['BANK_TRANSFER'];
+  return PAYMENT_METHOD_KEYS.filter((method) => saved.includes(method));
 }
 
-// checkout tabs a student gets - card/wallets go through PayHere when it is set up,
-// otherwise they run in test mode (never on a production server)
+// checkout tabs a student gets - card/wallets go through PayHere once it is set up
 function checkoutMethodsFor(enabled) {
   const online = enabled.filter((method) => method !== 'BANK_TRANSFER');
   const tabs = [];
   if (online.length > 0) {
     if (payhere.isConfigured()) tabs.push('ONLINE');
-    else if (!config.isProduction) tabs.push(...online);
+    else tabs.push(...online);
   }
   if (enabled.includes('BANK_TRANSFER')) tabs.push('BANK_TRANSFER');
   return tabs;
 }
 
 async function assertMethodAllowed(method) {
-  const tabs = checkoutMethodsFor(readEnabledMethods(await repository.getPaymentSettings()));
+  const tabs = checkoutMethodsFor(await loadEnabledMethods());
   if (!tabs.includes(method)) {
     throw ApiError.forbidden('This payment method is not available right now. Please choose another one.');
   }
@@ -668,6 +667,7 @@ function maskAccountNumber(accountNumber) {
 // checkout tabs - the institute's own receiving details
 async function getPaymentSettings() {
   const row = await repository.getPaymentSettings();
+  const enabledMethods = await loadEnabledMethods();
   return {
     bankName: row ? row.bank_name : null,
     bankAccountName: row ? row.bank_account_name : null,
@@ -676,11 +676,9 @@ async function getPaymentSettings() {
     bankSwift: row ? row.bank_swift : null,
     ezCashNumber: row ? row.ez_cash_number : null,
     mcashNumber: row ? row.mcash_number : null,
-    enabledMethods: readEnabledMethods(row),
-    checkoutMethods: checkoutMethodsFor(readEnabledMethods(row)),
+    enabledMethods,
+    checkoutMethods: checkoutMethodsFor(enabledMethods),
     onlinePaymentsEnabled: payhere.isConfigured(),
-    // card / wallets are simulated until PayHere is set up
-    cardTestMode: !payhere.isConfigured(),
   };
 }
 
@@ -688,23 +686,17 @@ async function updatePaymentSettings(adminUser, settings) {
   let methods = null;
   if (Array.isArray(settings.enabledMethods)) {
     methods = PAYMENT_METHOD_KEYS.filter((method) => settings.enabledMethods.includes(method));
-    // before the database update only the default (bank transfer) exists
-    if (!(await schema.hasColumn('payment_settings', 'enabled_methods'))) {
-      if (methods.join(',') !== 'BANK_TRANSFER') throw schema.migrationRequired();
-      methods = null;
-    }
-  }
-  if (methods) {
+    const current = await loadEnabledMethods();
     // turning a method off must be confirmed by typing REMOVE
-    const current = readEnabledMethods(await repository.getPaymentSettings());
     const removed = current.filter((method) => !methods.includes(method));
     if (removed.length > 0 && String(settings.confirmText || '').trim().toUpperCase() !== 'REMOVE') {
       throw ApiError.badRequest('Type REMOVE to confirm turning off a payment method.');
     }
+    if (methods.join(',') === current.join(',')) methods = null;
   }
 
   await repository.upsertPaymentSettings(settings, adminUser.id);
-  if (methods) await repository.saveEnabledMethods(methods.join(','), adminUser.id);
+  if (methods) await repository.saveEnabledMethods(methods, adminUser.id);
   await recordAuditEvent({
     actorId: adminUser.id,
     action: 'PAYMENT_SETTINGS_UPDATED',

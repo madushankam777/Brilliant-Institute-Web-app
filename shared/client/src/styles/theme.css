@@ -4471,11 +4471,3 @@ input.switch:focus-visible {
   gap: 6px;
 }
 
-.test-mode-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 14px;
-  font-size: 0.85rem;
-  color: var(--color-muted);
-}

@@ -483,16 +483,26 @@ async function upsertPaymentSettings(
   );
 }
 
-// payment methods the admin switched on
-async function saveEnabledMethods(methodsCsv, updatedBy) {
+// payment methods the admin switched on - kept as the latest PAYMENT_METHODS_SET entry in audit_log
+async function findEnabledMethods() {
+  const [rows] = await pool.execute(
+    `SELECT details FROM audit_log WHERE action = 'PAYMENT_METHODS_SET' ORDER BY id DESC LIMIT 1`
+  );
+  if (!rows[0]) return null;
+  const details = typeof rows[0].details === 'string' ? JSON.parse(rows[0].details) : rows[0].details;
+  return details && Array.isArray(details.methods) ? details.methods : null;
+}
+
+async function saveEnabledMethods(methods, adminId) {
   await pool.execute(
-    `INSERT INTO payment_settings (id, enabled_methods, updated_by, updated_at) VALUES (1, ?, ?, NOW())
-     ON DUPLICATE KEY UPDATE enabled_methods = VALUES(enabled_methods), updated_by = VALUES(updated_by), updated_at = NOW()`,
-    [methodsCsv, updatedBy]
+    `INSERT INTO audit_log (actor_id, action, entity_type, entity_id, details, created_at)
+     VALUES (?, 'PAYMENT_METHODS_SET', 'payment_settings', 1, ?, NOW())`,
+    [adminId, JSON.stringify({ methods })]
   );
 }
 
 module.exports = {
+  findEnabledMethods,
   saveEnabledMethods,
   searchStudents,
   listActiveEnrollmentsForStudents,

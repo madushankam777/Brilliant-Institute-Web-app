@@ -32,7 +32,6 @@ const EMPTY_FORM = {
 function PaymentSettingsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [enabledMethods, setEnabledMethods] = useState(['BANK_TRANSFER']);
-  const [cardTestMode, setCardTestMode] = useState(false);
   // turning a method off - admin must type REMOVE
   const [pendingRemove, setPendingRemove] = useState(null);
   const [removeText, setRemoveText] = useState('');
@@ -58,7 +57,6 @@ function PaymentSettingsPage() {
           mcashNumber: settings.mcashNumber || '',
         });
         setEnabledMethods(settings.enabledMethods || ['BANK_TRANSFER']);
-        setCardTestMode(Boolean(settings.cardTestMode));
       })
       .catch((error) => {
         if (isMounted) setLoadError(error.message);
@@ -164,14 +162,7 @@ function PaymentSettingsPage() {
                   return (
                     <label key={option.value} className={`method-switch${isOn ? ' is-on' : ''}`}>
                       <span>
-                        <strong>
-                          {option.label}
-                          {option.value !== 'BANK_TRANSFER' && cardTestMode && (
-                            <span className="badge badge-warning" style={{ marginLeft: '8px' }}>
-                              Test mode
-                            </span>
-                          )}
-                        </strong>
+                        <strong>{option.label}</strong>
                         <span className="order-line-sub">{option.help}</span>
                       </span>
                       <input
