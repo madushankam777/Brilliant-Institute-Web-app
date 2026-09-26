@@ -22,7 +22,7 @@ const {
 const router = express.Router();
 
 // public - no login needed (About page)
-router.get('/overview', controller.getPublicOverview);
+router.get('/public-tutors', controller.listPublicTutors);
 
 router.use(authenticate);
 

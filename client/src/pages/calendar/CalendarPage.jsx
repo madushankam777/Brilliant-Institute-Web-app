@@ -1,9 +1,13 @@
-// Calendar for every role: the month's classes, public holidays (red, from
-// Google Calendar), cancelled days (orange dot) and extra classes (green dot).
-// Tutors and Admin can cancel a day or undo a change from the day panel.
+// Calendar page - classes, holidays, cancelled and extra classes
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { cancelClassDay, deleteClassEvent, fetchMyTaughtClasses, fetchMyTimetable } from '../../api/courseApi';
+import {
+  browseClasses,
+  cancelClassDay,
+  deleteClassEvent,
+  fetchMyTaughtClasses,
+  fetchMyTimetable,
+} from '../../api/courseApi';
 import useHolidays from '../../hooks/useHolidays';
 import useClassEvents from '../../hooks/useClassEvents';
 import { useAuth } from '../../context/AuthContext';
@@ -23,7 +27,7 @@ import {
 
 const INTRO = {
   STUDENT_PARENT: 'Your classes for the month. Classes are not held on public holidays.',
-  TUTOR: 'The classes you teach this month. Classes are not held on public holidays.',
+  TUTOR: 'The classes you teach this month. Click a date to also see the other classes at the institute that day.',
   ADMIN: 'Every class on the platform, month by month, with public holidays marked.',
 };
 
@@ -62,9 +66,12 @@ function shortDate(dateKey) {
 function CalendarPage() {
   const { user } = useAuth();
   const isAdmin = user.role === 'ADMIN';
-  const isStaff = isAdmin || user.role === 'TUTOR';
+  const isTutor = user.role === 'TUTOR';
+  const isStaff = isAdmin || isTutor;
 
   const [classes, setClasses] = useState([]);
+  // tutor only - every other tutor's classes, to see who uses which hall
+  const [otherClasses, setOtherClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [view, setView] = useState(() => ({ year: new Date().getFullYear(), month: new Date().getMonth() }));
@@ -94,6 +101,21 @@ function CalendarPage() {
       isCurrent = false;
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isTutor) return undefined;
+    let isCurrent = true;
+    browseClasses()
+      .then((list) => {
+        if (isCurrent) setOtherClasses(list.filter((item) => item.tutorId !== user.id));
+      })
+      .catch(() => {
+        if (isCurrent) setOtherClasses([]);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [isTutor, user.id]);
 
   // moving to another month selects today (this month) or that month's 1st
   function selectDate(dateKey) {
@@ -130,6 +152,7 @@ function CalendarPage() {
 
   const holiday = holidays[selectedDate];
   const dayClasses = occurrencesOn(classes, events, selectedDate);
+  const otherDayClasses = occurrencesOn(otherClasses, events, selectedDate);
   const canChange = isStaff && selectedDate >= todayKey();
   const monthHolidays = Object.entries(holidays).sort(([a], [b]) => a.localeCompare(b));
 
@@ -269,6 +292,35 @@ function CalendarPage() {
                   ))
                 )}
               </div>
+
+              {/* other classes that day - tutors only */}
+              {isTutor && (
+                <div className="card">
+                  <h2>Other classes this day</h2>
+                  {otherDayClasses.length === 0 ? (
+                    <p className="muted" style={{ margin: 0 }}>
+                      No other classes - every hall is free.
+                    </p>
+                  ) : (
+                    otherDayClasses.map((item) => (
+                      <div
+                        key={item.key}
+                        className={`agenda-class${holiday || item.kind === 'cancelled' ? ' is-cancelled' : ''}`}
+                      >
+                        <span className="day-agenda-time">{formatTimeRange(item.startTime, item.endTime)}</span>
+                        <span className="agenda-class-body">
+                          <strong>{item.subject}</strong>
+                          <span className="order-line-sub">
+                            {item.venue} · {item.tutorName}
+                            {item.kind === 'cancelled' && ' · cancelled'}
+                            {item.kind === 'extra' && ' · extra class'}
+                          </span>
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
 
               <div className="card">
                 <h2>Holidays this month</h2>

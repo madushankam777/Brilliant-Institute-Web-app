@@ -226,20 +226,18 @@ async function findConflictingTutorClass({ tutorId, dayOfWeek, startTime, endTim
   return rows[0] || null;
 }
 
-// Public numbers for the About page - counts only, no personal details.
-async function getPublicOverview() {
-  const [[counts]] = await pool.execute(
-    `SELECT
-       (SELECT COUNT(*) FROM classes WHERE status = 'ACTIVE') AS class_count,
-       (SELECT COUNT(DISTINCT tutor_id) FROM classes WHERE status = 'ACTIVE') AS tutor_count,
-       (SELECT COUNT(*) FROM users WHERE role = 'STUDENT_PARENT' AND status = 'ACTIVE') AS student_count`
+// About page - tutors who teach an active class (no email or phone)
+async function listPublicTutors() {
+  const [rows] = await pool.execute(
+    `SELECT u.id, u.full_name, u.profile_picture_path, u.bio,
+            GROUP_CONCAT(DISTINCT c.subject ORDER BY c.subject SEPARATOR '|') AS subjects
+     FROM users u
+     JOIN classes c ON c.tutor_id = u.id AND c.status = 'ACTIVE'
+     WHERE u.role = 'TUTOR' AND u.status = 'ACTIVE'
+     GROUP BY u.id, u.full_name, u.profile_picture_path, u.bio
+     ORDER BY u.full_name`
   );
-  const [subjects] = await pool.execute(
-    `SELECT DISTINCT subject_area FROM classes
-     WHERE status = 'ACTIVE' AND subject_area IS NOT NULL AND subject_area <> '' ORDER BY subject_area`
-  );
-  const [grades] = await pool.execute(`SELECT DISTINCT level FROM classes WHERE status = 'ACTIVE'`);
-  return { counts, subjects: subjects.map((row) => row.subject_area), grades: grades.map((row) => row.level) };
+  return rows;
 }
 
 // --- Cancelled days and extra classes (class_events) ---
@@ -299,8 +297,7 @@ async function deleteClassEvent(eventId) {
   await pool.execute(`DELETE FROM class_events WHERE id = ?`, [eventId]);
 }
 
-// A weekly class that meets at that time on that date, in the same room or
-// with the same tutor (a class cancelled for that date doesn't count).
+// a weekly class using the same room or tutor at that time
 async function findBusyWeeklyClass({ eventDate, dayOfWeek, startTime, endTime, venue, tutorId }) {
   const [rows] = await pool.execute(
     `SELECT c.subject, c.venue, c.start_time, c.end_time, c.tutor_id, t.full_name AS tutor_name
@@ -445,7 +442,7 @@ module.exports = {
   createNotification,
   findConflictingVenueClass,
   findConflictingTutorClass,
-  getPublicOverview,
+  listPublicTutors,
   listClassEvents,
   findClassEvent,
   findCancelledDay,

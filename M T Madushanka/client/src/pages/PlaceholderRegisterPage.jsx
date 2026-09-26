@@ -16,8 +16,7 @@ const initialForm = {
   enrollmentKey: '',
 };
 
-// Letters, spaces, apostrophes, periods, and hyphens only - no digits or
-// other symbols typed into a name field by mistake.
+// Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
 

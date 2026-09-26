@@ -18,9 +18,7 @@ const CHIP_CLASS = {
   extra: 'class-calendar-chip is-extra',
 };
 
-// Full month view: classes as chips, public holidays in red with that day's
-// classes crossed out. A day with a cancelled class gets an orange dot and a
-// day with an extra class a green dot.
+// Full month view
 function ClassCalendar({ year, month, onMonthChange, classes, events = [], holidays = {}, selectedDate, onSelectDate }) {
   const today = todayKey();
   // blank cells finish the last week so the grid stays a full rectangle

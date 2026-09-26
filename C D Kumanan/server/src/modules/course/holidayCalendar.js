@@ -1,6 +1,4 @@
-// Sri Lankan public holidays from Google Calendar's public holiday calendar.
-// Uses the calendar's public iCal feed, so no Google API key is needed.
-// The feed is cached for 12 hours; if Google can't be reached the last copy is kept.
+// Sri Lankan public holidays from Google Calendar (cached 12 hours)
 const config = require('../../../../../shared/server/src/config/env');
 
 const CACHE_MS = 12 * 60 * 60 * 1000;

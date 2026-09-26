@@ -1,5 +1,4 @@
-// Tutor/Admin: one click, mark today's attendance - no digging through a
-// list of past sessions to find today's row.
+// Tutor/Admin: one click, mark today's attendance
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrCreateTodaySession } from '../../api/attendanceApi';
@@ -40,8 +39,7 @@ function ClassSessionsPage() {
     };
   }, []);
 
-  // mark attendance btn - opens (or creates) today's session for this class
-  // and jumps straight to it, so this is the only click that's ever needed
+  // mark attendance btn
   async function handleMarkToday(classId) {
     setOpenError('');
     setOpeningId(classId);

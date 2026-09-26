@@ -111,8 +111,7 @@ function Navbar() {
     setToasts([]);
   }, [userId]);
 
-  // check again every minute (and when the tab regains focus), so scheduled
-  // reminders show up at their time
+  // check again every minute
   useEffect(() => {
     if (!isLoggedIn) return undefined;
     const timer = setInterval(loadNotifications, POLL_MS);
@@ -355,7 +354,7 @@ function Navbar() {
                           <span>
                             <span className="search-item-title">{person.fullName}</span>
                             <span className="search-item-sub">
-                              {person.email} · {person.role.replace('_', ' / ')}
+                              {[person.studentCode, person.email, person.role.replace('_', ' / ')].filter(Boolean).join(' · ')}
                             </span>
                           </span>
                         </button>

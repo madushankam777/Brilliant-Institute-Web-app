@@ -1,5 +1,4 @@
-// "Extra class" dialog: a calendar of every class at the institute, so the
-// tutor can see who is using which hall and when before booking a slot.
+// "Extra class" dialog
 import { useEffect, useState } from 'react';
 import { addExtraClass, browseClasses } from '../../api/courseApi';
 import useClassEvents from '../../hooks/useClassEvents';
@@ -10,11 +9,28 @@ import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import {
   addDaysToKey,
   formatLongDate,
+  formatTime,
   formatTimeRange,
+  fromMinutes,
   occurrencesOn,
   toMinutes,
   todayKey,
 } from '../../../../shared/client/src/utils/schedule';
+
+// time choices - 6:00 AM to 10:00 PM every 30 minutes
+const TIME_SLOTS = [];
+for (let minutes = 6 * 60; minutes <= 22 * 60; minutes += 30) {
+  TIME_SLOTS.push(fromMinutes(minutes));
+}
+
+function withValue(options, value) {
+  return options.includes(value) ? options : [...options, value].sort();
+}
+
+function nowMinutes() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
 
 function overlaps(item, startTime, endTime) {
   return toMinutes(item.startTime) < toMinutes(endTime) && toMinutes(item.endTime) > toMinutes(startTime);
@@ -46,7 +62,23 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
   // nothing runs on a public holiday
   const dayClasses = date ? occurrencesOn(allClasses, events, date) : [];
   const running = holidays[date] ? [] : dayClasses.filter((item) => item.kind !== 'cancelled');
-  const hasTimes = startTime && endTime && endTime > startTime;
+  const hasTimes = startTime && endTime && toMinutes(endTime) > toMinutes(startTime);
+  // today: a start time that has already passed can't be picked
+  const isPast = (time) => date === today && toMinutes(time) <= nowMinutes();
+  const startIsPast = Boolean(startTime) && isPast(startTime);
+  const startOptions = withValue(TIME_SLOTS.slice(0, -1), startTime);
+  const endOptions = withValue(TIME_SLOTS, endTime).filter((time) => toMinutes(time) > toMinutes(startTime));
+
+  // new start keeps the same length of class
+  function changeStart(value) {
+    const length = Math.max(toMinutes(endTime) - toMinutes(startTime), 30);
+    setStartTime(value);
+    if (toMinutes(endTime) <= toMinutes(value)) {
+      setEndTime(fromMinutes(Math.min(toMinutes(value) + length, 22 * 60)));
+    }
+    clearFieldError('startTime');
+    clearFieldError('endTime');
+  }
 
   // same hall, or the same tutor, at an overlapping time
   const clash =
@@ -61,6 +93,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
     event.preventDefault();
     const ok = validate({
       date: !date && 'Pick a day on the calendar.',
+      startTime: startIsPast && 'That time has already passed today. Pick a later time.',
       endTime: !hasTimes && 'End time must be after the start time.',
       venue: !room && 'Enter the hall or room.',
     });
@@ -152,28 +185,42 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
           <div className="card-field-row">
             <div className="form-field">
               <label htmlFor="extra-start">Start time</label>
-              <input
+              <select
                 id="extra-start"
-                type="time"
                 value={startTime}
-                onChange={(e) => {
-                  setStartTime(e.target.value);
-                  clearFieldError('endTime');
-                }}
-              />
+                className={fieldErrors.startTime || startIsPast ? 'input-error' : ''}
+                onChange={(e) => changeStart(e.target.value)}
+              >
+                {startOptions.map((time) => (
+                  <option key={time} value={time} disabled={isPast(time)}>
+                    {formatTime(time)}
+                    {isPast(time) ? ' (passed)' : ''}
+                  </option>
+                ))}
+              </select>
+              {(fieldErrors.startTime || startIsPast) && (
+                <p className="field-error">
+                  {fieldErrors.startTime || 'That time has already passed today. Pick a later time.'}
+                </p>
+              )}
             </div>
             <div className="form-field">
               <label htmlFor="extra-end">End time</label>
-              <input
+              <select
                 id="extra-end"
-                type="time"
                 value={endTime}
                 className={fieldErrors.endTime ? 'input-error' : ''}
                 onChange={(e) => {
                   setEndTime(e.target.value);
                   clearFieldError('endTime');
                 }}
-              />
+              >
+                {endOptions.map((time) => (
+                  <option key={time} value={time}>
+                    {formatTime(time)}
+                  </option>
+                ))}
+              </select>
               {fieldErrors.endTime && <p className="field-error">{fieldErrors.endTime}</p>}
             </div>
           </div>
@@ -226,7 +273,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={isSaving || Boolean(clash) || Boolean(date && holidays[date])}
+              disabled={isSaving || Boolean(clash) || startIsPast || Boolean(date && holidays[date])}
             >
               {isSaving ? 'Saving...' : 'Add extra class'}
             </button>

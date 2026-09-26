@@ -2,8 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchClassEvents } from '../api/courseApi';
 import { addDaysToKey, startOfWeek, todayKey } from '../../../shared/client/src/utils/schedule';
 
-// Cancelled days and extra classes between two dates.
-// Returns [events, reload]; if they can't be loaded the list is empty.
+// Cancelled days and extra classes between two dates
 function useClassEvents(fromDate, toDate) {
   const [events, setEvents] = useState([]);
   const [version, setVersion] = useState(0);

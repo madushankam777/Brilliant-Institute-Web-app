@@ -9,10 +9,10 @@ const listHolidays = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { holidays } });
 });
 
-// public - About page numbers
-const getPublicOverview = asyncHandler(async (req, res) => {
-  const overview = await service.getPublicOverview();
-  res.status(200).json({ success: true, data: overview });
+// public - About page tutor cards
+const listPublicTutors = asyncHandler(async (req, res) => {
+  const tutors = await service.listPublicTutors();
+  res.status(200).json({ success: true, data: { tutors } });
 });
 
 // cancelled days and extra classes between two dates
@@ -139,7 +139,7 @@ const listMyCourses = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getPublicOverview,
+  listPublicTutors,
   listHolidays,
   listClassEvents,
   cancelClassDay,

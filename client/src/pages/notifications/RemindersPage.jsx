@@ -1,5 +1,4 @@
-// Tutor: schedule reminders for a date and time. At that moment they appear
-// in the notification bell of whoever they were set for.
+// Tutor: schedule reminders for a date and time
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchMyClassesForMessaging,
@@ -88,6 +87,9 @@ function RemindersPage() {
 
   const upcoming = reminders.filter((item) => item.status === 'SCHEDULED');
   const sent = reminders.filter((item) => item.status === 'SENT').reverse();
+
+  // a time that has already passed today
+  const timeIsPast = Boolean(date && time) && new Date(`${date}T${time}`) <= new Date();
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -186,10 +188,12 @@ function RemindersPage() {
                             setTime(e.target.value);
                             clearFieldError('time');
                           }}
-                          className={fieldErrors.time || fieldErrors.remindAt ? 'input-error' : ''}
+                          className={fieldErrors.time || fieldErrors.remindAt || timeIsPast ? 'input-error' : ''}
                         />
-                        {(fieldErrors.time || fieldErrors.remindAt) && (
-                          <p className="field-error">{fieldErrors.time || fieldErrors.remindAt}</p>
+                        {(fieldErrors.time || fieldErrors.remindAt || timeIsPast) && (
+                          <p className="field-error">
+                            {fieldErrors.time || fieldErrors.remindAt || 'That time has already passed. Pick a later time.'}
+                          </p>
                         )}
                       </div>
                     </div>

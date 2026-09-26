@@ -1,5 +1,4 @@
-// Admin: list/filter/create/suspend/reactivate user accounts (ADM-02),
-// plus generating the enrollment keys that let a Tutor self-register.
+// Admin: list/filter/create/suspend/reactivate user accounts
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {

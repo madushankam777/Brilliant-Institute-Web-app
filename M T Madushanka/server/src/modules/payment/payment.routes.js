@@ -18,6 +18,8 @@ const {
   failPayoutRules,
   bankDetailsRules,
   paymentSettingsRules,
+  studentSearchRules,
+  recordPaymentRules,
 } = require('./payment.validation');
 
 const router = express.Router();
@@ -49,9 +51,7 @@ router.get('/balance', authorize(ROLES.STUDENT_PARENT), controller.getMyBalances
 router.get('/history', authorize(ROLES.STUDENT_PARENT), controller.getMyPaymentHistory);
 router.post('/', authorize(ROLES.STUDENT_PARENT), makePaymentRules, validateRequest, controller.makePayment);
 
-// Real online payment (card / eZ Cash / mCash via PayHere). The webhook that
-// actually settles it is mounted separately in app.js, ahead of the auth and
-// CSRF guards, because PayHere calls it server-to-server.
+// real online payment (PayHere)
 router.post(
   '/checkout/online',
   authorize(ROLES.STUDENT_PARENT),
@@ -95,6 +95,22 @@ router.patch(
   controller.editBankTransferPayment
 );
 
+// admin - record a cash / bank-slip payment at the office
+router.get(
+  '/admin/students',
+  authorize(ROLES.ADMIN),
+  studentSearchRules,
+  validateRequest,
+  controller.searchStudentsForPayment
+);
+router.post(
+  '/admin/record-payment',
+  authorize(ROLES.ADMIN),
+  recordPaymentRules,
+  validateRequest,
+  controller.recordOfficePayment
+);
+
 router.get(
   '/admin/pending-bank-transfers',
   authorize(ROLES.ADMIN),
@@ -120,8 +136,7 @@ router.patch(
   controller.rejectBankTransferPayment
 );
 
-// Any authenticated Student/Parent or Admin can request a receipt image -
-// the service layer checks it's either the paying student or an Admin.
+// Any authenticated Student/Parent or Admin can request a receipt image
 router.get(
   '/:paymentId/receipt-image',
   authorize(ROLES.STUDENT_PARENT, ROLES.ADMIN),

@@ -14,8 +14,7 @@ const authRoutes = require('./modules/auth/auth.routes');
 
 const app = express();
 
-// We run behind a proxy in production, so this lets Express read the
-// real client IP/HTTPS status correctly (needed for rate limiting + cookies).
+// We run behind a proxy in production
 app.set('trust proxy', config.trustProxy);
 
 // Adds standard security headers to every response.
@@ -24,9 +23,7 @@ app.use(helmet());
 // Only allow our own frontend to call this API (with cookies), never "*".
 app.use(
   cors({
-    // CLIENT_ORIGIN can list more than one allowed origin (comma-separated) -
-    // e.g. localhost plus a LAN IP for testing from other devices. Still an
-    // explicit whitelist check, never "*", per OWASP CORS guidance.
+    // CLIENT_ORIGIN can list more than one allowed origin
     origin(origin, callback) {
       if (
         !origin ||

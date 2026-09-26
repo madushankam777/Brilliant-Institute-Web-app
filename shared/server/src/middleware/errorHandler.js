@@ -20,9 +20,7 @@ function errorHandler(err, req, res, next) {
   const isKnownError = err instanceof ApiError;
   const statusCode = isKnownError ? err.statusCode : 500;
 
-  // Expected client errors (401 on a logged-out page load, wrong password,
-  // validation) are already visible as a status line from the request logger;
-  // only unexpected failures deserve a full stack trace in the console.
+  // full stack trace only for unexpected errors
   if (!isKnownError || statusCode >= 500) {
     // eslint-disable-next-line no-console
     console.error(`[error] ${req.method} ${req.originalUrl} ->`, err);
@@ -48,8 +46,7 @@ function errorHandler(err, req, res, next) {
     responseBody.details = err.details;
   }
 
-  // Stack traces go to the server console only - never to the browser,
-  // even in development (a dev server can be reached through a tunnel).
+  // Stack traces go to the server console only
   res.status(statusCode).json(responseBody);
 }
 

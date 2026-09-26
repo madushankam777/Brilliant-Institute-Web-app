@@ -1,21 +1,4 @@
-// PayHere gateway - real card / eZ Cash / mCash payments.
-// -----------------------------------------------------------------------
-// Flow (PayHere "Checkout API"):
-//   1. We create a PENDING payment row and hand the browser a signed set of
-//      form fields (buildCheckoutRequest).
-//   2. The browser POSTs that form to PayHere and the payer enters their
-//      card there - card data never touches this server, which keeps the
-//      project out of the heavy PCI-DSS scope.
-//   3. PayHere POSTs the result server-to-server to our notify_url. That
-//      callback - verified with verifyNotification() - is the ONLY thing
-//      that marks a payment successful. The payer's browser coming back to
-//      return_url proves nothing and is display-only.
-//
-// Money never moves "into a bank account" from here: PayHere settles to
-// whichever bank account the merchant registered in their PayHere account.
-//
-// Spec: https://support.payhere.lk/api-&-mobile-sdk/checkout-api
-// -----------------------------------------------------------------------
+// PayHere gateway - card / eZ Cash / mCash payments
 const crypto = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 
@@ -33,9 +16,7 @@ const STATUS = Object.freeze({
   CHARGEDBACK: '-3',
 });
 
-// PayHere reports which instrument was actually used. Map the ones we know
-// onto this project's own method codes; anything unrecognised stays
-// 'ONLINE' rather than inventing a label for it.
+// PayHere reports which instrument was actually used
 const METHOD_MAP = Object.freeze({
   VISA: 'CARD',
   MASTER: 'CARD',
@@ -44,8 +25,7 @@ const METHOD_MAP = Object.freeze({
   MCASH: 'MCASH',
 });
 
-// MD5 is not a security choice we get to make - PayHere's signature
-// protocol specifies it, so both directions have to use it.
+// MD5 is required by PayHere's signature rules
 function md5Upper(value) {
   return crypto.createHash('md5').update(String(value)).digest('hex').toUpperCase();
 }
@@ -75,10 +55,7 @@ function notifyUrl() {
   );
 }
 
-/**
- * Signed field set for the browser to POST to PayHere.
- * Returns { actionUrl, fields } - `fields` goes into a hidden form.
- */
+// Signed field set for the browser to POST to PayHere
 function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
   if (!isConfigured()) {
     throw new Error('PayHere is not configured.');
@@ -111,15 +88,12 @@ function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
       items: itemDescription,
       currency,
       amount: formattedAmount,
-      // Proves the amount/order came from us and wasn't edited in the
-      // browser on the way to PayHere. Without it PayHere rejects the
-      // request outright.
+      // signature so the amount can't be changed in the browser
       hash,
       first_name: firstName,
       last_name: lastName,
       email: student.email,
-      // PayHere requires these, but a tuition class has no delivery address -
-      // send the institute's own city/country rather than fake personal data.
+      // PayHere needs an address - use the institute's
       phone: student.phone || '',
       address: 'Brilliant Institute',
       city: 'Colombo',
@@ -128,11 +102,7 @@ function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
   };
 }
 
-/**
- * Checks that a notification really came from PayHere (and not from someone
- * POSTing to our public webhook). Returns a normalised result; callers must
- * treat `valid === false` as "ignore this entirely".
- */
+// Checks that a notification really came from PayHere
 function verifyNotification(body = {}) {
   const {
     merchant_id: merchantId,

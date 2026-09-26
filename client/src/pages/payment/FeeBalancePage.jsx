@@ -15,11 +15,12 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import { useAuth } from '../../context/AuthContext';
+import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
-// Shown when no real gateway is configured - the built-in simulator, where
-// the "card" fields are collected here and no money actually moves.
+// demo simulator tabs
 const PAYMENT_METHODS = [
   { value: 'CARD', label: 'Card' },
   { value: 'EZ_CASH', label: 'eZ Cash' },
@@ -27,9 +28,7 @@ const PAYMENT_METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
-// Shown when PayHere IS configured. Card/eZ Cash/mCash collapse into one
-// option because the payer chooses the instrument on PayHere's own page -
-// we deliberately never see a card number.
+// Shown when PayHere IS configured
 const LIVE_PAYMENT_METHODS = [
   { value: 'ONLINE', label: 'Card / eZ Cash / mCash' },
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
@@ -41,12 +40,10 @@ const BANK_ONLY_METHODS = [{ value: 'BANK_TRANSFER', label: 'Bank Transfer' }];
 // wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
-// Letters, spaces, apostrophes, and hyphens only - no digits or symbols
-// typed into a name field by mistake.
+// Letters, spaces, apostrophes, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 
-// Letters, numbers, spaces, hyphens, and slashes - what a real bank
-// account number or transfer reference looks like, nothing else.
+// Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
 function formatCurrency(amount) {
@@ -78,6 +75,12 @@ function detectCardBrand(digits) {
   return 'Card';
 }
 
+// card number as 1234-5678-9012-3456
+function formatCardNumber(raw) {
+  const digits = String(raw).replace(/\D/g, '').slice(0, 19);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1-');
+}
+
 // auto-add "/" in expiry date input (MM/YY)
 function formatExpiryInput(rawValue, previousFormatted) {
   const isDeleting = rawValue.length < previousFormatted.length;
@@ -96,6 +99,7 @@ function formatExpiryInput(rawValue, previousFormatted) {
 const emptyCardDetails = { cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' };
 
 function FeeBalancePage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const autoStartedRef = useRef(false);
@@ -119,8 +123,7 @@ function FeeBalancePage() {
   const [bankTransferClosedMessage, setBankTransferClosedMessage] = useState('');
   const [paymentSettings, setPaymentSettings] = useState(null);
 
-  // Set by the server: true once PayHere credentials are in place, false
-  // while the project is running on the built-in simulator.
+  // gateway / simulator switches from the server
   const onlinePaymentsEnabled = Boolean(paymentSettings && paymentSettings.onlinePaymentsEnabled);
   const simulatorEnabled = Boolean(paymentSettings && paymentSettings.simulatorEnabled);
   let methodTabs = BANK_ONLY_METHODS;
@@ -158,8 +161,7 @@ function FeeBalancePage() {
       });
   }, [loadBalances]);
 
-  // Settings arrive a moment after the balances do - keep the chosen method
-  // on one of the tabs that are actually available.
+  // Settings arrive a moment after the balances do
   useEffect(() => {
     setPaymentMethod((current) => (methodTabs.some((tab) => tab.value === current) ? current : defaultMethod));
   }, [methodTabs, defaultMethod]);
@@ -266,9 +268,12 @@ function FeeBalancePage() {
       setPayError('Please enter a valid amount greater than zero.');
       return;
     }
+    if (parsedAmount > Number(activeEnrollment.balance)) {
+      setPayError(`The amount can't be more than your balance of ${formatCurrency(activeEnrollment.balance)}.`);
+      return;
+    }
 
-    // Real gateway: reserve the payment, then hand the browser over to
-    // PayHere. Nothing else on this page runs - we leave the site.
+    // Real gateway: reserve the payment
     if (paymentMethod === 'ONLINE') {
       setIsPaying(true);
       try {
@@ -609,10 +614,11 @@ function FeeBalancePage() {
                             id="cardNumber"
                             type="text"
                             inputMode="numeric"
-                            placeholder="0000 0000 0000 0000"
-                            maxLength={19}
+                            placeholder="0000-0000-0000-0000"
+                            maxLength={23}
+                            autoComplete="cc-number"
                             value={cardDetails.cardNumber}
-                            onChange={(e) => updateCardField('cardNumber', e.target.value)}
+                            onChange={(e) => updateCardField('cardNumber', formatCardNumber(e.target.value))}
                             className={fieldErrors.cardNumber ? 'input-error' : ''}
                           />
                           {fieldErrors.cardNumber && <p className="field-error">{fieldErrors.cardNumber}</p>}
@@ -646,7 +652,7 @@ function FeeBalancePage() {
                               placeholder="123"
                               maxLength={4}
                               value={cardDetails.cvv}
-                              onChange={(e) => updateCardField('cvv', e.target.value)}
+                              onChange={(e) => updateCardField('cvv', e.target.value.replace(/\D/g, ''))}
                               className={fieldErrors.cvv ? 'input-error' : ''}
                             />
                             {fieldErrors.cvv && <p className="field-error">{fieldErrors.cvv}</p>}
@@ -674,7 +680,8 @@ function FeeBalancePage() {
                             type="tel"
                             placeholder="07XXXXXXXX"
                             value={walletPhone}
-                            onChange={(e) => setWalletPhone(e.target.value)}
+                            maxLength={12}
+                            onChange={(e) => setWalletPhone(e.target.value.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, ''))}
                             className={fieldErrors.walletPhone ? 'input-error' : ''}
                           />
                           {fieldErrors.walletPhone ? (
@@ -690,6 +697,18 @@ function FeeBalancePage() {
 
                     {paymentMethod === 'BANK_TRANSFER' && (
                       <>
+                        {/* slip note - name and registration number */}
+                        <div className="slip-note" role="note">
+                          <Icon name="alertTriangle" size={22} />
+                          <div>
+                            <strong>Write your full name and registration number clearly on the bank slip</strong>
+                            {' '}(or in the transfer reference) so the office can match your payment.
+                            <div className="slip-note-details">
+                              <span>{user.fullName}</span>
+                              <span>{user.studentCode || 'Registration number on your profile'}</span>
+                            </div>
+                          </div>
+                        </div>
                         <div className="callout" style={{ marginBottom: '16px' }}>
                           <span>
                             <strong>Transfer to this account, then fill in the details below:</strong>
@@ -743,17 +762,14 @@ function FeeBalancePage() {
 
                     <div className="form-field">
                       <label htmlFor="amount">Amount (LKR)</label>
-                      <input
+                      <NumberInput
                         id="amount"
-                        type="number"
-                        min="1"
-                        max={activeEnrollment.balance}
-                        step="0.01"
+                        decimals={2}
                         placeholder="0.00"
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        required
+                        onChange={setAmount}
                       />
+                      <p className="field-help">Up to {formatCurrency(activeEnrollment.balance)}.</p>
                     </div>
 
                     <button type="submit" className="btn btn-primary btn-block" disabled={isPaying}>

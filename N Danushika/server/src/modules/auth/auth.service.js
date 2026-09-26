@@ -10,14 +10,13 @@ const { ROLES, SESSION_COOKIE_NAME } = require('../../../../../shared/server/src
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
 const { passwordVersion } = require('../../../../../shared/server/src/utils/sessionToken');
+const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
 const repository = require('./auth.repository');
 
-// Same cost as real hashes, so a login for an unknown email takes as long
-// as one for a real account (no timing hint about which emails exist).
+// Same cost as real hashes
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', config.auth.bcryptSaltRounds);
 
-// ST0000001, ST0000002, ... - built from the row's own auto-increment id,
-// so it's only ever known once the INSERT has actually happened.
+// student code, e.g. ST0000001
 function buildStudentCode(userId) {
   return `ST${String(userId).padStart(7, '0')}`;
 }
@@ -25,8 +24,7 @@ function buildStudentCode(userId) {
 async function registerUser({ fullName, email, password, phone, role, enrollmentKey, grade }) {
   const existing = await repository.findUserByEmail(email);
   if (existing) {
-    // It's fine to say "this email is taken" on a public sign-up form -
-    // unlike login, there's no security downside to telling them that here.
+    // sign-up can say the email is taken
     throw ApiError.conflict('An account with this email already exists. Try logging in instead.');
   }
 
@@ -93,8 +91,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
   return toSafeUser(user);
 }
 
-// Create a signed login token for this user. `pwv` ties the session to the
-// current password, so changing or resetting it logs out every other session.
+// login token - pwv logs out old sessions after a password change
 function signSessionToken(user) {
   return jwt.sign(
     { sub: user.id, role: user.role, email: user.email, pwv: passwordVersion(user.password_hash) },
@@ -103,12 +100,9 @@ function signSessionToken(user) {
   );
 }
 
-// Store the login token in a cookie that JavaScript can't read and that
-// only gets sent back to our own site (httpOnly + SameSite=Strict).
+// Store the login token in a cookie that JavaScript can't read
 function attachSessionCookie(res, token) {
-  // A Secure cookie is dropped by the browser over plain http://, so decide
-  // per request: HTTPS (including through a trusted proxy) gets Secure,
-  // local http://localhost does not. COOKIE_SECURE=true forces it on.
+  // Secure cookie on HTTPS
   const isHttps = Boolean(res.req && res.req.secure);
   res.cookie(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -123,13 +117,11 @@ function clearSessionCookie(res) {
   res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
 }
 
-// Check email + password and log the user in, with lockout after too many
-// failed attempts.
+// login - locks the account after too many failed attempts
 async function loginWithEmailAndPassword({ email, password }, res) {
   const user = await repository.findUserByEmail(email);
 
-  // Same error for "no such user" and "wrong password" on purpose, so a
-  // login attempt can't be used to guess which emails are registered.
+  // Same error for "no such user" and "wrong password" on purpose
   const genericError = 'Invalid email or password.';
   const isAccountUsable = Boolean(user) && user.status === 'ACTIVE';
 
@@ -247,9 +239,7 @@ async function removeProfilePicture(userId) {
   return toSafeUser(user);
 }
 
-// Change the logged-in user's own password (must know the current one).
-// Returns the user row with the new hash so the caller can re-issue this
-// browser's session (every other session stops working).
+// Change the logged-in user's own password
 async function changePassword(userId, { currentPassword, newPassword }) {
   const user = await repository.findUserById(userId);
   if (!user) {
@@ -280,31 +270,123 @@ function refreshSession(res, userRow) {
 
 const RESET_TOKEN_BYTES = 32;
 const RESET_TOKEN_TTL_MINUTES = 30;
+const RESET_CODE_TTL_MINUTES = 15;
+const RESET_CODE_MAX_TRIES = 5;
+const RESET_CODE_RESEND_SECONDS = 60;
+
+// wrong-code count and last send time per user (kept in memory)
+const codeTries = new Map();
+const lastCodeSentAt = new Map();
 
 function hashResetToken(rawToken) {
   return crypto.createHash('sha256').update(rawToken).digest('hex');
 }
 
+// reset code hash - tied to the user and the server secret
+function hashResetCode(userId, code) {
+  return crypto.createHmac('sha256', config.auth.jwtSecret).update(`${userId}:${code}`).digest('hex');
+}
+
+// forgot password btn - email a 6-digit code (same answer whether or not the email exists)
 async function requestPasswordReset(email) {
   const user = await repository.findUserByEmail(email);
+  if (!user || user.status !== 'ACTIVE') return;
 
-  if (user && user.status === 'ACTIVE') {
-    const rawToken = await createResetToken(user.id);
-    await recordAuditEvent({
-      actorId: user.id,
-      action: 'PASSWORD_RESET_REQUESTED',
-      entityType: 'user',
-      entityId: user.id,
-    });
+  // one code a minute at most
+  const last = lastCodeSentAt.get(user.id) || 0;
+  if (Date.now() - last < RESET_CODE_RESEND_SECONDS * 1000) return;
+  lastCodeSentAt.set(user.id, Date.now());
 
-    // The link must only ever reach the account owner, never this response.
-    // No email service is set up yet, so in development it goes to the
-    // server console; otherwise the office issues a link (Admin > user page).
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60 * 1000);
+  await repository.invalidateResetTokensForUser(user.id);
+  await repository.deleteOldResetTokensForUser(user.id);
+  await repository.createPasswordResetToken(user.id, hashResetCode(user.id, code), expiresAt);
+  codeTries.delete(user.id);
+
+  await recordAuditEvent({
+    actorId: user.id,
+    action: 'PASSWORD_RESET_REQUESTED',
+    entityType: 'user',
+    entityId: user.id,
+  });
+
+  // sent in the background so the reply takes the same time for every email
+  sendMail({
+    to: user.email,
+    subject: `${code} is your Brilliant Institute reset code`,
+    text:
+      `Hi ${user.full_name},\n\nYour password reset code is ${code}\n\n` +
+      `It works once and expires in ${RESET_CODE_TTL_MINUTES} minutes. ` +
+      'If you did not ask for this, you can ignore this email - your password stays the same.\n\nBrilliant Institute',
+    html: resetCodeEmail(user.full_name, code),
+  }).catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error(`[mail] could not send the reset code to ${user.email}: ${error.message}`);
     if (!config.isProduction) {
       // eslint-disable-next-line no-console
-      console.log(`[dev-only] Password reset link for ${email}: /reset-password?token=${rawToken}`);
+      console.log(`[dev-only] reset code for ${user.email}: ${code}`);
     }
+  });
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+}
+
+// reset code email
+function resetCodeEmail(name, code) {
+  return `
+  <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
+    <h2 style="margin:0 0 12px;color:#1d4ed8">Brilliant Institute</h2>
+    <p>Hi ${escapeHtml(name)},</p>
+    <p>Use this code to reset your password:</p>
+    <p style="font-size:32px;font-weight:800;letter-spacing:8px;margin:16px 0;color:#1d4ed8">${code}</p>
+    <p>It works once and expires in ${RESET_CODE_TTL_MINUTES} minutes.</p>
+    <p style="color:#64748b;font-size:13px">Didn't ask for this? Ignore this email - your password stays the same.</p>
+  </div>`;
+}
+
+// reset with code btn - check the emailed code, set the new password and log in
+async function resetPasswordWithCode({ email, code, newPassword }, res) {
+  const invalid = 'That code is wrong or has expired. Check the latest email or ask for a new code.';
+  const user = await repository.findUserByEmail(email);
+  if (!user || user.status !== 'ACTIVE') {
+    throw ApiError.badRequest(invalid);
   }
+
+  const resetToken = await repository.findValidResetTokenForUser(user.id, hashResetCode(user.id, code));
+  if (!resetToken) {
+    // too many wrong codes - the current code stops working
+    const tries = (codeTries.get(user.id) || 0) + 1;
+    codeTries.set(user.id, tries);
+    if (tries >= RESET_CODE_MAX_TRIES) {
+      await repository.invalidateResetTokensForUser(user.id);
+      codeTries.delete(user.id);
+      throw ApiError.badRequest('Too many wrong codes. Please ask for a new code.');
+    }
+    throw ApiError.badRequest(invalid);
+  }
+
+  const newHash = await bcrypt.hash(newPassword, config.auth.bcryptSaltRounds);
+  await repository.updatePasswordHash(user.id, newHash);
+  await repository.markResetTokenUsed(resetToken.id);
+  await repository.invalidateResetTokensForUser(user.id);
+  await repository.resetFailedLoginCounter(user.id);
+  codeTries.delete(user.id);
+
+  await recordAuditEvent({
+    actorId: user.id,
+    action: 'PASSWORD_RESET_COMPLETED',
+    entityType: 'user',
+    entityId: user.id,
+    details: { method: 'email code' },
+  });
+
+  // log straight in with the new password
+  const updatedUser = { ...user, password_hash: newHash };
+  attachSessionCookie(res, signSessionToken(updatedUser));
+  return toSafeUser(updatedUser);
 }
 
 // one-time reset token; only its hash is stored
@@ -312,6 +394,7 @@ async function createResetToken(userId) {
   const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString('hex');
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
   await repository.invalidateResetTokensForUser(userId);
+  await repository.deleteOldResetTokensForUser(userId);
   await repository.createPasswordResetToken(userId, hashResetToken(rawToken), expiresAt);
   return rawToken;
 }
@@ -351,6 +434,7 @@ module.exports = {
   changePassword,
   refreshSession,
   requestPasswordReset,
+  resetPasswordWithCode,
   createResetToken,
   RESET_TOKEN_TTL_MINUTES,
   resetPasswordWithToken,

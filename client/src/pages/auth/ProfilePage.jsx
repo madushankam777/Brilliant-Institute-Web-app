@@ -1,5 +1,4 @@
-// Profile page: two separate forms - one to edit your details, one to
-// change your password.
+// Profile page: two separate forms
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -280,6 +279,16 @@ function ProfilePage() {
           <Alert type="error" message={profileError} />
 
           <form onSubmit={handleProfileSubmit} noValidate>
+            {user.studentCode && (
+              <FormField
+                id="studentCode"
+                label="Registration number"
+                icon="user"
+                value={user.studentCode}
+                onChange={() => {}}
+                disabled
+              />
+            )}
             <FormField id="email" label="Email address" icon="mail" value={user.email} onChange={() => {}} disabled />
             <p className="field-help" style={{ marginTop: '-12px' }}>
               Your email address cannot be changed here.

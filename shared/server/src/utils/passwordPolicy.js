@@ -1,8 +1,6 @@
 // Password strength rule
 const MIN_LENGTH = 8;
-// bcrypt silently ignores anything past 72 bytes, so a longer password
-// gives no extra security and two different passwords could hash the
-// same - reject before that point instead of allowing false confidence.
+// bcrypt ignores anything past 72 bytes
 const MAX_LENGTH = 72;
 
 const STRENGTH_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;

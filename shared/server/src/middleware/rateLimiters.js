@@ -2,10 +2,7 @@
 const rateLimit = require('express-rate-limit');
 const config = require('../config/env');
 
-// Login / sign-up / reset: only FAILED attempts count, per device and
-// email - so a whole class signing in on the institute Wi-Fi is fine, but
-// guessing one account's password is not. (Accounts also lock after
-// repeated wrong passwords.)
+// login limiter - failed attempts per device + email
 const authAttemptLimiter = rateLimit({
   windowMs: config.rateLimit.authWindowMinutes * 60 * 1000,
   max: config.rateLimit.authMaxAttempts,
@@ -33,6 +30,25 @@ const authDeviceLimiter = rateLimit({
 });
 
 const authLimiter = [authDeviceLimiter, authAttemptLimiter];
+
+// forgot password - every request counts, so nobody can flood an inbox
+const resetRequestLimiter = [
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    keyGenerator: (req) => `${req.ip}|${String((req.body && req.body.email) || '').trim().toLowerCase()}`,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many code requests. Please wait a few minutes and try again.' },
+  }),
+  rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many code requests from this device. Please try again later.' },
+  }),
+];
 
 // per logged-in person, so classmates on the same Wi-Fi don't block each other
 function perUserKey(req) {
@@ -63,8 +79,7 @@ const checkinLimiter = rateLimit({
   },
 });
 
-// blocks guessing a re-registration key. A key is only valid for the student
-// it was issued to, so this is already narrow - the limit closes the gap.
+// blocks guessing a re-registration key
 const keyRedemptionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -89,4 +104,4 @@ const contactLimiter = rateLimit({
   },
 });
 
-module.exports = { authLimiter, apiLimiter, checkinLimiter, keyRedemptionLimiter, contactLimiter };
+module.exports = { resetRequestLimiter, authLimiter, apiLimiter, checkinLimiter, keyRedemptionLimiter, contactLimiter };

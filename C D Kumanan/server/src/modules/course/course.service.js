@@ -3,7 +3,6 @@ const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { toSafeClass, toSafeTutorProfile } = require('../../../../../shared/server/src/utils/sanitize');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
-const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const repository = require('./course.repository');
 const holidayCalendar = require('./holidayCalendar');
 const {
@@ -72,10 +71,16 @@ function todayDateString() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-async function assertValidStartDate(startDate, dayOfWeek) {
+async function assertValidStartDate(startDate, dayOfWeek, startTime) {
   if (!startDate) return;
   if (startDate < todayDateString()) {
     throw ApiError.badRequest('The first class date cannot be in the past.');
+  }
+  // first class today - the start time must still be ahead
+  const now = new Date();
+  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  if (startDate === todayDateString() && String(startTime).slice(0, 5) <= nowTime) {
+    throw ApiError.badRequest('That start time has already passed today. Pick a later time or another day.');
   }
   const weekday = DAY_NAMES[new Date(`${startDate}T00:00:00`).getDay()];
   if (weekday !== dayOfWeek) {
@@ -135,7 +140,7 @@ async function resolveTutorForNewClass(actingUser, requestedTutorId) {
 
 async function createClass(actingUser, data) {
   const tutorId = await resolveTutorForNewClass(actingUser, data.tutorId);
-  await assertValidStartDate(data.startDate, data.dayOfWeek);
+  await assertValidStartDate(data.startDate, data.dayOfWeek, data.startTime);
   await assertNoScheduleConflicts({ tutorId, ...data });
 
   const classId = await repository.createClass({ ...data, tutorId });
@@ -151,8 +156,7 @@ async function createClass(actingUser, data) {
   return { classData: toSafeClass(created) };
 }
 
-// Which edits a student actually needs to hear about. Cosmetic edits
-// (description wording, capacity) don't earn a notification.
+// Which edits a student actually needs to hear about
 const NOTIFIABLE_FIELDS = [
   { key: 'dayOfWeek', column: 'day_of_week', label: 'day', kind: 'text' },
   { key: 'startTime', column: 'start_time', label: 'start time', kind: 'time' },
@@ -162,8 +166,7 @@ const NOTIFIABLE_FIELDS = [
   { key: 'subject', column: 'subject', label: 'class title', kind: 'text' },
 ];
 
-// MySQL hands times back as "15:00:00" while the form sends "15:00", so
-// times are compared on HH:MM only.
+// compare times on HH:MM only
 function hasFieldChanged(field, before, after) {
   if (before === undefined || before === null || after === undefined || after === null) return false;
   if (field.kind === 'number') return Number(before) !== Number(after);
@@ -177,8 +180,7 @@ function describeClassChanges(existing, data) {
   ).map((field) => `${field.label} is now ${data[field.key]}`);
 }
 
-// Tell everyone enrolled that their class moved/changed. Never blocks the
-// edit itself - a notification that fails to send shouldn't undo the update.
+// Tell everyone enrolled that their class moved/changed
 async function notifyEnrolledStudents(classId, message, actorId) {
   try {
     const studentIds = await repository.listActiveStudentIdsForClass(classId);
@@ -363,16 +365,16 @@ async function listMyCourses(studentUser) {
   }));
 }
 
-// About page numbers; grades come back in school order
-async function getPublicOverview() {
-  const { counts, subjects, grades } = await repository.getPublicOverview();
-  return {
-    classCount: Number(counts.class_count),
-    tutorCount: Number(counts.tutor_count),
-    studentCount: Number(counts.student_count),
-    subjects,
-    grades: GRADES.filter((grade) => grades.includes(grade)),
-  };
+// About page - tutor cards
+async function listPublicTutors() {
+  const rows = await repository.listPublicTutors();
+  return rows.map((row) => ({
+    id: row.id,
+    fullName: row.full_name,
+    profilePictureUrl: row.profile_picture_path,
+    bio: row.bio ? String(row.bio).slice(0, 220) : null,
+    subjects: row.subjects ? row.subjects.split('|') : [],
+  }));
 }
 
 // --- Cancelled days and extra classes ---
@@ -414,8 +416,7 @@ async function requireClassEvents() {
   if (!(await hasClassEvents())) throw migrationRequired();
 }
 
-// Students only see changes to their own classes; staff see everything
-// (tutors need the whole picture to find a free room for an extra class).
+// Students only see changes to their own classes
 async function listClassEvents(user, fromDate, toDate) {
   if (!(await hasClassEvents())) return [];
   const studentId = user.role === ROLES.STUDENT_PARENT ? user.id : null;
@@ -479,8 +480,7 @@ async function cancelClassDay(user, classId, { date, note }) {
   return { event: toSafeClassEvent(event), notifiedCount };
 }
 
-// A room or a tutor can only hold one class at a time on that day,
-// counting weekly classes and other extra classes.
+// A room or a tutor can only hold one class at a time on that day
 async function assertExtraClassSlotFree({ date, startTime, endTime, venue, tutorId }) {
   const slot = { eventDate: date, startTime, endTime, venue, tutorId };
   const clash =
@@ -505,6 +505,12 @@ async function addExtraClass(user, classId, { date, startTime, endTime, venue, n
 
   if (date < todayDateString()) {
     throw ApiError.badRequest('An extra class cannot be in the past.');
+  }
+  // today - the start time must still be ahead
+  const now = new Date();
+  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  if (date === todayDateString() && startTime.slice(0, 5) <= nowTime) {
+    throw ApiError.badRequest('That start time has already passed today. Pick a later time.');
   }
   const [holiday] = await holidayCalendar.getHolidays(date, date);
   if (holiday) {
@@ -571,8 +577,7 @@ async function deleteClassEvent(user, eventId) {
   return { restored, notifiedCount };
 }
 
-// Weekly timetable: a tutor's classes, or the classes a student attends.
-// Anyone can see their own; only Admin can look up someone else's.
+// weekly timetable - your own, or anyone's for admin
 async function getTimetable(viewer, userId) {
   const targetId = userId || viewer.id;
   if (targetId !== viewer.id && viewer.role !== ROLES.ADMIN) {
@@ -595,7 +600,7 @@ async function getTimetable(viewer, userId) {
 }
 
 module.exports = {
-  getPublicOverview,
+  listPublicTutors,
   listClassEvents,
   cancelClassDay,
   addExtraClass,

@@ -1,7 +1,6 @@
 require('dotenv').config();
 
-// Every variable in this list MUST be present in the environment (.env file)
-// or the server will stop immediately with a helpful error message.
+// Every variable in this list MUST be present in the environment
 const REQUIRED_VARS = [
   'JWT_SECRET',
   'DB_HOST',
@@ -30,8 +29,7 @@ function assertRequiredEnvVars() {
     process.exit(1);
   }
 
-  // A short JWT secret is brute-forceable against the signed tokens it
-  // produces - refuse to start rather than run with a weak one.
+  // refuse to start with a weak JWT secret
   if (process.env.JWT_SECRET.length < 32) {
     // eslint-disable-next-line no-console
     console.error(
@@ -61,20 +59,12 @@ const config = {
   isProduction: process.env.NODE_ENV === 'production',
   port: toInt(process.env.PORT, 5000),
   clientOrigin: process.env.CLIENT_ORIGIN,
-  // CLIENT_ORIGIN may be a comma-separated list (e.g. one entry for
-  // localhost and one for a LAN IP) so the same build can be reached from
-  // this machine and from other devices during local/LAN testing. CORS
-  // still only ever allows origins explicitly listed here - never "*".
+  // CLIENT_ORIGIN may be a comma-separated list
   clientOrigins: String(process.env.CLIENT_ORIGIN || '')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
-  // Only trust X-Forwarded-For when we're actually behind a real reverse
-  // proxy - otherwise a client could spoof it and dodge IP rate limits.
-  // TRUST_PROXY=true means "proxies running on this machine" (Vite's proxy,
-  // the Cloudflare tunnel client) - never Express's boolean `true`, which
-  // trusts every hop and lets anyone fake their IP. A number (hop count) or
-  // an address list is also accepted.
+  // trust X-Forwarded-For only behind a real proxy
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
 
   db: {
@@ -87,9 +77,7 @@ const config = {
   },
 
   auth: {
-    // Behind an HTTPS tunnel/reverse proxy the app still speaks plain HTTP,
-    // so NODE_ENV alone can't decide this. Set COOKIE_SECURE=true when the
-    // public URL is https:// so the session cookie is never sent in clear.
+    // Secure cookie - set COOKIE_SECURE=true on https
     cookieSecure:
       process.env.COOKIE_SECURE === 'true' ||
       (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production'),
@@ -115,6 +103,16 @@ const config = {
     ),
   },
 
+  // email (password reset codes) - any SMTP server, e.g. Gmail with an app password
+  mail: {
+    host: process.env.SMTP_HOST || '',
+    port: toInt(process.env.SMTP_PORT, 587),
+    secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.MAIL_FROM || `Brilliant Institute <${process.env.SMTP_USER || 'no-reply@brilliantinstitute.edu'}>`,
+  },
+
   // Google Calendar's public holiday calendar (Sri Lanka by default)
   holidays: {
     calendarId: process.env.HOLIDAY_CALENDAR_ID || 'en.lk#holiday@group.v.calendar.google.com',
@@ -123,38 +121,26 @@ const config = {
   paymentGateway: {
     providerName: process.env.PAYMENT_GATEWAY_PROVIDER_NAME || 'mock-gateway',
     apiKey: process.env.PAYMENT_GATEWAY_API_KEY || '',
-    // The built-in card simulator marks fees as paid without any money
-    // moving, so it is off unless switched on for a demo - and never in
-    // production. Real online payments use PayHere.
+    // demo card simulator - off unless switched on, never in production
     simulatorAllowed: process.env.ALLOW_PAYMENT_SIMULATOR === 'true' && process.env.NODE_ENV !== 'production',
   },
 
-  // PayHere - the live card / eZ Cash / mCash gateway. When merchantId and
-  // merchantSecret are both set, real online payments are enabled; when they
-  // are blank the app falls back to the built-in simulator so the project
-  // still runs locally without credentials.
+  // PayHere - the live card / eZ Cash / mCash gateway
   payhere: {
     merchantId: process.env.PAYHERE_MERCHANT_ID || '',
     merchantSecret: process.env.PAYHERE_MERCHANT_SECRET || '',
     // 'sandbox' until you have gone through PayHere's live approval.
     mode: process.env.PAYHERE_MODE === 'live' ? 'live' : 'sandbox',
     currency: process.env.PAYHERE_CURRENCY || 'LKR',
-    // The public https:// origin the browser reaches this app on. PayHere
-    // sends the payer back here, and posts its server-to-server payment
-    // notification to <publicBaseUrl>/api/payments/payhere/notify - so
-    // "localhost" will NOT work, it must be reachable from the internet
-    // (a tunnel such as ngrok/cloudflared is fine while developing).
+    // public https:// address (PayHere returns and notifies here)
     publicBaseUrl: (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, ''),
-    // Optional override when the API is served from a different public
-    // origin than the site (leave blank when Vite proxies /api).
+    // optional notify URL when the API has its own address
     notifyUrlOverride: process.env.PAYHERE_NOTIFY_URL || '',
   },
 
-  // Paying tutors OUT. PayHere cannot do this - it only collects money. See
-  // payment/payoutGateway.js for what each provider means.
+  // paying tutors out (PayHere only collects)
   payouts: {
-    // 'BANK_FILE' (export a bulk-credit file for corporate online banking)
-    // or 'API' (a payout provider the institute has an account with).
+    // 'BANK_FILE' or 'API'
     provider: process.env.PAYOUT_PROVIDER === 'API' ? 'API' : 'BANK_FILE',
     providerName: process.env.PAYOUT_PROVIDER_NAME || '',
     apiBaseUrl: (process.env.PAYOUT_API_BASE_URL || '').replace(/\/+$/, ''),

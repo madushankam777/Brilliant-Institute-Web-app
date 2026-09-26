@@ -1,5 +1,4 @@
-// Login page: check the user's email/password, then send them to the
-// page they were trying to reach (or the dashboard).
+// Login page: check the user's email/password
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';

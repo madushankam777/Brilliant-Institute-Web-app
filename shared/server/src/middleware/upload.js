@@ -39,8 +39,7 @@ function makeStorage(destinationDir) {
   });
 }
 
-// The browser's claimed type can be faked, so the first bytes of each saved
-// file must really look like a JPG, PNG, WEBP or PDF.
+// check the real file type from its first bytes
 function hasRealFileSignature(filePath, mimeType) {
   const head = Buffer.alloc(12);
   let fd;

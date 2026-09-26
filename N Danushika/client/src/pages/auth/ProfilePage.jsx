@@ -1,5 +1,4 @@
-// Profile page: two separate forms - one to edit your details, one to
-// change your password.
+// Profile page: two separate forms
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -24,8 +23,7 @@ function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
-// Letters, spaces, apostrophes, periods, and hyphens only - no digits or
-// other symbols typed into a name field by mistake.
+// Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
 

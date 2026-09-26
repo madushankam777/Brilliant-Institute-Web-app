@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchHolidays } from '../api/courseApi';
 import { addDaysToKey, startOfWeek, todayKey } from '../../../shared/client/src/utils/schedule';
 
-// Public holidays between two dates as { 'YYYY-MM-DD': 'Holiday name' }.
-// If they can't be loaded the calendars simply show no holidays.
+// public holidays between two dates as { date: name }
 function useHolidays(fromDate, toDate) {
   const [holidays, setHolidays] = useState({});
 

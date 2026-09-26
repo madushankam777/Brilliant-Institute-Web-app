@@ -16,8 +16,7 @@ const router = express.Router();
 
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
 
-// Letters, spaces, apostrophes, periods, and hyphens only - no digits or
-// other symbols someone typed (or pasted) into a name field by mistake.
+// Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 // Digits plus the punctuation real phone numbers are written with.
 const PHONE_REGEX = /^[0-9+\-\s()]+$/;

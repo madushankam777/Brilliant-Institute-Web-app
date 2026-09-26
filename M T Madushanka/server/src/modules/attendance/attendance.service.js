@@ -34,7 +34,7 @@ async function listClassSessions(tutorUser, classId) {
   return { classSubject: classRow.subject, sessions };
 }
 
-// local date - toISOString() would give the UTC date, a day behind before 5:30 AM in Sri Lanka
+// local date (toISOString gives the UTC date)
 function todayDateString() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -70,9 +70,7 @@ function generateCheckinCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 }
 
-// generate key btn - tutor makes a fresh key for this session and reads it
-// out / shows it on screen; any student enrolled in the class can use it
-// to mark themselves present from their own device
+// generate key btn
 async function startSelfCheckIn(tutorUser, sessionId) {
   const session = await repository.findSessionWithClass(sessionId);
   if (!session) {

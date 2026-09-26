@@ -1,16 +1,25 @@
 const { body } = require('express-validator');
-const { param } = require('express-validator');
+const { param, query } = require('express-validator');
 const { INSTANT_PAYMENT_METHODS } = require('./payment.constants');
 
-// Sri Lankan mobile number - what eZ Cash / mCash are actually tied to
-// (07XXXXXXXX, or the same number written as +947XXXXXXXX).
+// money amount - plain digits with up to 2 decimals (no "-", no "1e3")
+function amountRule(field, message) {
+  return body(field)
+    .customSanitizer((value) => (value === undefined || value === null ? value : String(value).trim()))
+    .matches(/^\d{1,8}(\.\d{1,2})?$/)
+    .withMessage(message)
+    .bail()
+    .isFloat({ gt: 0, max: 10000000 })
+    .withMessage(message);
+}
+
+// Sri Lankan mobile number
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
 // Letters, spaces, apostrophes, and hyphens only - no digits or symbols.
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 
-// Letters, numbers, spaces, hyphens, and slashes - what a real bank
-// account number or transfer reference looks like, nothing else.
+// Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
 function isMethod(...methods) {
@@ -19,9 +28,7 @@ function isMethod(...methods) {
 
 const makePaymentRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
-  body('amount')
-    .isFloat({ gt: 0 })
-    .withMessage('Amount must be a positive number.'),
+  amountRule('amount', 'Amount must be a positive number.'),
   body('paymentMethod')
     .isIn(INSTANT_PAYMENT_METHODS)
     .withMessage(
@@ -54,16 +61,15 @@ const makePaymentRules = [
     .withMessage('Enter a valid mobile number registered for this wallet (e.g. 07XXXXXXXX).'),
 ];
 
-// Online checkout only needs what we sign - the payer picks their card or
-// wallet on PayHere's own page, so no instrument details come from here.
+// Online checkout only needs what we sign
 const onlineCheckoutRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
-  body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number.'),
+  amountRule('amount', 'Amount must be a positive number.'),
 ];
 
 const bankTransferRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
-  body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number.'),
+  amountRule('amount', 'Amount must be a positive number.'),
   body('bankReference')
     .trim()
     .isLength({ min: 4, max: 40 })
@@ -81,13 +87,17 @@ const approveBankTransferRules = [
   ...paymentIdParamRules,
   body('amount')
     .optional({ checkFalsy: true })
+    .customSanitizer((value) => String(value).trim())
+    .matches(/^\d{1,8}(\.\d{1,2})?$/)
+    .withMessage('Enter the amount shown on the bank slip.')
+    .bail()
     .isFloat({ gt: 0, max: 10000000 })
     .withMessage('Enter the amount shown on the bank slip.'),
 ];
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-// edit btn - bankReference is optional here since a student may only replace the receipt image
+// edit btn - bank reference is optional
 const editBankTransferRules = [
   ...paymentIdParamRules,
   body('bankReference')
@@ -101,7 +111,7 @@ const editBankTransferRules = [
 
 const payTutorRules = [
   body('tutorId').isInt({ min: 1 }).withMessage('Please select a Tutor.'),
-  body('amount').isFloat({ gt: 0, max: 10000000 }).withMessage('Amount must be a positive number.'),
+  amountRule('amount', 'Amount must be a positive number.'),
   body('note').optional({ checkFalsy: true }).trim().isLength({ max: 200 }).withMessage('Note is too long.'),
   body('periodLabel')
     .optional({ checkFalsy: true })
@@ -131,8 +141,7 @@ const payTutorRules = [
 
 const tutorIdParamRules = [param('tutorId').isInt({ min: 1 }).withMessage('Invalid tutor id.')];
 
-// tutor's own payout bank details - every field optional so a tutor can
-// save them one at a time, but whatever is sent must look like real data
+// tutor's own payout bank details
 const bankDetailsRules = [
   body('bankName').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bank name is too long.'),
   body('accountHolder')
@@ -208,7 +217,26 @@ const failPayoutRules = [
     .withMessage('Keep the reason under 255 characters.'),
 ];
 
+// record payment - admin
+const studentSearchRules = [
+  query('search').trim().isLength({ min: 1, max: 60 }).withMessage('Type a registration number or name.'),
+];
+
+const recordPaymentRules = [
+  body('enrollmentId').isInt({ min: 1 }).withMessage('Choose the class being paid for.'),
+  amountRule('amount', 'Enter the amount the student paid.'),
+  body('method').isIn(['CASH', 'BANK_DEPOSIT']).withMessage('Choose how the student paid.'),
+  body('reference')
+    .optional({ checkFalsy: true })
+    .trim()
+    .matches(/^[A-Za-z0-9 \-/]{1,40}$/)
+    .withMessage('Reference can only contain letters, numbers, spaces, hyphens and slashes.'),
+  body('note').optional({ checkFalsy: true }).trim().isLength({ max: 200 }).withMessage('Note is too long.'),
+];
+
 module.exports = {
+  studentSearchRules,
+  recordPaymentRules,
   payoutIdParamRules,
   approveBankTransferRules,
   tutorIdParamRules,

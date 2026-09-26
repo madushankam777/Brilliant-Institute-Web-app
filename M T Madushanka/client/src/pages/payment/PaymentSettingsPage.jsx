@@ -1,5 +1,4 @@
-// Admin: the institute's own receiving details, shown to students at checkout
-// on the Bank Transfer / eZ Cash / mCash tabs.
+// Admin: institute bank / wallet details for checkout
 import { useEffect, useState } from 'react';
 import { fetchPaymentSettings, updatePaymentSettings } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
@@ -10,8 +9,7 @@ import { getNavItems } from '../../components/layout/navItems';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
-// Digits, spaces, and dashes only - matches the server's own account
-// number rule (payment.validation.js bankDetailsRules/paymentSettingsRules).
+// Digits, spaces, and dashes only
 const ACCOUNT_NUMBER_REGEX = /^[0-9 -]{4,34}$/;
 // Sri Lankan mobile number - what eZ Cash / mCash are actually tied to.
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;

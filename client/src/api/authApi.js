@@ -1,12 +1,4 @@
-/**
- * authApi.js
- * -----------------------------------------------------------------------
- * Every network call for the Registration & Authentication module lives
- * in this one file. Components never call axios/httpClient directly -
- * they call these named functions instead, which keeps API endpoints
- * and payload shapes in one predictable place.
- * -----------------------------------------------------------------------
- */
+// auth API calls - login, register, profile
 
 import httpClient from '../../../shared/client/src/api/httpClient';
 
@@ -90,7 +82,13 @@ export async function requestPasswordReset(email) {
   return response.data; // { success, message }
 }
 
-/** UPDATE - complete a password reset using the emailed token (REG-05). */
+// reset with the emailed code - also logs the user in
+export async function resetPasswordWithCode({ email, code, newPassword }) {
+  const response = await httpClient.post('/auth/reset-password', { email, code, newPassword });
+  return response.data.data.user;
+}
+
+// reset with an admin reset link
 export async function resetPassword({ token, newPassword }) {
   const response = await httpClient.post('/auth/reset-password', { token, newPassword });
   return response.data.message;

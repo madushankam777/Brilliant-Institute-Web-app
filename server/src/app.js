@@ -29,9 +29,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    // CLIENT_ORIGIN can list more than one allowed origin (comma-separated) -
-    // e.g. localhost plus a LAN IP for testing from other devices. Still an
-    // explicit whitelist check, never "*", per OWASP CORS guidance.
+    // CLIENT_ORIGIN can list more than one allowed origin
     origin(origin, callback) {
       if (
         !origin ||
@@ -63,11 +61,7 @@ app.use(
 
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
 
-// PayHere's server-to-server payment notification. Mounted ahead of the rate
-// limiter and CSRF guard because it carries no session cookie and no
-// X-Requested-With header, and must not be throttled when several payments
-// settle at once. The md5 signature check inside the service is what makes it
-// safe - an unsigned request is ignored.
+// PayHere's server-to-server payment notification
 app.post(
   '/api/payments/payhere/notify',
   express.urlencoded({ extended: false, limit: '32kb' }),

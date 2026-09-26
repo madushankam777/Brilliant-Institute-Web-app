@@ -41,8 +41,7 @@ function MarkAttendancePage() {
     try {
       const data = await fetchAttendanceSheet(sessionId);
       setSessionInfo(data.session);
-      // Default anyone not yet marked to PRESENT, which is the most
-      // common case and saves the tutor clicking for every student.
+      // Default anyone not yet marked to PRESENT
       setRows(
         data.students.map((student) => ({
           ...student,
@@ -74,8 +73,7 @@ function MarkAttendancePage() {
     );
   }
 
-  // generate key btn - a fresh 6-digit key students can enter themselves to
-  // mark PRESENT, without waiting for the tutor to go through the roster
+  // generate key btn
   async function handleStartCheckin() {
     setShowCheckin(true);
     setIsStartingCheckin(true);

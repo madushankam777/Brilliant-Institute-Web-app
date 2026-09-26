@@ -1,5 +1,4 @@
-// Route table for this module (Registration & Login only).
-// Attendance/Payment pages live in M T Madushanka's own folder.
+// Route table for this module
 import { Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/layout/Navbar';

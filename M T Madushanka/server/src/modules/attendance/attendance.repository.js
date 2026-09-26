@@ -74,9 +74,7 @@ async function listSessionsForClass(classId) {
   return rows;
 }
 
-// every actively-enrolled student shows up on the attendance sheet -
-// attendance and fee payment are tracked separately, so an outstanding
-// balance should never block a tutor from recording who was in class.
+// every actively-enrolled student shows up on the attendance sheet
 async function listActiveStudentsForClass(classId) {
   const [rows] = await pool.execute(
     `SELECT u.id AS student_id, u.full_name AS student_name, u.student_code,

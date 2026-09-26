@@ -18,8 +18,7 @@ import { getNavItems } from '../../components/layout/navItems';
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
-// Shown when no real gateway is configured - the built-in simulator, where
-// the "card" fields are collected here and no money actually moves.
+// demo simulator tabs
 const PAYMENT_METHODS = [
   { value: 'CARD', label: 'Card' },
   { value: 'EZ_CASH', label: 'eZ Cash' },
@@ -27,9 +26,7 @@ const PAYMENT_METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
-// Shown when PayHere IS configured. Card/eZ Cash/mCash collapse into one
-// option because the payer chooses the instrument on PayHere's own page -
-// we deliberately never see a card number.
+// Shown when PayHere IS configured
 const LIVE_PAYMENT_METHODS = [
   { value: 'ONLINE', label: 'Card / eZ Cash / mCash' },
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
@@ -38,12 +35,10 @@ const LIVE_PAYMENT_METHODS = [
 // wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
-// Letters, spaces, apostrophes, and hyphens only - no digits or symbols
-// typed into a name field by mistake.
+// Letters, spaces, apostrophes, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 
-// Letters, numbers, spaces, hyphens, and slashes - what a real bank
-// account number or transfer reference looks like, nothing else.
+// Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
 function formatCurrency(amount) {
@@ -116,8 +111,7 @@ function FeeBalancePage() {
   const [bankTransferClosedMessage, setBankTransferClosedMessage] = useState('');
   const [paymentSettings, setPaymentSettings] = useState(null);
 
-  // Set by the server: true once PayHere credentials are in place, false
-  // while the project is running on the built-in simulator.
+  // gateway switch from the server
   const onlinePaymentsEnabled = Boolean(paymentSettings && paymentSettings.onlinePaymentsEnabled);
   const methodTabs = onlinePaymentsEnabled ? LIVE_PAYMENT_METHODS : PAYMENT_METHODS;
 
@@ -151,9 +145,7 @@ function FeeBalancePage() {
       });
   }, [loadBalances]);
 
-  // Settings arrive a moment after the balances do, so a checkout that was
-  // auto-opened may have defaulted to the simulator's Card tab. Once we know
-  // the real gateway is live, move it onto the online option.
+  // Settings arrive a moment after the balances do
   useEffect(() => {
     if (!onlinePaymentsEnabled) return;
     setPaymentMethod((current) =>
@@ -264,8 +256,7 @@ function FeeBalancePage() {
       return;
     }
 
-    // Real gateway: reserve the payment, then hand the browser over to
-    // PayHere. Nothing else on this page runs - we leave the site.
+    // Real gateway: reserve the payment
     if (paymentMethod === 'ONLINE') {
       setIsPaying(true);
       try {

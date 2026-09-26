@@ -1,6 +1,4 @@
-// Nav items for this standalone module only - unlike the shared navItems.js
-// (built for the combined site), this list only points at routes that
-// actually exist in this module's own App.jsx.
+// Nav items for this standalone module only
 const STUDENT_NAV = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/attendance/history', label: 'Attendance', icon: 'calendar' },

@@ -110,7 +110,7 @@ function UserProfilePage() {
             {user.role === 'STUDENT_PARENT' && (
               <>
                 <div>
-                  <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>Student Code</p>
+                  <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>Registration No.</p>
                   <p style={{ marginTop: 0 }}>{user.studentCode || 'Not assigned'}</p>
                 </div>
                 <div>
@@ -173,8 +173,7 @@ function UserProfilePage() {
           </div>
         )}
 
-        {/* Admin-only: the vetting documents captured when this tutor's
-            enrollment key was issued. Tutors never see these. */}
+        {/* Admin-only: tutor's vetting documents */}
         {user.role === 'TUTOR' && (
           <div className="card">
             <h2>Verification documents</h2>

@@ -1,5 +1,4 @@
-// "Pay a tutor" dialog: shows where the money goes from and to, then records
-// the payment with the bank's reference (or queues it for the bulk bank file).
+// "Pay a tutor" dialog
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchTutorPayoutAccount, payTutor, updateTutorBankDetailsAsAdmin } from '../../api/paymentApi';
@@ -8,6 +7,7 @@ import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import { todayKey } from '../../../../shared/client/src/utils/schedule';
+import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 
 const EMPTY_BANK_FORM = { bankName: '', accountHolder: '', accountNumber: '', branch: '' };
 
@@ -248,7 +248,9 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
                     inputMode="numeric"
                     placeholder="e.g. 8001234567"
                     value={bankForm.accountNumber}
-                    onChange={(e) => setBankForm((prev) => ({ ...prev, accountNumber: e.target.value }))}
+                    onChange={(e) =>
+                      setBankForm((prev) => ({ ...prev, accountNumber: e.target.value.replace(/[^\d -]/g, '') }))
+                    }
                     className={bankErrors.fieldErrors.accountNumber ? 'input-error' : ''}
                   />
                   {bankErrors.fieldErrors.accountNumber && (
@@ -319,16 +321,13 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
           <div className="card-field-row">
             <div className="form-field">
               <label htmlFor="payout-amount">Amount (LKR)</label>
-              <input
+              <NumberInput
                 id="payout-amount"
-                type="number"
-                inputMode="decimal"
-                min="0.01"
-                step="0.01"
+                decimals={2}
                 placeholder="e.g. 25000"
                 value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
+                onChange={(value) => {
+                  setAmount(value);
                   clearFieldError('amount');
                 }}
                 className={fieldErrors.amount ? 'input-error' : ''}

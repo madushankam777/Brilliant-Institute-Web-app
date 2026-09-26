@@ -1,11 +1,4 @@
-// Where the gateway sends the payer back to.
-// -----------------------------------------------------------------------
-// This page NEVER decides whether a payment worked. The gateway confirms
-// that to our server directly (see payhereGateway.js), and that callback
-// can arrive a second or two after the payer's browser gets here - so all
-// this screen does is poll our own API until the payment stops being
-// PENDING, then show whatever the server says.
-// -----------------------------------------------------------------------
+// payment return page - shows the result, never decides it
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { fetchPaymentStatus } from '../../api/paymentApi';

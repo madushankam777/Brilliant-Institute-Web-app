@@ -69,7 +69,6 @@ function formatCurrency(amount) {
 }
 
 // "Next class" stat card, shared by the student and tutor dashboards
-// (skips holidays and cancelled days, counts extra classes)
 function NextClassCard({ classes, holidays, events }) {
   const next = findNextClass(classes, new Date(), holidays, events);
   return (
@@ -118,7 +117,14 @@ function StudentDashboard({ user }) {
     <div className="page">
       <div className="page-header">
         <h1>Welcome back, {user.fullName.split(' ')[0]}!</h1>
-        <p className="muted">Here&apos;s a snapshot of your classes, attendance and fees.</p>
+        <p className="muted">
+          Here&apos;s a snapshot of your classes, attendance and fees.
+          {user.studentCode && (
+            <>
+              {' '}Registration number: <span className="reg-no">{user.studentCode}</span>
+            </>
+          )}
+        </p>
       </div>
 
       {isLoading ? (
@@ -223,8 +229,7 @@ function StudentDashboard({ user }) {
   );
 }
 
-// New tutors get paid by bank transfer, so nudge them once per session until
-// an account is on file.
+// ask new tutors once for bank details
 function useBankDetailsPrompt() {
   const [needsBankDetails, setNeedsBankDetails] = useState(false);
 

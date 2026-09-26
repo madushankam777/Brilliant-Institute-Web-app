@@ -1,5 +1,4 @@
-// Any logged-in role: view a tutor's public profile - their bio and the
-// classes they currently teach.
+// Tutor profile page - bio and classes
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { fetchTutorProfile } from '../../api/courseApi';

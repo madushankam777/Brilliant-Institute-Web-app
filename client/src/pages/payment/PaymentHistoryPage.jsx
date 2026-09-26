@@ -35,10 +35,12 @@ const METHOD_LABELS = {
   EZ_CASH: 'eZ Cash',
   MCASH: 'mCash',
   BANK_TRANSFER: 'Bank Transfer',
+  ONLINE: 'Online',
+  CASH: 'Cash at the office',
+  BANK_DEPOSIT: 'Bank deposit slip',
 };
 
-// The one non-sensitive detail worth showing per method - never a full
-// card number, always just what a real receipt would show.
+// The one non-sensitive detail worth showing per method
 function paymentMethodSummary(payment) {
   const details = payment.paymentDetails;
   if (payment.paymentMethod === 'CARD' && details?.cardLast4) {

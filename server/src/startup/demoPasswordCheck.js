@@ -1,6 +1,4 @@
-// Warns in the server log if an active staff account still uses the demo
-// password from the seed scripts - anyone who has seen the README could
-// log in with it.
+// warns if a staff account still uses the demo password
 const bcrypt = require('bcryptjs');
 const { pool } = require('../../../shared/server/src/config/db');
 

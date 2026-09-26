@@ -1,7 +1,6 @@
 import logoImg from '../../assets/logo.jpeg';
 
-// Crest mark + wordmark used in every navbar/footer/auth panel so the
-// brand looks identical across both independently-deployed modules.
+// Crest mark + wordmark used in every navbar/footer/auth panel
 function Logo({ tagline, dark = false }) {
   return (
     <span className="brand">

@@ -1,5 +1,4 @@
-// Public "Contact Us" page: office details, map and a message form that
-// lands in the Admin's Enquiries inbox.
+// Contact Us page
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sendContactMessage } from '../../api/contactApi';

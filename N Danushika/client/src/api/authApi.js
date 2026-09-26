@@ -1,5 +1,4 @@
-// All the API calls for login/register/profile live here, so pages just
-// call these functions instead of using axios directly.
+// All the API calls for login/register/profile live here
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
 export async function registerAccount({

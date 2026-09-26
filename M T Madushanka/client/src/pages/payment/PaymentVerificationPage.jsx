@@ -1,5 +1,4 @@
-// Admin: review bank-transfer receipts submitted by students and either
-// approve (moves the balance, issues a receipt) or reject them.
+// Admin: approve or reject bank-transfer slips
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchPendingBankTransfers,

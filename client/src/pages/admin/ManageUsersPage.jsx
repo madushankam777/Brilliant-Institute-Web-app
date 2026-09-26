@@ -1,5 +1,4 @@
-// Admin: list/filter/create/suspend/reactivate user accounts (ADM-02),
-// plus generating the enrollment keys that let a Tutor self-register.
+// Admin: list/filter/create/suspend/reactivate user accounts
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -233,7 +232,7 @@ function ManageUsersPage() {
               <input
                 id="search"
                 type="text"
-                placeholder="Search name, ID or email..."
+                placeholder="Search name, registration no. or email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{ width: '100%' }}
@@ -283,7 +282,15 @@ function ManageUsersPage() {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Avatar name={user.fullName} pictureUrl={user.profilePictureUrl} size={28} />
-                          {user.fullName}
+                          <span>
+                            {user.fullName}
+                            {user.studentCode && (
+                              <>
+                                <br />
+                                <span className="reg-no">{user.studentCode}</span>
+                              </>
+                            )}
+                          </span>
                         </div>
                       </td>
                       <td>{user.email}</td>

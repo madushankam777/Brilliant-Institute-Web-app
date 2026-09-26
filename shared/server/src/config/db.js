@@ -11,8 +11,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: config.db.connectionLimit,
   queueLimit: 0,
-  // Returns DATE/DATETIME columns as strings instead of JS Date objects,
-  // which avoids timezone-conversion surprises for beginners.
+  // Returns DATE/DATETIME columns as strings instead of JS Date objects
   dateStrings: true,
 });
 

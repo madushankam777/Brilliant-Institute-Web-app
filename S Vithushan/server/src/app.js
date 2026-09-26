@@ -20,9 +20,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    // CLIENT_ORIGIN can list more than one allowed origin (comma-separated) -
-    // e.g. localhost plus a LAN IP for testing from other devices. Still an
-    // explicit whitelist check, never "*", per OWASP CORS guidance.
+    // CLIENT_ORIGIN can list more than one allowed origin
     origin(origin, callback) {
       if (
         !origin ||

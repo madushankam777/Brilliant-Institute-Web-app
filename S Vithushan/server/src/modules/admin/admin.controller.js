@@ -254,8 +254,7 @@ const getMyReregistrationStatus = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { status } });
 });
 
-// Shows exactly who would move up and whose account would close, before
-// anything is changed.
+// preview who moves up and who leaves
 const previewYearlyRollover = asyncHandler(async (req, res) => {
   const preview = await rollover.previewRollover(req.query.academicYear);
   res.status(200).json({ success: true, data: { preview } });

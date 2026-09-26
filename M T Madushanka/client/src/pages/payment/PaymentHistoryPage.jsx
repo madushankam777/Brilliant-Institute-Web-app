@@ -13,8 +13,7 @@ import { getNavItems } from '../../components/layout/navItems';
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
-// Letters, numbers, spaces, hyphens, and slashes - what a real bank
-// account number or transfer reference looks like, nothing else.
+// Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
 function formatCurrency(amount) {
@@ -39,13 +38,11 @@ const METHOD_LABELS = {
   EZ_CASH: 'eZ Cash',
   MCASH: 'mCash',
   BANK_TRANSFER: 'Bank Transfer',
-  // An online payment the payer never finished - it stays 'ONLINE' because
-  // they never got as far as picking a card or wallet on the gateway.
+  // An online payment the payer never finished
   ONLINE: 'Online Payment',
 };
 
-// The one non-sensitive detail worth showing per method - never a full
-// card number, always just what a real receipt would show.
+// The one non-sensitive detail worth showing per method
 function paymentMethodSummary(payment) {
   const details = payment.paymentDetails;
   if (payment.paymentMethod === 'CARD' && details?.cardLast4) {

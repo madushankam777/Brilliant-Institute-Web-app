@@ -1,5 +1,4 @@
-// Date and time helpers for timetables and calendars.
-// Dates are kept as 'YYYY-MM-DD' strings in local time.
+// Date and time helpers for timetables and calendars
 
 export const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -110,9 +109,7 @@ export function classesOn(classes, dateKey) {
   return sortByStartTime(classes.filter((item) => classRunsOn(item, dateKey)));
 }
 
-// One day's classes with that day's changes applied. Weekly classes come
-// back as kind 'regular' or 'cancelled', extra classes as kind 'extra'.
-// Only changes to the given classes are used.
+// One day's classes with that day's changes applied
 export function occurrencesOn(classes, events, dateKey) {
   const classById = new Map(classes.map((item) => [item.id, item]));
   const dayEvents = events.filter((event) => event.date === dateKey && classById.has(event.classId));
@@ -135,9 +132,7 @@ export function occurrencesOn(classes, events, dateKey) {
   return sortByStartTime([...weekly, ...extras]);
 }
 
-// The next class that has not started yet, looking up to two weeks ahead.
-// Public holidays ({ 'YYYY-MM-DD': name }) and cancelled days are skipped;
-// extra classes count.
+// The next class that has not started yet, looking up to two weeks ahead
 export function findNextClass(classes, now = new Date(), holidays = {}, events = []) {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   for (let offset = 0; offset <= 14; offset += 1) {

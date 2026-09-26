@@ -1,6 +1,4 @@
-// A short fingerprint of the user's password hash, stored in the session
-// token. When the password changes the fingerprint changes, so every
-// session made with the old password stops working.
+// password fingerprint in the session token (new password ends old sessions)
 const crypto = require('crypto');
 const config = require('../config/env');
 

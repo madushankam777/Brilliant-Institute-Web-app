@@ -1,5 +1,4 @@
-// Step 2 of password reset: the user opens the link from their email
-// (which includes a token) and picks a new password.
+// Step 2 of password reset
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../../api/authApi';

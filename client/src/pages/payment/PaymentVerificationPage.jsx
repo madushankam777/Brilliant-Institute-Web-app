@@ -1,5 +1,4 @@
-// Admin: check bank slips uploaded by students. Approving takes the amount
-// read off the slip - that amount reduces the balance and counts as revenue.
+// Admin: check bank slips uploaded by students
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchPendingBankTransfers,
@@ -11,6 +10,8 @@ import LoadingSpinner from '../../../../shared/client/src/components/common/Load
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
+import RecordPaymentCard from './RecordPaymentCard';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -116,11 +117,14 @@ function PaymentVerificationPage() {
         <div className="page-header">
           <h1>Payment Verification</h1>
           <p className="muted">
-            Check each bank slip and enter the amount it shows. Approving updates the student&apos;s
-            balance, issues a receipt and adds the amount to revenue.
+            Record payments made at the office, and check bank slips students upload. Each payment updates the
+            student&apos;s balance, issues a receipt and adds the amount to revenue.
           </p>
         </div>
 
+        <RecordPaymentCard onRecorded={load} />
+
+        <h2 className="section-title">Bank slips waiting for verification</h2>
         <Alert type="error" message={errorMessage} />
         <Alert type="success" message={successMessage} />
 
@@ -150,6 +154,7 @@ function PaymentVerificationPage() {
                       <td>{formatDateTime(payment.createdAt)}</td>
                       <td>
                         <div className="order-line-title">{payment.studentName}</div>
+                        {payment.studentCode && <span className="reg-no">{payment.studentCode}</span>}
                         <div className="order-line-sub">{payment.studentEmail}</div>
                       </td>
                       <td>{payment.subject}</td>
@@ -189,7 +194,9 @@ function PaymentVerificationPage() {
             <dl className="detail-grid" style={{ marginBottom: '14px' }}>
               <div>
                 <dt>Student</dt>
-                <dd>{target.payment.studentName}</dd>
+                <dd>
+                  {target.payment.studentName} {target.payment.studentCode && <span className="reg-no">{target.payment.studentCode}</span>}
+                </dd>
               </div>
               <div>
                 <dt>Class</dt>
@@ -232,15 +239,12 @@ function PaymentVerificationPage() {
             {target.action === 'approve' ? (
               <div className="form-field">
                 <label htmlFor="received-amount">Amount received (LKR)</label>
-                <input
+                <NumberInput
                   id="received-amount"
-                  type="number"
-                  inputMode="decimal"
-                  min="0.01"
-                  step="0.01"
+                  decimals={2}
                   value={receivedAmount}
-                  onChange={(e) => {
-                    setReceivedAmount(e.target.value);
+                  onChange={(value) => {
+                    setReceivedAmount(value);
                     setAmountError('');
                   }}
                   className={amountError ? 'input-error' : ''}

@@ -58,7 +58,13 @@ const classBodyRules = [
     .custom((value, { req }) => !req.body.startTime || value > req.body.startTime)
     .withMessage('End time must be after the start time.'),
   body('capacity').isInt({ min: 1, max: 500 }).withMessage('Capacity must be between 1 and 500.'),
-  body('fee').isFloat({ min: 0 }).withMessage('Fee must be zero or a positive number.'),
+  body('fee')
+    .customSanitizer((value) => (value === undefined || value === null ? value : String(value).trim()))
+    .matches(/^\d{1,7}(\.\d{1,2})?$/)
+    .withMessage('Fee must be a number between 0 and 1,000,000.')
+    .bail()
+    .isFloat({ min: 0, max: 1000000 })
+    .withMessage('Fee must be between 0 and 1,000,000.'),
   body('tutorId').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Invalid tutor id.'),
 ];
 

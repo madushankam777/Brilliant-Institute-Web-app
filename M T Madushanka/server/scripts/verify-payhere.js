@@ -1,21 +1,4 @@
-/**
- * verify-payhere.js
- * -----------------------------------------------------------------------
- * Run this after filling in the PayHere values in .env, BEFORE trying a
- * real payment:
- *
- *     npm run payhere:verify
- *
- * It does two things:
- *   1. Reports what the app will actually send PayHere (mode, notify URL)
- *      so you can paste the right URL into your PayHere dashboard.
- *   2. Self-tests the signing and the notification signature check against
- *      PayHere's documented formulas, so a broken signature is caught here
- *      rather than by a customer whose payment silently fails.
- *
- * It talks to nobody - no network, no database.
- * -----------------------------------------------------------------------
- */
+// verify-payhere.js - checks the PayHere settings in .env
 const crypto = require('crypto');
 const config = require('../../../shared/server/src/config/env');
 const payhere = require('../src/modules/payment/payhereGateway');

@@ -1,7 +1,6 @@
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
-// `confirmName` must be the target's full name, typed in CAPITAL LETTERS -
-// the server re-checks this itself, this isn't just a client-side gate.
+// `confirmName` must be the target's full name, typed in CAPITAL LETTERS
 export async function suspendUser(userId, confirmName) {
   const response = await httpClient.patch(`/admin/users/${userId}/suspend`, { confirmName });
   return response.data.data.user;

@@ -100,7 +100,15 @@ function MyStudentsPage() {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Avatar name={student.fullName} pictureUrl={student.profilePictureUrl} size={28} />
-                          {student.fullName}
+                          <span>
+                            {student.fullName}
+                            {student.studentCode && (
+                              <>
+                                <br />
+                                <span className="reg-no">{student.studentCode}</span>
+                              </>
+                            )}
+                          </span>
                         </div>
                       </td>
                       <td>{student.email}</td>

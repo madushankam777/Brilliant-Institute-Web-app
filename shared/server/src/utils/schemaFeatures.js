@@ -1,6 +1,4 @@
-// Checks whether optional database updates have been applied, so features
-// switch on by themselves once sql/update_database.sql has been run.
-// Results are cached for 30 seconds, so no restart is needed afterwards.
+// Checks whether optional database updates have been applied
 const { pool } = require('../config/db');
 const ApiError = require('./ApiError');
 

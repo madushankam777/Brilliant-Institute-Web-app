@@ -3,8 +3,7 @@ const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
 const authService = require('./auth.service');
 
-// POST /api/auth/register - create a Student/Parent account, or a Tutor
-// account if a valid enrollment key is included.
+// POST /api/auth/register
 const register = asyncHandler(async (req, res) => {
   const { fullName, email, password, phone, role, enrollmentKey, grade } = req.body;
   const user = await authService.registerUser({
@@ -102,13 +101,19 @@ const forgotPassword = asyncHandler(async (req, res) => {
   // same answer whether or not the email exists, and never the link itself
   res.status(200).json({
     success: true,
-    message: 'If an account exists for that email, a password reset link has been sent.',
+    message: 'If an account exists for that email, a 6-digit reset code has been sent to it.',
   });
 });
 
 // POST /api/auth/reset-password - set a new password using a reset token.
 const resetPassword = asyncHandler(async (req, res) => {
-  const { token, newPassword } = req.body;
+  const { token, email, code, newPassword } = req.body;
+  // emailed code - reset and log in
+  if (!token) {
+    const user = await authService.resetPasswordWithCode({ email, code, newPassword }, res);
+    res.status(200).json({ success: true, message: 'Your password has been reset. You are now logged in.', data: { user } });
+    return;
+  }
   await authService.resetPasswordWithToken(token, newPassword);
   res.status(200).json({
     success: true,

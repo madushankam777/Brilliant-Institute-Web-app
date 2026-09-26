@@ -1,5 +1,4 @@
-// Class/enrollment status enums + the fixed subject-area filter list shown
-// on the Browse Classes page.
+// Class/enrollment status enums + the fixed subject-area filter list
 const CLASS_STATUS = Object.freeze({
   ACTIVE: 'ACTIVE',
   CANCELLED: 'CANCELLED',

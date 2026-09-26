@@ -1,5 +1,4 @@
-// Admin: operations dashboard - key counts, revenue by period, recent payments
-// and a live feed of audit events.
+// Admin: operations dashboard
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchDashboardStats } from '../../api/adminApi';
@@ -70,6 +69,8 @@ const PAYMENT_METHOD_LABEL = {
   MCASH: 'mCash',
   BANK_TRANSFER: 'Bank Transfer',
   ONLINE: 'Online',
+  CASH: 'Cash',
+  BANK_DEPOSIT: 'Bank deposit slip',
 };
 
 function AdminDashboardPage() {
@@ -190,7 +191,10 @@ function AdminDashboardPage() {
                     <tbody>
                       {recentPayments.map((payment) => (
                         <tr key={payment.id}>
-                          <td>{payment.studentName}</td>
+                          <td>
+                            {payment.studentName}
+                            {payment.studentCode && <div className="order-line-sub">{payment.studentCode}</div>}
+                          </td>
                           <td>{payment.subject}</td>
                           <td>{formatCurrency(payment.amount)}</td>
                           <td>{PAYMENT_METHOD_LABEL[payment.paymentMethod] || payment.paymentMethod}</td>

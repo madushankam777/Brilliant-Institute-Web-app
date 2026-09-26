@@ -1,5 +1,4 @@
-// Admin: pay tutors from the institute's bank account and keep a record of
-// every payment (with the bank's reference number).
+// Admin: pay tutors and keep a record
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchTutorPayouts,

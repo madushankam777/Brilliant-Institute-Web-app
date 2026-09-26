@@ -1,6 +1,6 @@
 const express = require('express');
 const authenticate = require('../../../../../shared/server/src/middleware/authenticate');
-const { authLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
+const { authLimiter, resetRequestLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
 const validateRequest = require('../../../../../shared/server/src/middleware/validateRequest');
 const { profilePictureUpload } = require('../../../../../shared/server/src/middleware/upload');
 const controller = require('./auth.controller');
@@ -36,7 +36,7 @@ router.post('/logout', controller.logout);
 
 router.post(
   '/forgot-password',
-  authLimiter,
+  resetRequestLimiter,
   forgotPasswordValidationRules,
   validateRequest,
   controller.forgotPassword

@@ -78,8 +78,8 @@ async function listUsers({ search, role, status }) {
   const params = [];
 
   if (search) {
-    clauses.push('(full_name LIKE ? OR email LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`);
+    clauses.push('(full_name LIKE ? OR email LIKE ? OR student_code LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (role) {
     clauses.push('role = ?');
@@ -123,9 +123,7 @@ async function updateUserStatus(userId, status) {
   ]);
 }
 
-// delete btn - soft delete only: history (classes taught, payments, audit log
-// entries) references this row, so it stays and just drops out of every
-// active listing instead of being physically removed.
+// delete btn - soft delete only
 async function softDeleteUser(userId) {
   await pool.execute(`UPDATE users SET status = 'DELETED', updated_at = NOW() WHERE id = ?`, [
     userId,
@@ -220,8 +218,7 @@ async function listAdminIds() {
   return rows.map((row) => row.id);
 }
 
-// students a tutor may message - everyone actively enrolled in their classes,
-// optionally narrowed to one class
+// students a tutor may message
 async function listStudentIdsForTutor(tutorId, classId) {
   const params = [tutorId];
   let clause = '';
@@ -360,8 +357,7 @@ async function findReregistrationKeyById(keyId) {
   return rows[0] || null;
 }
 
-// The student redeeming a key must be the student it was issued to, so the
-// lookup is always scoped to their own id.
+// a key only works for the student it was issued to
 async function findRedeemableKeyForStudent(keyCode, studentId) {
   const [rows] = await pool.execute(
     `SELECT * FROM student_reregistration_keys
@@ -431,8 +427,7 @@ async function setStudentGrade(studentId, grade, academicYear) {
   );
 }
 
-// Everyone the roll-over has to decide about: active students, and whether
-// they hold a confirmed place for the year being opened.
+// Everyone the roll-over has to decide about
 async function listStudentsForRollover(academicYear) {
   const [rows] = await pool.execute(
     `SELECT id, full_name, email, grade, reregistered_for_year
@@ -450,9 +445,7 @@ async function markStudentLeft(studentId) {
   );
 }
 
-// Leaving the institute ends their enrolments too, so they stop appearing on
-// class rosters, attendance sheets and fee-due lists. The rows stay for the
-// records - only their status changes.
+// Leaving the institute ends their enrolments too
 async function closeEnrollmentsForStudent(studentId) {
   const [result] = await pool.execute(
     `UPDATE enrollments SET status = 'REMOVED' WHERE student_id = ? AND status = 'ACTIVE'`,

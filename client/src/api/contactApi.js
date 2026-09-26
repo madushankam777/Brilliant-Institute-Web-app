@@ -6,10 +6,10 @@ export async function sendContactMessage(payload) {
   return response.data;
 }
 
-// public numbers for the About page
-export async function fetchInstituteOverview() {
-  const response = await httpClient.get('/courses/overview');
-  return response.data.data;
+// About page - tutor cards
+export async function fetchPublicTutors() {
+  const response = await httpClient.get('/courses/public-tutors');
+  return response.data.data.tutors;
 }
 
 // admin inbox - status: NEW | HANDLED | '' (all)

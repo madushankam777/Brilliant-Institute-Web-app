@@ -1,19 +1,6 @@
 import { useCallback, useState } from 'react';
 
-/**
- * Keeps per-field error messages for a form, and turns a rejected API call
- * into those same per-field messages.
- *
- * The API rejects with { message, status, details }, where details is
- * [{ field, message }] straight from express-validator. Anything that names a
- * field lands under that field; anything that doesn't (a conflict, a 500)
- * stays in formError for the banner above the form.
- *
- *   const { fieldErrors, formError, validate, captureError, clearErrors } = useFormErrors();
- *
- *   if (!validate({ fee: !form.fee && 'Enter a monthly fee.' })) return;
- *   try { await save(); } catch (error) { captureError(error); }
- */
+// per-field form errors, including errors from the API
 function useFormErrors() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -33,10 +20,7 @@ function useFormErrors() {
     });
   }, []);
 
-  /**
-   * Checks a map of field -> message-or-falsy. Returns true when everything
-   * passed, so a caller can `if (!validate({...})) return;`.
-   */
+  // Checks a map of field -> message-or-falsy
   const validate = useCallback((checks) => {
     const found = {};
     Object.entries(checks).forEach(([field, message]) => {
@@ -53,16 +37,14 @@ function useFormErrors() {
     const mapped = {};
     details.forEach((detail) => {
       if (!detail || !detail.field) return;
-      // Nested paths ("paymentDetails.cardLast4") are kept whole and also
-      // stored under the leaf, so a form can key off whichever it uses.
+      // keep nested field paths and their last part
       if (!mapped[detail.field]) mapped[detail.field] = detail.message;
       const leaf = String(detail.field).split('.').pop();
       if (leaf && !mapped[leaf]) mapped[leaf] = detail.message;
     });
 
     setFieldErrors(mapped);
-    // With every problem shown under its own field, the banner would just
-    // repeat "Please fix the highlighted fields" - so leave it out.
+    // no banner when every error is under its field
     setFormError(Object.keys(mapped).length > 0 ? '' : (error && error.message) || 'Something went wrong.');
   }, []);
 

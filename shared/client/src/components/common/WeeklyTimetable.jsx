@@ -73,10 +73,7 @@ function DayColumn({ day, classes, isToday, holiday, showTutor, today }) {
   );
 }
 
-// Monday-Sunday view of this week's classes; this week's public holidays
-// ({ 'YYYY-MM-DD': name }) and cancelled days are crossed out, and extra
-// classes (events) are added in green.
-// In a narrow space it becomes a list of only the days that have classes.
+// Monday-Sunday view of this week's classes
 function WeeklyTimetable({ classes, holidays = {}, events = [], showTutor = false, emptyMessage = 'No classes scheduled yet.' }) {
   if (classes.length === 0) {
     return <p className="muted timetable-empty">{emptyMessage}</p>;

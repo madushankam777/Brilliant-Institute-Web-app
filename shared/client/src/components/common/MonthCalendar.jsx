@@ -8,9 +8,7 @@ function startOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-// Month grid (Monday first). isMarked(dateKey) puts a small red dot on a day,
-// public holidays ({ 'YYYY-MM-DD': name }) show in red, and days before
-// minDate cannot be picked.
+// month grid - dots for marked days, holidays in red
 function MonthCalendar({ selectedDate, onSelectDate, isMarked, minDate, markLegend, holidays = {} }) {
   const [viewMonth, setViewMonth] = useState(() =>
     startOfMonth(selectedDate ? parseDateKey(selectedDate) : new Date())

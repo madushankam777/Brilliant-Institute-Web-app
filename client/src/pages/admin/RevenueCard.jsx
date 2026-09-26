@@ -1,5 +1,4 @@
-// Admin dashboard: revenue for today, this month, this year or the last 5 years,
-// with a bar chart of the days/months/years around it.
+// Admin dashboard - revenue card and chart
 import { useEffect, useRef, useState } from 'react';
 import { fetchRevenueReport } from '../../api/adminApi';
 import Alert from '../../../../shared/client/src/components/common/Alert';

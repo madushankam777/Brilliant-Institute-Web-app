@@ -1,5 +1,4 @@
-// Admin: make a one-time password reset link for a user who forgot their
-// password. There is no email service, so the office hands it over in person.
+// Admin: one-time password reset link
 import { useState } from 'react';
 import { createPasswordResetLink } from '../../api/adminApi';
 import Alert from '../../../../shared/client/src/components/common/Alert';

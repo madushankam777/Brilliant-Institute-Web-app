@@ -158,8 +158,7 @@ export async function fetchReregistrationOptions() {
   return response.data.data.options;
 }
 
-// payload: { mode: 'STUDENTS' | 'CLASS' | 'GRADE', studentIds?, classId?, grade?, toGrade?, academicYear }
-// Key codes come back only from this call; no later listing includes them.
+// issue re-registration keys (codes are only returned here)
 export async function generateReregistrationKeys(payload) {
   const response = await httpClient.post('/admin/reregistration-keys', payload);
   return response.data.data.result;

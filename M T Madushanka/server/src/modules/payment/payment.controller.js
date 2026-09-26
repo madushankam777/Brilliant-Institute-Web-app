@@ -13,14 +13,13 @@ const makePayment = asyncHandler(async (req, res) => {
   const { enrollmentId, amount, paymentMethod, paymentDetails } = req.body;
   const result = await service.makePayment(req.user, {
     enrollmentId,
-    amount,
+    amount: Number(amount),
     paymentMethod,
     paymentDetails,
   });
 
   if (result.pending) {
-    // SRS ATP-UC-02 exception path: gateway timeout - the payment is
-    // safely stored as PENDING and can be retried shortly.
+    // gateway timeout - payment stays PENDING
     return res.status(202).json({
       success: true,
       message:
@@ -61,15 +60,13 @@ const getMyPaymentHistory = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { payments } });
 });
 
-// GET /api/payments/bank-transfer/availability - lets the client show/hide
-// the Bank Transfer option before the student fills out the whole form.
+// GET /api/payments/bank-transfer/availability
 const getBankTransferAvailability = asyncHandler(async (req, res) => {
   const availability = service.getBankTransferAvailability();
   res.status(200).json({ success: true, data: availability });
 });
 
-// POST /api/payments/bank-transfer - the receipt image has already been
-// validated/saved by the upload middleware ahead of this handler.
+// POST /api/payments/bank-transfer
 const submitBankTransferPayment = asyncHandler(async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'Please attach your transfer receipt.' });
@@ -77,7 +74,7 @@ const submitBankTransferPayment = asyncHandler(async (req, res) => {
   const { enrollmentId, amount, bankReference } = req.body;
   const result = await service.submitBankTransferPayment(req.user, {
     enrollmentId,
-    amount,
+    amount: Number(amount),
     bankReference,
     receiptImagePath: toPublicUploadPath(req.file.path),
   });
@@ -185,7 +182,7 @@ const payTutor = asyncHandler(async (req, res) => {
   const { tutorId, amount, note, periodLabel, method, bankReference, transferDate } = req.body;
   const payout = await service.payTutor(req.user, {
     tutorId,
-    amount,
+    amount: Number(amount),
     note,
     periodLabel,
     method,
@@ -261,21 +258,14 @@ const listTutorPayouts = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
-// Hands the browser a signed field set to POST to PayHere. No money has
-// moved at this point - the payment is only PENDING.
+// Hands the browser a signed field set to POST to PayHere
 const startOnlineCheckout = asyncHandler(async (req, res) => {
   const { enrollmentId, amount } = req.body;
-  const checkout = await service.startOnlineCheckout(req.user, { enrollmentId, amount });
+  const checkout = await service.startOnlineCheckout(req.user, { enrollmentId, amount: Number(amount) });
   res.status(201).json({ success: true, data: { checkout } });
 });
 
-// Public webhook - PayHere calls this server-to-server. It is deliberately
-// unauthenticated (PayHere has no session cookie); the signature check
-// inside the service is what makes it trustworthy.
-//
-// Always answers 200: a non-2xx just makes PayHere retry, and a request
-// that fails verification is not going to start verifying on the 4th
-// attempt. Rejections are logged instead.
+// PayHere webhook - public, trusted only after the signature check
 const handlePayHereNotification = asyncHandler(async (req, res) => {
   const outcome = await service.handlePayHereNotification(req.body);
 
@@ -294,7 +284,28 @@ const getMyPaymentStatus = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { payment } });
 });
 
+// record payment - student search
+const searchStudentsForPayment = asyncHandler(async (req, res) => {
+  const students = await service.searchStudentsForPayment(req.query.search);
+  res.status(200).json({ success: true, data: { students } });
+});
+
+// record payment btn
+const recordOfficePayment = asyncHandler(async (req, res) => {
+  const { enrollmentId, amount, method, reference, note } = req.body;
+  const data = await service.recordOfficePayment(req.user, {
+    enrollmentId: Number(enrollmentId),
+    amount,
+    method,
+    reference,
+    note,
+  });
+  res.status(201).json({ success: true, message: `Payment recorded. Receipt: ${data.receiptNumber}.`, data });
+});
+
 module.exports = {
+  searchStudentsForPayment,
+  recordOfficePayment,
   getMyBalances,
   makePayment,
   retryPendingPayment,

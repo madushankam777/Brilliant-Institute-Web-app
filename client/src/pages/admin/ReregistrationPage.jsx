@@ -1,5 +1,4 @@
-// Admin: issue one-time re-registration keys (for a whole class, a whole
-// grade or chosen students) and run the 1 January roll-over.
+// Admin: issue one-time re-registration keys
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchReregistrationOptions,

@@ -1,3 +1,2 @@
-/* Global styles for the combined site. The actual design system lives in
-   one shared place so every page stays visually identical - see below. */
+/* Global styles for the combined site */
 @import '../../shared/client/src/styles/theme.css';

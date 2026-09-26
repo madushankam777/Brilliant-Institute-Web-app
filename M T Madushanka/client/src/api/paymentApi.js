@@ -15,25 +15,19 @@ export async function makePayment({ enrollmentId, amount, paymentMethod, payment
   return response.data.data.payment;
 }
 
-// pay online btn - reserves a pending payment and gets back the signed
-// fields to POST to the gateway. Card details are typed on the gateway's
-// own page, never here.
+// pay online btn
 export async function startOnlineCheckout({ enrollmentId, amount }) {
   const response = await httpClient.post('/payments/checkout/online', { enrollmentId, amount });
   return response.data.data.checkout;
 }
 
-// Polled on the way back from the gateway: the real result arrives on the
-// server's webhook, which can land a moment after the payer returns.
+// Polled on the way back from the gateway
 export async function fetchPaymentStatus(paymentId) {
   const response = await httpClient.get(`/payments/${paymentId}/status`);
   return response.data.data.payment;
 }
 
-/**
- * Leaves the SPA for the gateway's hosted payment page. A real form POST is
- * what the gateway expects - fetch/XHR can't hand the browser over.
- */
+// Leaves the SPA for the gateway's hosted payment page
 export function redirectToGateway({ actionUrl, fields }) {
   const form = document.createElement('form');
   form.method = 'POST';

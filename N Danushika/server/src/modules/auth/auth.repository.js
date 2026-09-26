@@ -100,6 +100,25 @@ async function markResetTokenUsed(tokenId) {
   await pool.execute(`UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?`, [tokenId]);
 }
 
+// reset code check - a still-valid code for this user
+async function findValidResetTokenForUser(userId, tokenHash) {
+  const [rows] = await pool.execute(
+    `SELECT * FROM password_reset_tokens
+     WHERE user_id = ? AND token_hash = ? AND used_at IS NULL AND expires_at > NOW()
+     LIMIT 1`,
+    [userId, tokenHash]
+  );
+  return rows[0] || null;
+}
+
+// clear finished codes so a repeated code never clashes
+async function deleteOldResetTokensForUser(userId) {
+  await pool.execute(
+    `DELETE FROM password_reset_tokens WHERE user_id = ? AND (used_at IS NOT NULL OR expires_at <= NOW())`,
+    [userId]
+  );
+}
+
 // A new link (or a finished reset) cancels every older link for that user.
 async function invalidateResetTokensForUser(userId) {
   await pool.execute(
@@ -108,8 +127,7 @@ async function invalidateResetTokensForUser(userId) {
   );
 }
 
-// Find a tutor enrollment key by its code, but only if it's still usable -
-// same "valid means unused" shape as findValidResetTokenByHash above.
+// Find a tutor enrollment key by its code
 async function findValidTutorKeyByCode(keyCode) {
   const [rows] = await pool.execute(
     `SELECT * FROM tutor_enrollment_keys WHERE key_code = ? AND status = 'UNUSED' LIMIT 1`,
@@ -118,8 +136,7 @@ async function findValidTutorKeyByCode(keyCode) {
   return rows[0] || null;
 }
 
-// Mark a tutor enrollment key as used, so it can't be redeemed a second
-// time, and record which account redeemed it.
+// Mark a tutor enrollment key as used
 async function markTutorKeyUsed(keyId, userId) {
   await pool.execute(
     `UPDATE tutor_enrollment_keys SET status = 'USED', used_by = ?, used_at = NOW() WHERE id = ?`,
@@ -127,8 +144,7 @@ async function markTutorKeyUsed(keyId, userId) {
   );
 }
 
-// Claims the key before the account is created, so two sign-ups racing
-// with the same key can't both get through. Returns false if already taken.
+// Claims the key before the account is created
 async function claimTutorKey(keyId) {
   const [result] = await pool.execute(
     `UPDATE tutor_enrollment_keys SET status = 'USED', used_at = NOW() WHERE id = ? AND status = 'UNUSED'`,
@@ -159,6 +175,8 @@ module.exports = {
   findValidResetTokenByHash,
   markResetTokenUsed,
   invalidateResetTokensForUser,
+  findValidResetTokenForUser,
+  deleteOldResetTokensForUser,
   findValidTutorKeyByCode,
   markTutorKeyUsed,
   claimTutorKey,

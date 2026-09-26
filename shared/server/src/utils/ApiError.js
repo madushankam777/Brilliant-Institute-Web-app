@@ -4,8 +4,7 @@ class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
     this.statusCode = statusCode;
-    // Optional extra info safe to show the user, e.g. field-level
-    // validation errors. Never put raw DB errors or stack traces here.
+    // extra info that is safe to show the user
     this.details = details;
   }
 

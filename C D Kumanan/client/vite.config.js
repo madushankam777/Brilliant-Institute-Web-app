@@ -21,16 +21,9 @@ export default defineConfig({
     fs: {
       allow: [path.resolve(__dirname, '../..')],
     },
-    // Forward API/upload calls to the backend so the browser only ever talks
-    // to this one origin - required for cookies (SameSite=strict) to work
-    // when the site is reached through a tunnel/reverse proxy on a single
-    // public URL, and it's what lets httpClient use a plain relative
-    // '/api' base instead of guessing a hostname.
+    // send /api and /uploads to the backend
     proxy: {
-      // Strip Origin on the proxy hop - it's a server-to-server request at
-      // that point, not the browser's cross-origin request, so the backend
-      // should see it as same-origin (needed for CORS to work no matter
-      // what public URL - LAN IP, tunnel, real domain - served the page).
+      // Strip Origin on the proxy hop
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

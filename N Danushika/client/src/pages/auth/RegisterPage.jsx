@@ -15,8 +15,7 @@ function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
-// Letters, spaces, apostrophes, periods, and hyphens only - covers real
-// names ("Mary-Jane O'Brien") while catching digits/symbols typed by mistake.
+// Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
 

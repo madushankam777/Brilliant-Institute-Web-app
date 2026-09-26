@@ -1,10 +1,4 @@
-// The 1 January roll-over.
-//
-// Students who confirmed their place with a re-registration key move up a
-// grade. Students who did not are closed out: status LEFT, which blocks login
-// and hides them from rosters, while keeping their payment and attendance
-// history for the institute's records. A/L students have finished, so they are
-// closed out as graduated rather than as leavers.
+// The 1 January roll-over
 const { nextGrade, isFinalGrade } = require('../../../../../shared/server/src/config/grades');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
@@ -57,8 +51,7 @@ async function previewRollover(academicYear) {
   };
 }
 
-// Idempotent per year: the log row is the guard, so a restart on 1 January
-// cannot run it twice.
+// runs once per year (the log row is the guard)
 async function runYearlyRollover({ academicYear, actorId = null, force = false }) {
   if (!(await schema.hasReregistration())) throw schema.migrationRequired();
   const year = Number(academicYear);
@@ -151,10 +144,7 @@ async function runYearlyRollover({ academicYear, actorId = null, force = false }
   };
 }
 
-// The automatic run only fires in the first week of January, and only if
-// re-registration was actually opened for that year. Without that guard, a
-// server first started in January would close every account on the system
-// because nobody had been given a key yet.
+// auto run - first week of January, only if re-registration was opened
 async function runIfDue() {
   const now = new Date();
   if (now.getMonth() !== 0 || now.getDate() > 7) return null;
@@ -181,8 +171,7 @@ async function runIfDue() {
   return result;
 }
 
-// Checked once at boot and once a day after that, so the server does not have
-// to be running at the exact moment midnight passes on 31 December.
+// check at start-up and once a day
 function startRolloverScheduler() {
   const check = () => {
     runIfDue().catch((error) => console.error('[rollover] check failed:', error.message));

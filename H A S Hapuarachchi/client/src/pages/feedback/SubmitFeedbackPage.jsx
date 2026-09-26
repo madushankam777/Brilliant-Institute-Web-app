@@ -1,5 +1,4 @@
-// Student/Parent or Tutor: submit feedback/complaint (FBC-01), route it to
-// Admin/Tutor/both, and keep the conversation going like a chat (FBC-02)
+// Feedback page - send a message and chat with replies
 import { useCallback, useEffect, useState } from 'react';
 import {
   submitFeedback,
@@ -94,8 +93,7 @@ function SubmitFeedbackPage() {
     fetchAllTutors()
       .then(setTutors)
       .catch(() => {
-        // The tutor picker just stays empty - submitting to Admin only
-        // still works fine without this list.
+        // tutor list failed - sending to Admin still works
       });
   }, [loadTickets]);
 

@@ -11,9 +11,7 @@ const sharedPackageAliases = ['react', 'react-dom', 'react/jsx-runtime', 'react-
 );
 
 const SECURITY_HEADERS = {
-  // The app loads only its own bundle; inline styles are needed because
-  // React writes style props out as inline style attributes. Form posts are
-  // limited to this site plus PayHere's hosted checkout.
+  // security headers
   'Content-Security-Policy': [
     "default-src 'self'",
     "script-src 'self'",
@@ -34,9 +32,7 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
 };
 
-// The dev server injects an inline React Refresh script and an HMR websocket,
-// which a strict CSP blocks - so dev gets every header except the CSP, and
-// the strict CSP applies to the production build served by `vite preview`.
+// dev server gets every header except the CSP
 const { 'Content-Security-Policy': _strictCsp, ...DEV_HEADERS } = SECURITY_HEADERS;
 
 export default defineConfig({
@@ -44,8 +40,7 @@ export default defineConfig({
   resolve: {
     alias: sharedPackageAliases,
   },
-  // Static files (favicon, etc.) live once in shared/client/public instead
-  // of a separate copy per app.
+  // static files from shared/client/public
   publicDir: path.resolve(__dirname, '../shared/client/public'),
   server: {
     port: 5173,
@@ -53,23 +48,15 @@ export default defineConfig({
     headers: DEV_HEADERS,
     // allow tunnel hostnames (Vite blocks unrecognized Host headers by default)
     allowedHosts: ['.loca.lt', '.trycloudflare.com'],
-    // The dev server may only read this app and shared/client - never the
-    // server code, the sql/ folder (it holds a database password) or uploads.
+    // The dev server may only read this app and shared/client
     fs: {
       strict: true,
       allow: [__dirname, path.resolve(__dirname, '../shared/client')],
       deny: ['.env', '.env.*', '*.{crt,pem,key}', '**/*.sql', '**/uploads/**', '**/server/**'],
     },
-    // Forward API/upload calls to the backend so the browser only ever talks
-    // to this one origin - required for cookies (SameSite=strict) to work
-    // when the site is reached through a tunnel/reverse proxy on a single
-    // public URL, and it's what lets httpClient use a plain relative
-    // '/api' base instead of guessing a hostname.
+    // send /api and /uploads to the backend
     proxy: {
-      // Strip Origin on the proxy hop - it's a server-to-server request at
-      // that point, not the browser's cross-origin request, so the backend
-      // should see it as same-origin (needed for CORS to work no matter
-      // what public URL - LAN IP, tunnel, real domain - served the page).
+      // Strip Origin on the proxy hop
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

@@ -1,12 +1,4 @@
-// Stops stale copies of THIS project's dev servers so `npm run dev` never
-// dies with EADDRINUSE or gets shadowed by an old server on the same port.
-//
-//   node ../scripts/free-port.js server    (backend, port 5000)
-//   node ../scripts/free-port.js client    (Vite dev server, port 5173)
-//   node ../scripts/free-port.js preview   (Vite production preview, port 4173)
-//
-// Only processes that belong to this repository are stopped. If something
-// unrelated owns the port it is left alone and a clear message is printed.
+// stops old copies of this project's dev servers before starting
 const path = require('path');
 const { execFileSync } = require('child_process');
 

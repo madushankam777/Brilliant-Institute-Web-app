@@ -1,8 +1,4 @@
-// Paying tutors. PayHere only collects money, so a payout leaves the institute
-// in one of three ways:
-//   BANK_TRANSFER - admin transfers it from the institute's bank, then records the bank reference
-//   BANK_FILE     - queued and exported as a bulk-credit CSV for corporate online banking
-//   PAYOUT_API    - sent through a payout provider (needs PAYOUT_PROVIDER=API and its credentials)
+// Paying tutors - bank transfer, bank file or payout API
 const config = require('../../../../../shared/server/src/config/env');
 
 function isApiConfigured() {
@@ -14,8 +10,7 @@ function last4(accountNumber) {
   return digits.length >= 4 ? digits.slice(-4) : null;
 }
 
-// Sends one payout through the provider. Throws on failure so the caller can
-// record FAILED instead of pretending it went through.
+// Sends one payout through the provider
 async function sendTransfer({ payoutId, amount, bank, reference }) {
   if (!isApiConfigured()) {
     throw new Error('No payout provider is configured.');
@@ -62,8 +57,7 @@ const FILE_COLUMNS = [
 
 function csvCell(value) {
   let text = String(value === null || value === undefined ? '' : value);
-  // A cell starting with = + - @ is run as a formula by Excel. Names and bank
-  // details are typed by tutors, so neutralise them with a leading quote.
+  // stop Excel running a cell as a formula
   if (/^[=+\-@\t\r]/.test(text) && !/^-?\d+(\.\d+)?$/.test(text)) {
     text = `'${text}`;
   }

@@ -1,5 +1,4 @@
-// Tutor/Admin: create or edit a class, with CRS-05 conflict detection.
-// One route handles both modes - "new" (no :classId) vs "edit" (:classId set).
+// Tutor/Admin: create or edit a class, with CRS-05 conflict detection
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createClass, updateClass, fetchClassDetails, fetchAllTutors } from '../../api/courseApi';

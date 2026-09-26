@@ -37,7 +37,7 @@ export function getNavItems(role) {
     { to: '/calendar', label: 'Calendar', icon: 'calendarDays' },
     { to: '/attendance/history', label: 'Attendance', icon: 'calendar' },
     { to: '/attendance/checkin', label: 'Mark Attendance', icon: 'checkCircle' },
-    { to: '/payments', label: 'Fees', icon: 'card' },
+    { to: '/payments', label: 'Fees', icon: 'card', end: true },
     { to: '/payments/history', label: 'History', icon: 'receipt' },
     { to: '/feedback', label: 'Feedback', icon: 'chat' },
     { to: '/reregister', label: 'Re-register', icon: 'refresh' },

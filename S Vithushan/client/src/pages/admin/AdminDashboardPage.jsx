@@ -1,5 +1,4 @@
-// Admin: dashboard overview (ADM-01) - user/class/revenue/complaint
-// counts, a revenue trend line, and a live feed of recent audit events.
+// Admin: dashboard overview
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchDashboardStats } from '../../api/adminApi';
@@ -22,8 +21,7 @@ function monthLabel(yyyyMm) {
   return new Date(Number(year), Number(month) - 1, 1).toLocaleString('en-US', { month: 'short' });
 }
 
-// Small dependency-free line chart - consistent with this codebase's
-// approach of hand-rolled SVG (see Icon.jsx) instead of a charting library.
+// Small dependency-free line chart
 function RevenueTrendChart({ points }) {
   if (points.length === 0) {
     return <p className="muted">No revenue recorded yet.</p>;

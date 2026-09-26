@@ -1,14 +1,7 @@
 // Shared axios instance: sends cookies, handles 401s
 import axios from 'axios';
 
-// The only place the API base URL is read from - never hardcode it elsewhere.
-// A plain relative path by default: the dev server proxies /api to the
-// backend (see vite.config.js), so the browser only ever talks to the one
-// origin it loaded the page from. That makes the exact same build work
-// unchanged whether it's opened as localhost, a LAN IP, or a public tunnel
-// URL - and it's required for cookies to work at all through a tunnel,
-// since a separate backend origin would make every request cross-site.
-// Set VITE_API_BASE_URL only if the API is genuinely served elsewhere.
+// API base URL (relative - the dev server proxies /api)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const httpClient = axios.create({
@@ -36,8 +29,7 @@ export function setSessionExpiredHandler(handler) {
 // A 401 here is an expected inline error (e.g. wrong password), not an expired session.
 const AUTH_ENTRY_POINTS = ['/auth/login', '/auth/register'];
 
-// A file download (responseType: 'blob') gets its error body as a Blob too,
-// so the server's message has to be read back out of it or it is lost.
+// read the error message out of a blob download
 async function readErrorBody(error) {
   const data = error.response && error.response.data;
   if (typeof Blob !== 'undefined' && data instanceof Blob) {

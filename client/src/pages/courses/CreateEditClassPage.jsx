@@ -1,6 +1,4 @@
-// Admin creates a class on a day picked from the calendar; admin or the tutor
-// can edit it later. Days the tutor already teaches show a red dot, and times
-// that clash with their other classes cannot be picked.
+// create / edit class page
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -33,6 +31,7 @@ import {
   todayKey,
 } from '../../../../shared/client/src/utils/schedule';
 import { useAuth } from '../../context/AuthContext';
+import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 
 const SUBJECT_AREAS = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Other'];
 
@@ -210,10 +209,14 @@ function CreateEditClassPage() {
   );
   const clash = busySlots.find((busy) => overlaps(form.startTime, form.endTime, busy)) || null;
 
+  const now = new Date();
+  const startsToday = !isEditMode && selectedDate === todayKey();
   const startOptions = withValue(TIME_SLOTS.slice(0, -1), form.startTime).map((time) => ({
     time,
-    // a start time inside another class is taken
-    taken: busySlots.some((busy) => toMinutes(time) >= toMinutes(busy.startTime) && toMinutes(time) < toMinutes(busy.endTime)),
+    // a start time inside another class is taken, and today's passed times too
+    taken:
+      busySlots.some((busy) => toMinutes(time) >= toMinutes(busy.startTime) && toMinutes(time) < toMinutes(busy.endTime)) ||
+      (startsToday && toMinutes(time) <= now.getHours() * 60 + now.getMinutes()),
   }));
   const endOptions = withValue(TIME_SLOTS, form.endTime)
     .filter((time) => toMinutes(time) > toMinutes(form.startTime))
@@ -399,7 +402,7 @@ function CreateEditClassPage() {
                       {startOptions.map((option) => (
                         <option key={option.time} value={option.time} disabled={option.taken}>
                           {formatTime(option.time)}
-                          {option.taken ? ' (booked)' : ''}
+                          {option.taken ? ' (not free)' : ''}
                         </option>
                       ))}
                     </select>
@@ -511,14 +514,11 @@ function CreateEditClassPage() {
             <div className="card-field-row">
               <div className="form-field">
                 <label htmlFor="capacity">Maximum Capacity (Seats)</label>
-                <input
+                <NumberInput
                   id="capacity"
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  max="500"
+                  maxLength={3}
                   value={form.capacity}
-                  onChange={(e) => updateField('capacity', e.target.value)}
+                  onChange={(value) => updateField('capacity', value)}
                   aria-invalid={Boolean(fieldErrors.capacity)}
                   className={fieldErrors.capacity ? 'input-error' : ''}
                 />
@@ -526,14 +526,12 @@ function CreateEditClassPage() {
               </div>
               <div className="form-field">
                 <label htmlFor="fee">Monthly Fee (LKR)</label>
-                <input
+                <NumberInput
                   id="fee"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
+                  decimals={2}
+                  maxLength={10}
                   value={form.fee}
-                  onChange={(e) => updateField('fee', e.target.value)}
+                  onChange={(value) => updateField('fee', value)}
                   aria-invalid={Boolean(fieldErrors.fee)}
                   className={fieldErrors.fee ? 'input-error' : ''}
                 />

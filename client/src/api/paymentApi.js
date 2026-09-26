@@ -15,25 +15,19 @@ export async function makePayment({ enrollmentId, amount, paymentMethod, payment
   return response.data.data.payment;
 }
 
-// pay online btn - reserves a pending payment and gets back the signed
-// fields to POST to the gateway. Card details are typed on the gateway's
-// own page, never here.
+// pay online btn
 export async function startOnlineCheckout({ enrollmentId, amount }) {
   const response = await httpClient.post('/payments/checkout/online', { enrollmentId, amount });
   return response.data.data.checkout;
 }
 
-// Polled on the way back from the gateway: the real result arrives on the
-// server's webhook, which can land a moment after the payer returns.
+// Polled on the way back from the gateway
 export async function fetchPaymentStatus(paymentId) {
   const response = await httpClient.get(`/payments/${paymentId}/status`);
   return response.data.data.payment;
 }
 
-/**
- * Leaves the SPA for the gateway's hosted payment page. A real form POST is
- * what the gateway expects - fetch/XHR can't hand the browser over.
- */
+// Leaves the SPA for the gateway's hosted payment page
 export function redirectToGateway({ actionUrl, fields }) {
   const form = document.createElement('form');
   form.method = 'POST';
@@ -190,8 +184,7 @@ export async function fetchPayoutBatch() {
   return response.data.data.batch;
 }
 
-// Comes back as a CSV file, not JSON - the caller saves it and uploads it to
-// the bank's corporate portal.
+// Comes back as a CSV file, not JSON
 export async function exportPayoutFile() {
   const response = await httpClient.post('/payments/admin/payouts/export', null, {
     responseType: 'blob',
@@ -217,4 +210,16 @@ export async function confirmPayoutSettled(payoutId, { providerReference, transf
 export async function markPayoutFailed(payoutId, reason) {
   const response = await httpClient.patch(`/payments/admin/payouts/${payoutId}/failed`, { reason });
   return response.data.data.result;
+}
+
+// record payment - find students by registration number or name
+export async function searchStudentsForPayment(search) {
+  const response = await httpClient.get('/payments/admin/students', { params: { search } });
+  return response.data.data.students;
+}
+
+// record payment btn - { enrollmentId, amount, method, reference, note }
+export async function recordOfficePayment(payload) {
+  const response = await httpClient.post('/payments/admin/record-payment', payload);
+  return response.data;
 }

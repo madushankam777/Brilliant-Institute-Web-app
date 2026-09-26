@@ -22,8 +22,7 @@ function ForgotPasswordPage() {
       const result = await requestPasswordReset(email);
       setSubmitted(true);
       if (result.data && result.data.devOnlyResetToken) {
-        // Only sent by the server outside production, since there's no
-        // real email service hooked up yet in development.
+        // old dev-only token (the server no longer sends it)
         setDevOnlyResetToken(result.data.devOnlyResetToken);
       }
     } catch (error) {

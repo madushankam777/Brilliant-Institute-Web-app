@@ -1,5 +1,4 @@
-// Placeholder login only (real auth module is N Danushika's) - used so
-// this module can be reviewed/tested standalone without her code.
+// Placeholder login only
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');

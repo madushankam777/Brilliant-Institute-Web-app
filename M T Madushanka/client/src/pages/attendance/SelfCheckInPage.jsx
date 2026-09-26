@@ -1,6 +1,4 @@
-// Student: type the key the tutor gave in class to mark yourself Present -
-// see attendance.service.js for the key's rules (only works if you're
-// enrolled in that class, expires after a short while).
+// Student: type the key the tutor gave in class to mark yourself Present
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { selfCheckIn } from '../../api/attendanceApi';

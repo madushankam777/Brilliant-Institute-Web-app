@@ -187,8 +187,7 @@ function bucketRange(bucket, firstKey, lastKey) {
   return [`${firstKey}-01-01`, `${Number(lastKey) + 1}-01-01`];
 }
 
-// The headline total is today / this month / this year / all 5 years;
-// the points are the bars of the chart around it.
+// revenue total and chart bars
 async function getRevenueReport(period) {
   const today = await repository.getDatabaseToday();
   const [year, month] = today.split('-').map(Number);
@@ -242,9 +241,7 @@ async function listUsers(filters) {
   return rows.map(toSafeUserForAdmin);
 }
 
-// view profile btn - Admin also sees the CV/certificates captured when this
-// tutor's enrollment key was issued. Tutors never get this on their own
-// profile: every route serving it sits behind authorize(ADMIN).
+// view profile btn - admin also sees tutor documents
 async function getUserProfile(userId) {
   const user = await repository.findUserById(userId);
   if (!user || user.status === 'DELETED') {
@@ -322,8 +319,7 @@ async function activateUser(actingUser, userId) {
   if (targetUser.status === USER_STATUS.ACTIVE) {
     throw ApiError.badRequest('This user is already active.');
   }
-  // tutors may only undo a suspension - closed accounts and ones the
-  // office suspended are for an Admin to decide
+  // tutors may only undo a suspension
   if (actingUser.role === ROLES.TUTOR) {
     if (targetUser.status !== USER_STATUS.SUSPENDED) {
       throw ApiError.forbidden('Only an Administrator can reopen this account.');
@@ -346,8 +342,7 @@ async function activateUser(actingUser, userId) {
   return toSafeUserForAdmin(updated);
 }
 
-// delete btn - only a suspended account can be deleted, so nobody's access
-// gets pulled by this call alone (suspend is the actual access-revoking step)
+// delete btn - only a suspended account can be deleted
 async function deleteUser(actingUser, userId) {
   if (userId === actingUser.id) {
     throw ApiError.badRequest('You cannot delete your own account.');
@@ -369,8 +364,7 @@ async function deleteUser(actingUser, userId) {
   });
 }
 
-// Admin: one-time reset link to give the user in person (there is no email
-// service, so a forgotten password is reset through the office)
+// Admin: one-time reset link to give the user in person
 async function createPasswordResetLink(adminUser, userId) {
   const targetUser = await repository.findUserById(userId);
   if (!targetUser || targetUser.status === USER_STATUS.DELETED) {
@@ -634,8 +628,7 @@ async function redeemReregistrationKey(studentUser, keyCode) {
     throw ApiError.conflict('That key has just been used.');
   }
 
-  // A key for a year already under way takes effect now. One for next year
-  // only confirms the place - the January roll-over moves the grade.
+  // A key for a year already under way takes effect now
   const appliesNow = key.academic_year <= currentAcademicYear();
   if (appliesNow) {
     await repository.setStudentGrade(studentUser.id, key.to_grade, key.academic_year);
@@ -844,9 +837,7 @@ async function listMyClassesForMessaging(tutorUser) {
   return rows.map((row) => ({ id: row.id, subject: row.subject, level: row.level }));
 }
 
-// Tutor -> their own students and/or Admin. A tutor can never reach a student
-// who isn't actively enrolled in one of their classes: the recipient list is
-// built from their own enrollments, never from anything the client sends.
+// Tutor -> their own students and/or Admin
 async function sendTutorMessage(tutorUser, { audience, classId, subject, message }) {
   const recipientIds = new Set();
 
@@ -923,7 +914,7 @@ function toMysqlDateTime(date) {
   );
 }
 
-// audience: SELF (only the tutor), CLASS (one of their classes) or ALL (all their students)
+// audience: SELF, CLASS or ALL
 async function scheduleReminder(tutorUser, { audience, classId, title, message, remindAt }) {
   const sendAt = parseLocalDateTime(remindAt);
   if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() <= Date.now()) {

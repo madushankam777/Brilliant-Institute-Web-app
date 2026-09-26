@@ -1,7 +1,4 @@
-// Adds sample tutors (with bank details), students across every grade,
-// classes, enrolments and a few past payouts, so every admin page has
-// something to show. Safe to run again - anything already there is skipped.
-// Every sample account uses the password Demo@1234.
+// adds sample tutors, students, classes and payouts (password Demo@1234)
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const bcrypt = require('bcryptjs');
 const config = require('../../shared/server/src/config/env');

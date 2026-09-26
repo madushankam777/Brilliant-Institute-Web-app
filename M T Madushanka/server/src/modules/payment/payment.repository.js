@@ -41,8 +41,8 @@ async function listBalancesForStudent(studentId, executor = pool) {
 // update balance after payment (marks as paid)
 async function updateEnrollmentBalance(enrollmentId, newBalance, executor = pool) {
   await executor.execute(
-    `UPDATE enrollments SET balance = ?, payment_status = 'PAID' WHERE id = ?`,
-    [newBalance, enrollmentId]
+    `UPDATE enrollments SET balance = ?, payment_status = IF(? <= 0, 'PAID', 'UNPAID') WHERE id = ?`,
+    [newBalance, newBalance, enrollmentId]
   );
 }
 
@@ -81,8 +81,7 @@ async function markPaymentSuccessful(
   );
 }
 
-// Approving a bank slip: the amount is what admin read off the slip, which
-// may differ from what the student typed in.
+// approve slip - uses the amount admin read off the slip
 async function approveBankTransfer(
   paymentId,
   { amount, balanceBefore, balanceAfter, gatewayTransactionId, paymentDetails },
@@ -112,9 +111,7 @@ async function updatePaymentDetails(paymentId, paymentDetails, executor = pool) 
   ]);
 }
 
-// An online payment starts as 'ONLINE' because the payer only picks their
-// instrument on the gateway's own page - this writes back what they
-// actually used once the gateway tells us.
+// save the method the payer actually used
 async function updatePaymentMethodAndDetails(
   paymentId,
   { paymentMethod, paymentDetails },
@@ -151,7 +148,8 @@ async function findPaymentByIdForUpdate(paymentId, connection) {
 async function listPendingBankTransfers(executor = pool) {
   const [rows] = await executor.execute(
     `SELECT p.id, p.enrollment_id, p.amount, p.balance_before, p.payment_details, p.created_at,
-            e.balance AS current_balance, u.full_name AS student_name, u.email AS student_email, c.subject
+            e.balance AS current_balance, u.full_name AS student_name, u.email AS student_email,
+            u.student_code, c.subject
      FROM payments p
      JOIN enrollments e ON e.id = p.enrollment_id
      JOIN classes c ON c.id = e.class_id
@@ -162,8 +160,7 @@ async function listPendingBankTransfers(executor = pool) {
   return rows;
 }
 
-// One payment with everything the receipt screen needs (subject + receipt
-// number), so the return-from-gateway page can render in a single query.
+// One payment with everything the receipt screen needs
 async function findPaymentWithDetailsById(paymentId, executor = pool) {
   const [rows] = await executor.execute(
     `SELECT p.id, p.student_id, p.enrollment_id, c.subject, p.amount, p.balance_before,
@@ -197,14 +194,12 @@ async function listPaymentHistoryForStudent(studentId, executor = pool) {
   return rows;
 }
 
-// admin dashboard - every payment (any method/status), newest first, so
-// Admin can actually see the individual transactions behind the revenue
-// number instead of just a lump sum
+// admin dashboard - recent payments
 async function listRecentPayments(limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 20;
   const [rows] = await pool.query(
     `SELECT p.id, p.amount, p.status, p.payment_method, p.created_at, p.paid_at,
-            u.full_name AS student_name, c.subject
+            u.full_name AS student_name, u.student_code, c.subject
      FROM payments p
      JOIN enrollments e ON e.id = p.enrollment_id
      JOIN classes c ON c.id = e.class_id
@@ -215,16 +210,41 @@ async function listRecentPayments(limit) {
   return rows;
 }
 
-// notify everyone who needs to react to a payment event - approve/reject
-// goes to the student, a new bank transfer submission goes to Admin, a
-// payout goes to the Tutor. Reuses the same notification_log table the
-// reminder system already writes to, so it shows up in the same bell.
+// notify everyone who needs to react to a payment event
 async function createNotification({ recipientId, type, message, sentBy }) {
   await pool.execute(
     `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
      VALUES (?, 'EMAIL', ?, ?, ?, NOW())`,
     [recipientId, type, message, sentBy || null]
   );
+}
+
+// admin record payment - find students by registration number, name or email
+async function searchStudents(term) {
+  const like = `%${term}%`;
+  const [rows] = await pool.execute(
+    `SELECT id, full_name, student_code, grade, email FROM users
+     WHERE role = 'STUDENT_PARENT' AND status = 'ACTIVE'
+       AND (student_code LIKE ? OR full_name LIKE ? OR email LIKE ?)
+     ORDER BY (student_code = ?) DESC, full_name
+     LIMIT 10`,
+    [like, like, like, term]
+  );
+  return rows;
+}
+
+async function listActiveEnrollmentsForStudents(studentIds) {
+  if (studentIds.length === 0) return [];
+  const [rows] = await pool.execute(
+    `SELECT e.id, e.student_id, e.balance, c.subject, t.full_name AS tutor_name
+     FROM enrollments e
+     JOIN classes c ON c.id = e.class_id
+     JOIN users t ON t.id = c.tutor_id
+     WHERE e.status = 'ACTIVE' AND e.student_id IN (${studentIds.map(() => '?').join(', ')})
+     ORDER BY c.subject`,
+    studentIds
+  );
+  return rows;
 }
 
 async function findActiveAdminIds() {
@@ -234,8 +254,7 @@ async function findActiveAdminIds() {
 
 // --- Tutor payouts (Admin paying a Tutor their share/salary) ---
 
-// tutor picker list - bank fields included so Admin's Pay Tutors page can
-// show them without a second round trip per tutor
+// tutor picker list
 async function listActiveTutors() {
   const [rows] = await pool.execute(
     `SELECT id, full_name, email, profile_picture_path,
@@ -274,9 +293,7 @@ async function findActiveTutorById(tutorId) {
   return rows[0] || null;
 }
 
-// The destination account is copied onto the payout row, so the history still
-// shows where the money went after the tutor changes their details.
-// settledAt is null for "now".
+// The destination account is copied onto the payout row
 async function createTutorPayout({
   tutorId,
   amount,
@@ -340,8 +357,7 @@ async function findTutorPayoutById(payoutId) {
   return rows[0] || null;
 }
 
-// Queued payouts joined to the tutor's CURRENT full account number - the
-// only place the full number is read, and only to build the bank file.
+// Queued payouts joined to the tutor's CURRENT full account number
 async function listPayoutsAwaitingTransfer() {
   if (!(await schema.hasPayoutTracking())) return [];
   const [rows] = await pool.execute(
@@ -411,8 +427,7 @@ async function listTutorPayouts() {
   return rows;
 }
 
-// Per tutor: total paid, paid this month, and the last payment date.
-// Queued and failed payouts have not reached the tutor, so they don't count.
+// Per tutor: total paid, paid this month, and the last payment date
 async function sumPayoutsByTutor() {
   const tracking = await schema.hasPayoutTracking();
   const paidOn = tracking ? 'COALESCE(settled_at, paid_at)' : 'paid_at';
@@ -469,6 +484,8 @@ async function upsertPaymentSettings(
 }
 
 module.exports = {
+  searchStudents,
+  listActiveEnrollmentsForStudents,
   findEnrollmentById,
   findEnrollmentByIdForUpdate,
   listBalancesForStudent,

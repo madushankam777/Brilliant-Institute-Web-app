@@ -1,11 +1,21 @@
-// Public "About Us" page. The numbers come live from the database.
+// About Us page
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchInstituteOverview } from '../../api/contactApi';
+import { fetchPublicTutors } from '../../api/contactApi';
 import { useAuth } from '../../context/AuthContext';
+import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import Footer from '../../../../shared/client/src/components/layout/Footer';
-import heroMediaImg from '../../../../shared/client/src/assets/hero-media.png';
+
+// image from shared/client/public
+const ABOUT_IMAGE = '/about%20us.jpg';
+
+const MISSION = [
+  'Teach clear, syllabus-focused lessons with tutors who know their students.',
+  'Keep a steady weekly routine, with timetables everyone can see.',
+  'Keep parents informed about attendance, fees and class changes.',
+  'Make joining, paying and asking for help simple and secure.',
+];
 
 const VALUES = [
   {
@@ -36,23 +46,49 @@ const STEPS = [
   { title: 'Learn and track progress', text: 'Check in to class, see your attendance and pay fees online.' },
 ];
 
-function StatBlock({ value, label }) {
-  return (
-    <div className="about-stat">
-      <span className="about-stat-value">{value}</span>
-      <span className="about-stat-label">{label}</span>
-    </div>
-  );
-}
+const FAQS = [
+  {
+    q: 'How do I join a class?',
+    a: 'Create an account as a student or parent, open Browse Classes, pick a class by subject, grade and day, and enrol. The fee then appears on your Fees page.',
+  },
+  {
+    q: 'What is my registration number?',
+    a: 'Every student gets a registration number (for example ST0000123) when they register. You can see it on your dashboard and profile page. Please write it on every bank slip.',
+  },
+  {
+    q: 'How can I pay the class fees?',
+    a: 'Upload a photo of your bank transfer slip on the Fees page, or pay at the office in cash or with a bank deposit slip. Every payment gets a receipt in your payment history.',
+  },
+  {
+    q: 'Are classes held on public holidays?',
+    a: 'No. Public holidays are marked on every calendar and timetable, and no classes run on those days.',
+  },
+  {
+    q: 'What if a class is cancelled or an extra class is added?',
+    a: 'The change shows on your calendar and timetable straight away, and you get a notification in the portal.',
+  },
+  {
+    q: 'How is attendance recorded?',
+    a: 'Tutors mark attendance in class, or show a short attendance key that students enter on their phone. Parents can see the full attendance history.',
+  },
+  {
+    q: 'I forgot my password. What do I do?',
+    a: 'Click "Forgot password" on the login page. We email you a 6-digit code - enter it with a new password and you are logged straight in.',
+  },
+  {
+    q: 'Do students need to register again each year?',
+    a: 'Yes. Near the end of the year the office gives each continuing student a re-registration key to confirm their place for the next grade.',
+  },
+];
 
 function AboutPage() {
   const { isLoggedIn } = useAuth();
-  const [overview, setOverview] = useState(null);
+  const [tutors, setTutors] = useState([]);
 
   useEffect(() => {
-    fetchInstituteOverview()
-      .then(setOverview)
-      .catch(() => setOverview(null));
+    fetchPublicTutors()
+      .then(setTutors)
+      .catch(() => setTutors([]));
   }, []);
 
   return (
@@ -75,63 +111,39 @@ function AboutPage() {
             </Link>
           </div>
         </div>
-        <div className="hero-media">
-          <img src={heroMediaImg} alt="Students learning together at Brilliant Institute" />
+        <div className="hero-media about-hero-media">
+          <img src={ABOUT_IMAGE} alt="A student exploring new ideas with digital learning" />
         </div>
       </section>
 
-      {overview && (
-        <section className="container">
-          <div className="about-stats">
-            <StatBlock value={overview.classCount} label="Weekly classes" />
-            <StatBlock value={overview.tutorCount} label="Tutors" />
-            <StatBlock value={overview.studentCount} label="Students & parents" />
-            <StatBlock value={overview.subjects.length} label="Subject areas" />
-          </div>
-        </section>
-      )}
-
+      {/* vision and mission */}
       <section className="section">
-        <div className="container about-split">
-          <div>
-            <span className="eyebrow">Our mission</span>
-            <h2 className="about-title">Good teaching, made simple to follow</h2>
-            <p className="muted">
-              We believe students learn best when they have a steady routine, tutors who know them, and parents who
-              can see how they are doing. That is why we pair classroom teaching with a portal where attendance, fees,
-              timetables and messages are always up to date.
-            </p>
-            <p className="muted">
-              Whether you are preparing for the O/L or A/L, or building strong basics in the middle grades, we are
-              here to guide you one class at a time.
+        <div className="container about-vm">
+          <div className="about-vm-card">
+            <div className="feature-icon-box">
+              <Icon name="eye" size={22} />
+            </div>
+            <span className="eyebrow">Our vision</span>
+            <h2>A place where every student can succeed</h2>
+            <p>
+              To be the tuition institute families trust most - where every student from Grade 6 to A/L gets the
+              guidance, routine and confidence to reach their best.
             </p>
           </div>
-
-          <div className="card about-offer">
-            <h3>What we teach</h3>
-            {overview && overview.subjects.length > 0 ? (
-              <div className="about-chips">
-                {overview.subjects.map((subject) => (
-                  <span key={subject} className="about-chip">
-                    {subject}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">Mathematics, Science and Languages for secondary students.</p>
-            )}
-            <h3>Grades</h3>
-            {overview && overview.grades.length > 0 ? (
-              <div className="about-chips">
-                {overview.grades.map((grade) => (
-                  <span key={grade} className="about-chip">
-                    {grade}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className="muted">Grade 6 to A/L.</p>
-            )}
+          <div className="about-vm-card">
+            <div className="feature-icon-box">
+              <Icon name="target" size={22} />
+            </div>
+            <span className="eyebrow">Our mission</span>
+            <h2>What we do every day</h2>
+            <ul className="about-mission-list">
+              {MISSION.map((item) => (
+                <li key={item}>
+                  <Icon name="checkCircle" size={18} />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
@@ -156,7 +168,37 @@ function AboutPage() {
         </div>
       </section>
 
-      <section className="section">
+      {/* meet our tutors */}
+      {tutors.length > 0 && (
+        <section className="section">
+          <div className="container">
+            <div className="section-heading">
+              <span className="eyebrow">Our team</span>
+              <h2>Meet our tutors</h2>
+              <p className="muted">Teachers who know the syllabus - and know their students.</p>
+            </div>
+            <div className="about-tutors">
+              {tutors.map((tutor) => (
+                <div key={tutor.id} className="about-tutor">
+                  <Avatar name={tutor.fullName} pictureUrl={tutor.profilePictureUrl} size={72} />
+                  <h3>{tutor.fullName}</h3>
+                  {tutor.bio && <p className="muted">{tutor.bio}</p>}
+                  <div className="about-tutor-subjects">
+                    {tutor.subjects.map((subject) => (
+                      <span key={subject}>{subject}</span>
+                    ))}
+                  </div>
+                  <Link to={`/courses/tutors/${tutor.id}`} className="btn btn-ghost btn-sm">
+                    View classes <Icon name="arrowRight" size={14} />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="section section-bg-soft">
         <div className="container">
           <div className="section-heading">
             <span className="eyebrow">Getting started</span>
@@ -171,6 +213,27 @@ function AboutPage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      {/* questions parents ask */}
+      <section className="section">
+        <div className="container about-faq-wrap">
+          <div className="section-heading">
+            <span className="eyebrow">FAQ</span>
+            <h2>Questions parents and students ask</h2>
+          </div>
+          <div className="about-faq">
+            {FAQS.map((item) => (
+              <details key={item.q} className="about-faq-item">
+                <summary>
+                  {item.q}
+                  <Icon name="chevronDown" size={18} />
+                </summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 

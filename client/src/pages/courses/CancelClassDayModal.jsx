@@ -1,5 +1,4 @@
-// "Cancel a date" dialog: calls off one day of a weekly class (the class
-// carries on as usual the other weeks). Cancelled days can be put back.
+// "Cancel a date" dialog
 import { useState } from 'react';
 import { cancelClassDay, deleteClassEvent } from '../../api/courseApi';
 import useClassEvents from '../../hooks/useClassEvents';
