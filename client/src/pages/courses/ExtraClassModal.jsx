@@ -6,6 +6,7 @@ import { useYearOfHolidays } from '../../hooks/useHolidays';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import MonthCalendar from '../../../../shared/client/src/components/common/MonthCalendar';
 import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 import {
   addDaysToKey,
   formatLongDate,
@@ -113,6 +114,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="extra-class-title">
       <div className="modal-dialog modal-wide">
+        <ModalClose onClose={onClose} disabled={isSaving} />
         <h2 id="extra-class-title">Extra class - {classItem.subject}</h2>
         <p className="muted" style={{ marginTop: '-6px' }}>
           Pick a day to see every class booked that day, then choose a free time and hall. Enrolled students are told

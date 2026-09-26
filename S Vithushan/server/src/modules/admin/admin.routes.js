@@ -173,6 +173,12 @@ router.patch(
   validateRequest,
   controller.revokeReregistrationKey
 );
+router.delete(
+  '/admin/reregistration-keys/:keyId',
+  reregistrationKeyIdParamRules,
+  validateRequest,
+  controller.deleteReregistrationKey
+);
 
 router.get(
   '/admin/reregistration/rollover',

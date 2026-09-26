@@ -5,6 +5,7 @@ import {
   fetchReregistrationKeys,
   generateReregistrationKeys,
   revokeReregistrationKey,
+  deleteReregistrationKey,
   fetchRolloverPreview,
   runYearlyRollover,
 } from '../../api/adminApi';
@@ -89,6 +90,8 @@ function ReregistrationPage() {
   const [keySearch, setKeySearch] = useState('');
   const [keyFilter, setKeyFilter] = useState('ALL');
   const [listMessage, setListMessage] = useState(null); // { type, text }
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
@@ -188,6 +191,21 @@ function ReregistrationPage() {
       setCopied(true);
     } catch {
       setCopied(false);
+    }
+  }
+
+  async function handleDelete(keyId) {
+    setListMessage(null);
+    setDeletingId(keyId);
+    try {
+      await deleteReregistrationKey(keyId);
+      setConfirmDeleteId(null);
+      setListMessage({ type: 'success', text: 'Key deleted.' });
+      await loadKeys();
+    } catch (error) {
+      setListMessage({ type: 'error', text: error.message });
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -544,11 +562,39 @@ function ReregistrationPage() {
                           <td>{formatDate(key.expiresAt)}</td>
                           <td>{formatDate(key.usedAt)}</td>
                           <td style={{ textAlign: 'right' }}>
-                            {key.status === 'UNUSED' && (
-                              <button type="button" className="btn btn-sm btn-secondary" onClick={() => handleRevoke(key.id)}>
-                                Revoke
-                              </button>
-                            )}
+                            <div className="row-actions">
+                              {confirmDeleteId === key.id ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-danger"
+                                    disabled={deletingId === key.id}
+                                    onClick={() => handleDelete(key.id)}
+                                  >
+                                    {deletingId === key.id ? 'Deleting...' : 'Confirm delete'}
+                                  </button>
+                                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => setConfirmDeleteId(null)}>
+                                    Keep
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  {key.status === 'UNUSED' && (
+                                    <button type="button" className="btn btn-sm btn-secondary" onClick={() => handleRevoke(key.id)}>
+                                      Revoke
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-secondary"
+                                    aria-label={`Delete key for ${key.studentName}`}
+                                    onClick={() => setConfirmDeleteId(key.id)}
+                                  >
+                                    <Icon name="trash" size={14} /> Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}

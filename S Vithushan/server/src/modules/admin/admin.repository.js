@@ -670,7 +670,14 @@ async function findLastSuspenderRole(userId) {
   return rows[0] ? rows[0].role : null;
 }
 
+// delete btn - remove a re-registration key record
+async function deleteReregistrationKey(keyId) {
+  const [result] = await pool.execute(`DELETE FROM student_reregistration_keys WHERE id = ?`, [keyId]);
+  return result.affectedRows > 0;
+}
+
 module.exports = {
+  deleteReregistrationKey,
   findLastSuspenderRole,
   getCoreCounts,
   getRevenueTrend,

@@ -171,6 +171,11 @@ export async function fetchReregistrationKeys(academicYear) {
   return response.data.data.keys;
 }
 
+// delete btn - re-registration key
+export async function deleteReregistrationKey(keyId) {
+  await httpClient.delete(`/admin/reregistration-keys/${keyId}`);
+}
+
 export async function revokeReregistrationKey(keyId) {
   await httpClient.patch(`/admin/reregistration-keys/${keyId}/revoke`);
 }

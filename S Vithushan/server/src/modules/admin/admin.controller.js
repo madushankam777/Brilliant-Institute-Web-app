@@ -247,6 +247,11 @@ const revokeReregistrationKey = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Re-registration key revoked.' });
 });
 
+const deleteReregistrationKey = asyncHandler(async (req, res) => {
+  await service.deleteReregistrationKey(req.user, Number(req.params.keyId));
+  res.status(200).json({ success: true, message: 'Re-registration key deleted.' });
+});
+
 const redeemReregistrationKey = asyncHandler(async (req, res) => {
   const result = await service.redeemReregistrationKey(req.user, req.body.keyCode);
   res.status(200).json({ success: true, message: result.message, data: { result } });
@@ -289,6 +294,7 @@ module.exports = {
   generateReregistrationKeys,
   listReregistrationKeys,
   revokeReregistrationKey,
+  deleteReregistrationKey,
   redeemReregistrationKey,
   getMyReregistrationStatus,
   listUsers,

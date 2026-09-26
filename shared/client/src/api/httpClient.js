@@ -12,7 +12,20 @@ const httpClient = axios.create({
 
 const STATE_CHANGING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
+// how many requests are running - drives the top loading bar
+let activeRequests = 0;
+const activityListeners = new Set();
+function setActive(change) {
+  activeRequests = Math.max(0, activeRequests + change);
+  activityListeners.forEach((listener) => listener(activeRequests));
+}
+export function onRequestActivity(listener) {
+  activityListeners.add(listener);
+  return () => activityListeners.delete(listener);
+}
+
 httpClient.interceptors.request.use((requestConfig) => {
+  setActive(1);
   const method = (requestConfig.method || 'get').toLowerCase();
   if (STATE_CHANGING_METHODS.has(method)) {
     requestConfig.headers['X-Requested-With'] = 'brilliant-institute-client';
@@ -43,8 +56,12 @@ async function readErrorBody(error) {
 }
 
 httpClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    setActive(-1);
+    return response;
+  },
   async (error) => {
+    setActive(-1);
     const status = error.response ? error.response.status : null;
     const requestUrl = error.config ? error.config.url : '';
     const isAuthEntryPoint = AUTH_ENTRY_POINTS.some((path) => requestUrl.includes(path));

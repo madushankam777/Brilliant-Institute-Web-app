@@ -18,6 +18,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { todayKey } from '../../../../shared/client/src/utils/schedule';
 import PayTutorModal from './PayTutorModal';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -67,6 +68,7 @@ function MarkPaidModal({ payout, onClose, onDone }) {
   return (
     <div className="modal-overlay" onClick={() => !isSaving && onClose()}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} disabled={isSaving} />
         <h2>Mark as paid</h2>
         <p className="muted">
           {formatCurrency(payout.amount)} to {payout.tutorName}. Enter the reference from the bank&apos;s
@@ -137,6 +139,7 @@ function MarkFailedModal({ payout, onClose, onDone }) {
   return (
     <div className="modal-overlay" onClick={() => !isSaving && onClose()}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} disabled={isSaving} />
         <h2>Transfer failed</h2>
         <p className="muted">
           {formatCurrency(payout.amount)} to {payout.tutorName}.

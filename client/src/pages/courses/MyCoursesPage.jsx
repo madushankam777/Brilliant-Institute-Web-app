@@ -7,6 +7,7 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
@@ -254,6 +255,7 @@ function MyCoursesPage() {
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => !isDeleting && closeDeleteModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <ModalClose onClose={closeDeleteModal} disabled={isDeleting} />
             <h2>Remove From History</h2>
             <p className="muted">
               This permanently removes <strong>{deleteTarget.subject}</strong> from your course history.

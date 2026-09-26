@@ -121,8 +121,6 @@ const config = {
   paymentGateway: {
     providerName: process.env.PAYMENT_GATEWAY_PROVIDER_NAME || 'mock-gateway',
     apiKey: process.env.PAYMENT_GATEWAY_API_KEY || '',
-    // demo card simulator - off unless switched on, never in production
-    simulatorAllowed: process.env.ALLOW_PAYMENT_SIMULATOR === 'true' && process.env.NODE_ENV !== 'production',
   },
 
   // PayHere - the live card / eZ Cash / mCash gateway

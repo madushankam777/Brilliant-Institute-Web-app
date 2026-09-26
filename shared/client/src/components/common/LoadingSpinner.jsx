@@ -1,9 +1,9 @@
-// Reusable loading indicator
+// loading indicator for a section of a page
 function LoadingSpinner({ label = 'Loading...' }) {
   return (
     <div className="loading-spinner" role="status" aria-live="polite">
       <span className="spinner" aria-hidden="true" />
-      <span>{label}</span>
+      <span className="loading-label">{label}</span>
     </div>
   );
 }

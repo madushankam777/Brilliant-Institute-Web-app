@@ -8,6 +8,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import { todayKey } from '../../../../shared/client/src/utils/schedule';
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const EMPTY_BANK_FORM = { bankName: '', accountHolder: '', accountNumber: '', branch: '' };
 
@@ -156,6 +157,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
         aria-modal="true"
         aria-labelledby="pay-title"
       >
+        <ModalClose onClose={onClose} disabled={isSubmitting} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
           <Avatar name={tutor.fullName} pictureUrl={tutor.profilePictureUrl} size={36} />
           <h2 id="pay-title" style={{ margin: 0 }}>

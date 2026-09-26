@@ -263,19 +263,38 @@ async function finalizePendingPayment(studentUser, paymentId) {
   }
 }
 
-// The simulator only runs when switched on for a demo and PayHere is not set up.
-function isSimulatorEnabled() {
-  return config.paymentGateway.simulatorAllowed && !payhere.isConfigured();
+// payment methods - the admin switches them on and off in Payment Settings
+const PAYMENT_METHOD_KEYS = ['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH'];
+
+function readEnabledMethods(row) {
+  if (!row || !row.enabled_methods) return ['BANK_TRANSFER'];
+  return String(row.enabled_methods)
+    .split(',')
+    .filter((method) => PAYMENT_METHOD_KEYS.includes(method));
 }
 
-function assertSimulatorEnabled() {
-  if (!isSimulatorEnabled()) {
-    throw ApiError.forbidden('Online card payments are not available. Please pay by bank transfer.');
+// checkout tabs a student gets - card/wallets go through PayHere when it is set up,
+// otherwise they run in test mode (never on a production server)
+function checkoutMethodsFor(enabled) {
+  const online = enabled.filter((method) => method !== 'BANK_TRANSFER');
+  const tabs = [];
+  if (online.length > 0) {
+    if (payhere.isConfigured()) tabs.push('ONLINE');
+    else if (!config.isProduction) tabs.push(...online);
+  }
+  if (enabled.includes('BANK_TRANSFER')) tabs.push('BANK_TRANSFER');
+  return tabs;
+}
+
+async function assertMethodAllowed(method) {
+  const tabs = checkoutMethodsFor(readEnabledMethods(await repository.getPaymentSettings()));
+  if (!tabs.includes(method)) {
+    throw ApiError.forbidden('This payment method is not available right now. Please choose another one.');
   }
 }
 
 async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, paymentDetails }) {
-  assertSimulatorEnabled();
+  await assertMethodAllowed(paymentMethod);
   const paymentId = await createPendingPaymentRecord(studentUser, {
     enrollmentId,
     amount,
@@ -286,7 +305,8 @@ async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, p
 }
 
 async function retryPendingPayment(studentUser, paymentId) {
-  assertSimulatorEnabled();
+  const pending = await repository.findPaymentById(paymentId);
+  if (pending) await assertMethodAllowed(pending.payment_method);
   return finalizePendingPayment(studentUser, paymentId);
 }
 
@@ -295,6 +315,7 @@ async function submitBankTransferPayment(
   studentUser,
   { enrollmentId, amount, bankReference, receiptImagePath }
 ) {
+  await assertMethodAllowed('BANK_TRANSFER');
   const { available, message } = getBankTransferAvailability();
   if (!available) {
     throw ApiError.badRequest(message);
@@ -655,15 +676,35 @@ async function getPaymentSettings() {
     bankSwift: row ? row.bank_swift : null,
     ezCashNumber: row ? row.ez_cash_number : null,
     mcashNumber: row ? row.mcash_number : null,
-    // Tells the checkout screen whether to send people to the real gateway
+    enabledMethods: readEnabledMethods(row),
+    checkoutMethods: checkoutMethodsFor(readEnabledMethods(row)),
     onlinePaymentsEnabled: payhere.isConfigured(),
-    onlinePaymentProvider: payhere.isConfigured() ? 'payhere' : null,
-    simulatorEnabled: isSimulatorEnabled(),
+    // card / wallets are simulated until PayHere is set up
+    cardTestMode: !payhere.isConfigured(),
   };
 }
 
 async function updatePaymentSettings(adminUser, settings) {
+  let methods = null;
+  if (Array.isArray(settings.enabledMethods)) {
+    methods = PAYMENT_METHOD_KEYS.filter((method) => settings.enabledMethods.includes(method));
+    // before the database update only the default (bank transfer) exists
+    if (!(await schema.hasColumn('payment_settings', 'enabled_methods'))) {
+      if (methods.join(',') !== 'BANK_TRANSFER') throw schema.migrationRequired();
+      methods = null;
+    }
+  }
+  if (methods) {
+    // turning a method off must be confirmed by typing REMOVE
+    const current = readEnabledMethods(await repository.getPaymentSettings());
+    const removed = current.filter((method) => !methods.includes(method));
+    if (removed.length > 0 && String(settings.confirmText || '').trim().toUpperCase() !== 'REMOVE') {
+      throw ApiError.badRequest('Type REMOVE to confirm turning off a payment method.');
+    }
+  }
+
   await repository.upsertPaymentSettings(settings, adminUser.id);
+  if (methods) await repository.saveEnabledMethods(methods.join(','), adminUser.id);
   await recordAuditEvent({
     actorId: adminUser.id,
     action: 'PAYMENT_SETTINGS_UPDATED',
@@ -1078,6 +1119,7 @@ async function startOnlineCheckout(studentUser, { enrollmentId, amount }) {
       'Online card payments are not switched on yet. Please use Bank Transfer, or ask an Administrator to finish the PayHere setup.'
     );
   }
+  await assertMethodAllowed('ONLINE');
 
   // same ownership and balance checks as other payments
   const paymentId = await createPendingPaymentRecord(studentUser, {

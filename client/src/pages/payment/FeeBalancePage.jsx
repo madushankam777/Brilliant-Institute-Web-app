@@ -1,5 +1,5 @@
 // Student/Parent: view balance, pay online
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchMyBalances,
@@ -20,22 +20,15 @@ import NumberInput from '../../../../shared/client/src/components/common/NumberI
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
-// demo simulator tabs
-const PAYMENT_METHODS = [
-  { value: 'CARD', label: 'Card' },
-  { value: 'EZ_CASH', label: 'eZ Cash' },
-  { value: 'MCASH', label: 'mCash' },
-  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
-];
-
-// Shown when PayHere IS configured
-const LIVE_PAYMENT_METHODS = [
-  { value: 'ONLINE', label: 'Card / eZ Cash / mCash' },
-  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
-];
-
-// Neither PayHere nor the demo simulator is on - bank transfer only.
-const BANK_ONLY_METHODS = [{ value: 'BANK_TRANSFER', label: 'Bank Transfer' }];
+// checkout tab names - the admin chooses which ones show
+const METHOD_LABELS = {
+  ONLINE: 'Card / eZ Cash / mCash',
+  CARD: 'Card',
+  EZ_CASH: 'eZ Cash',
+  MCASH: 'mCash',
+  BANK_TRANSFER: 'Bank Transfer',
+};
+const PAYMENT_METHODS = ['CARD', 'EZ_CASH', 'MCASH'].map((value) => ({ value, label: METHOD_LABELS[value] }));
 
 // wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
@@ -124,12 +117,13 @@ function FeeBalancePage() {
   const [paymentSettings, setPaymentSettings] = useState(null);
 
   // gateway / simulator switches from the server
-  const onlinePaymentsEnabled = Boolean(paymentSettings && paymentSettings.onlinePaymentsEnabled);
-  const simulatorEnabled = Boolean(paymentSettings && paymentSettings.simulatorEnabled);
-  let methodTabs = BANK_ONLY_METHODS;
-  if (onlinePaymentsEnabled) methodTabs = LIVE_PAYMENT_METHODS;
-  else if (simulatorEnabled) methodTabs = PAYMENT_METHODS;
-  const defaultMethod = methodTabs[0].value;
+  const methodKey = ((paymentSettings && paymentSettings.checkoutMethods) || []).join(',');
+  const methodTabs = useMemo(
+    () => methodKey.split(',').filter(Boolean).map((value) => ({ value, label: METHOD_LABELS[value] || value })),
+    [methodKey]
+  );
+  const defaultMethod = methodTabs.length > 0 ? methodTabs[0].value : '';
+  const hasBankDetails = Boolean(paymentSettings && paymentSettings.bankAccountNumber);
 
   const loadBalances = useCallback(async () => {
     setIsLoading(true);
@@ -556,6 +550,14 @@ function FeeBalancePage() {
                 <div className="card">
                   <h3 style={{ fontSize: '0.95rem', marginTop: 0 }}>Payment Details</h3>
                   <Alert type="error" message={payError} />
+                  {paymentSettings && methodTabs.length === 0 ? (
+                    <div className="callout">
+                      <span>
+                        <strong>Online payment is not available right now.</strong> Please pay at the office in
+                        cash or with a bank deposit slip - your balance is updated as soon as the office records it.
+                      </span>
+                    </div>
+                  ) : (
                   <form onSubmit={handlePaySubmit} noValidate>
                     <div className="payment-tabs">
                       {methodTabs.map((method) => {
@@ -588,6 +590,12 @@ function FeeBalancePage() {
                           stores your card number. You&apos;ll come straight back here afterwards.
                         </span>
                       </div>
+                    )}
+
+                    {['CARD', 'EZ_CASH', 'MCASH'].includes(paymentMethod) && paymentSettings?.cardTestMode && (
+                      <p className="test-mode-note">
+                        <span className="badge badge-warning">Test mode</span> No real money is charged.
+                      </p>
                     )}
 
                     {paymentMethod === 'BANK_TRANSFER' && !bankTransferAvailable && (
@@ -710,18 +718,25 @@ function FeeBalancePage() {
                           </div>
                         </div>
                         <div className="callout" style={{ marginBottom: '16px' }}>
-                          <span>
-                            <strong>Transfer to this account, then fill in the details below:</strong>
-                            <br />
-                            Bank: {paymentSettings?.bankName || '-'}
-                            <br />
-                            Account Name: {paymentSettings?.bankAccountName || '-'}
-                            <br />
-                            Account Number: <strong>{paymentSettings?.bankAccountNumber || '-'}</strong>
-                            <br />
-                            Branch: {paymentSettings?.bankBranch || '-'}
-                            {paymentSettings?.bankSwift && <> &middot; SWIFT: {paymentSettings.bankSwift}</>}
-                          </span>
+                          {hasBankDetails ? (
+                            <span>
+                              <strong>Transfer to this account, then fill in the details below:</strong>
+                              <br />
+                              Bank: {paymentSettings.bankName || '-'}
+                              <br />
+                              Account Name: {paymentSettings.bankAccountName || '-'}
+                              <br />
+                              Account Number: <strong>{paymentSettings.bankAccountNumber}</strong>
+                              <br />
+                              Branch: {paymentSettings.bankBranch || '-'}
+                              {paymentSettings.bankSwift && <> &middot; SWIFT: {paymentSettings.bankSwift}</>}
+                            </span>
+                          ) : (
+                            <span>
+                              <strong>The institute&apos;s bank details aren&apos;t available yet.</strong> Please contact
+                              the office for the account number, or pay at the office.
+                            </span>
+                          )}
                         </div>
                         <div className="form-field">
                           <label htmlFor="bankReference">Your Bank Account Number / Reference</label>
@@ -796,6 +811,7 @@ function FeeBalancePage() {
                         : 'Your card details are validated in your browser and never stored by Brilliant Institute - only the card brand and last 4 digits are kept on your receipt.'}
                     </p>
                   </form>
+                  )}
                 </div>
               </div>
             )}

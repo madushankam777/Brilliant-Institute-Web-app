@@ -614,6 +614,23 @@ async function revokeReregistrationKey(adminUser, keyId) {
   });
 }
 
+// delete btn - any key (a student who already used it keeps their place)
+async function deleteReregistrationKey(adminUser, keyId) {
+  if (!(await schema.hasReregistration())) throw schema.migrationRequired();
+  const key = await repository.findReregistrationKeyById(keyId);
+  if (!key) {
+    throw ApiError.notFound('Re-registration key not found.');
+  }
+  await repository.deleteReregistrationKey(keyId);
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'REREGISTRATION_KEY_DELETED',
+    entityType: 'student_reregistration_key',
+    entityId: keyId,
+    details: { studentId: key.student_id, status: key.status },
+  });
+}
+
 // The student's side: type the key, confirm the place.
 async function redeemReregistrationKey(studentUser, keyCode) {
   if (!(await schema.hasReregistration())) {
@@ -1016,6 +1033,7 @@ async function cancelReminder(tutorUser, reminderId) {
 }
 
 module.exports = {
+  deleteReregistrationKey,
   createPasswordResetLink,
   getRevenueReport,
   getReregistrationOptions,

@@ -7,8 +7,17 @@ import FormField from '../../../../shared/client/src/components/common/FormField
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems('ADMIN');
+
+// payment methods the admin can switch on or off
+const METHOD_OPTIONS = [
+  { value: 'BANK_TRANSFER', label: 'Bank transfer', help: 'Students upload a slip and you check it on Payment Verification.' },
+  { value: 'CARD', label: 'Card', help: 'Visa / Mastercard at checkout.' },
+  { value: 'EZ_CASH', label: 'eZ Cash', help: 'Dialog eZ Cash mobile wallet.' },
+  { value: 'MCASH', label: 'mCash', help: 'Mobitel mCash mobile wallet.' },
+];
 
 const EMPTY_FORM = {
   bankName: '',
@@ -22,6 +31,12 @@ const EMPTY_FORM = {
 
 function PaymentSettingsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [enabledMethods, setEnabledMethods] = useState(['BANK_TRANSFER']);
+  const [cardTestMode, setCardTestMode] = useState(false);
+  // turning a method off - admin must type REMOVE
+  const [pendingRemove, setPendingRemove] = useState(null);
+  const [removeText, setRemoveText] = useState('');
+  const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -42,6 +57,8 @@ function PaymentSettingsPage() {
           ezCashNumber: settings.ezCashNumber || '',
           mcashNumber: settings.mcashNumber || '',
         });
+        setEnabledMethods(settings.enabledMethods || ['BANK_TRANSFER']);
+        setCardTestMode(Boolean(settings.cardTestMode));
       })
       .catch((error) => {
         if (isMounted) setLoadError(error.message);
@@ -84,6 +101,23 @@ function PaymentSettingsPage() {
     });
   }
 
+  function toggleMethod(value) {
+    setSaveMessage('');
+    if (enabledMethods.includes(value)) {
+      setPendingRemove(METHOD_OPTIONS.find((option) => option.value === value));
+      setRemoveText('');
+      return;
+    }
+    setEnabledMethods((current) => [...current, value]);
+  }
+
+  // confirm remove btn
+  function confirmRemove() {
+    setEnabledMethods((current) => current.filter((item) => item !== pendingRemove.value));
+    setRemoveConfirmed(true);
+    setPendingRemove(null);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSaveMessage('');
@@ -91,7 +125,8 @@ function PaymentSettingsPage() {
 
     setIsSaving(true);
     try {
-      await updatePaymentSettings(form);
+      await updatePaymentSettings({ ...form, enabledMethods, confirmText: removeConfirmed ? 'REMOVE' : undefined });
+      setRemoveConfirmed(false);
       setSaveMessage('Payment settings saved. Students will see the updated details at checkout.');
     } catch (error) {
       captureError(error);
@@ -106,19 +141,9 @@ function PaymentSettingsPage() {
         <div className="page-header">
           <h1>Payment Settings</h1>
           <p className="muted">
-            The account students send money to. These details appear on the Bank Transfer, eZ Cash,
-            and mCash tabs at checkout, and every student sees the change immediately after you save.
+            Choose how students can pay, and the account they send money to. Students see changes as soon as you
+            save.
           </p>
-        </div>
-
-        <div className="callout">
-          <span>
-            <strong>Card payments don&apos;t come here.</strong> Card, eZ Cash, and mCash paid online go
-            through PayHere first, and PayHere settles them into the bank account registered on your
-            PayHere merchant account - changing the number below does not redirect card money. To
-            change where card money lands, update the bank account in your PayHere dashboard. The
-            account below is what students use for <strong>manual bank transfers</strong>.
-          </span>
         </div>
 
         <Alert type="error" message={loadError} />
@@ -131,7 +156,41 @@ function PaymentSettingsPage() {
             <Alert type="error" message={formError} />
 
             <form onSubmit={handleSubmit} noValidate>
-              <h2 style={{ fontSize: '0.95rem' }}>Bank transfer</h2>
+              {/* payment methods on / off */}
+              <h2 style={{ fontSize: '0.95rem' }}>Payment methods students can use</h2>
+              <div className="method-switches">
+                {METHOD_OPTIONS.map((option) => {
+                  const isOn = enabledMethods.includes(option.value);
+                  return (
+                    <label key={option.value} className={`method-switch${isOn ? ' is-on' : ''}`}>
+                      <span>
+                        <strong>
+                          {option.label}
+                          {option.value !== 'BANK_TRANSFER' && cardTestMode && (
+                            <span className="badge badge-warning" style={{ marginLeft: '8px' }}>
+                              Test mode
+                            </span>
+                          )}
+                        </strong>
+                        <span className="order-line-sub">{option.help}</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        className="switch"
+                        checked={isOn}
+                        onChange={() => toggleMethod(option.value)}
+                        aria-label={`${option.label} ${isOn ? 'on' : 'off'}`}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+              {enabledMethods.length === 0 && (
+                <p className="field-error">With every method off, students can only pay at the office.</p>
+              )}
+
+              <h2 style={{ fontSize: '0.95rem', marginTop: '24px' }}>Bank transfer</h2>
               <FormField
                 id="bankName"
                 label="Bank name"
@@ -208,6 +267,44 @@ function PaymentSettingsPage() {
           </div>
         )}
       </div>
+
+      {pendingRemove && (
+        <div className="modal-overlay" onClick={() => setPendingRemove(null)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <ModalClose onClose={() => setPendingRemove(null)} />
+            <h2>Turn off {pendingRemove.label}?</h2>
+            <p className="muted">
+              Students will no longer see <strong>{pendingRemove.label}</strong> at checkout. Type{' '}
+              <strong>REMOVE</strong> to confirm.
+            </p>
+            <div className="form-field">
+              <label htmlFor="remove-confirm">Type REMOVE</label>
+              <input
+                id="remove-confirm"
+                value={removeText}
+                autoComplete="off"
+                placeholder="REMOVE"
+                onChange={(e) => setRemoveText(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setPendingRemove(null)}>
+                Keep it on
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={removeText.trim().toUpperCase() !== 'REMOVE'}
+                onClick={confirmRemove}
+              >
+                Turn off
+              </button>
+            </div>
+            <p className="field-help" style={{ marginBottom: 0 }}>Click Save payment settings afterwards to apply it.</p>
+          </div>
+        </div>
+      )}
     </PortalShell>
   );
 }

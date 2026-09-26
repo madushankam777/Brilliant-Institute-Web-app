@@ -117,6 +117,13 @@ SET @ddl = (SELECT IF(COUNT(*) = 0,
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'classes' AND COLUMN_NAME = 'start_date');
 PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- payment methods the admin switches on (e.g. 'BANK_TRANSFER,CARD')
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE payment_settings ADD COLUMN enabled_methods VARCHAR(100) NULL AFTER mcash_number', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payment_settings' AND COLUMN_NAME = 'enabled_methods');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- 'LEFT' is set by the January roll-over; login already requires 'ACTIVE'
 ALTER TABLE users
   MODIFY COLUMN status ENUM('ACTIVE', 'SUSPENDED', 'DELETED', 'LEFT') NOT NULL DEFAULT 'ACTIVE';

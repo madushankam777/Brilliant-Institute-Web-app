@@ -150,9 +150,11 @@ const getPaymentSettings = asyncHandler(async (req, res) => {
 });
 
 const updatePaymentSettings = asyncHandler(async (req, res) => {
-  const { bankName, bankAccountName, bankAccountNumber, bankBranch, bankSwift, ezCashNumber, mcashNumber } =
+  const { bankName, bankAccountName, bankAccountNumber, bankBranch, bankSwift, ezCashNumber, mcashNumber, enabledMethods, confirmText } =
     req.body;
   const settings = await service.updatePaymentSettings(req.user, {
+    enabledMethods,
+    confirmText,
     bankName,
     bankAccountName,
     bankAccountNumber,

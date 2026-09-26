@@ -10,6 +10,7 @@ import LoadingSpinner from '../../../../shared/client/src/components/common/Load
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
@@ -224,6 +225,7 @@ function PaymentHistoryPage() {
       {editTarget && (
         <div className="modal-overlay" onClick={() => !isSavingEdit && closeEditModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <ModalClose onClose={closeEditModal} disabled={isSavingEdit} />
             <h2>Edit Bank Transfer Submission</h2>
             <p className="muted">
               Correct your reference number or replace the receipt image before an Administrator

@@ -14,6 +14,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -483,6 +484,7 @@ function AnnouncementsPage() {
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => !isDeleting && setDeleteTarget(null)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <ModalClose onClose={() => setDeleteTarget(null)} disabled={isDeleting} />
             <h2>Remove Announcement</h2>
             <p className="muted">
               Remove <strong>{deleteTarget.title}</strong>? It will no longer be shown to anyone it was

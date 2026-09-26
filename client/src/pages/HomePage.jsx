@@ -21,6 +21,7 @@ import {
   todayKey,
 } from '../../../shared/client/src/utils/schedule';
 import heroMediaImg from '../../../shared/client/src/assets/hero-media.png';
+import ModalClose from '../../../shared/client/src/components/common/ModalClose';
 
 const FEATURES = [
   {
@@ -274,6 +275,7 @@ function BankDetailsPrompt({ onDismiss }) {
   return (
     <div className="modal-overlay" onClick={onDismiss}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+        <ModalClose onClose={onDismiss} />
         <h2>Add your banking details</h2>
         <p className="muted">
           The institute pays tutors by bank transfer, and we don&apos;t have an account on file for you

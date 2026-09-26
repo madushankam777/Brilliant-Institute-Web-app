@@ -12,6 +12,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 import RecordPaymentCard from './RecordPaymentCard';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -189,6 +190,7 @@ function PaymentVerificationPage() {
             aria-modal="true"
             aria-labelledby="verify-title"
           >
+            <ModalClose onClose={closeModal} disabled={isConfirming} />
             <h2 id="verify-title">{target.action === 'approve' ? 'Verify bank slip' : 'Reject bank slip'}</h2>
 
             <dl className="detail-grid" style={{ marginBottom: '14px' }}>

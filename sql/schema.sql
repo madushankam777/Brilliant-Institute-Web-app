@@ -281,6 +281,7 @@ CREATE TABLE IF NOT EXISTS payment_settings (
   bank_swift          VARCHAR(20) NULL,
   ez_cash_number      VARCHAR(20) NULL,
   mcash_number        VARCHAR(20) NULL,
+  enabled_methods     VARCHAR(100) NULL,
   updated_by          INT UNSIGNED NULL,
   updated_at          DATETIME NULL,
   CONSTRAINT chk_payment_settings_singleton CHECK (id = 1),

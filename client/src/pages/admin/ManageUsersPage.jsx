@@ -19,6 +19,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -530,6 +531,7 @@ function ManageUsersPage() {
       {confirmTarget && (
         <div className="modal-overlay" onClick={() => !isConfirming && closeConfirmModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <ModalClose onClose={closeConfirmModal} disabled={isConfirming} />
             <h2>
               {confirmTarget.action === 'suspend'
                 ? 'Confirm Suspension'
@@ -620,6 +622,7 @@ function ManageUsersPage() {
       {showAddUser && (
         <div className="modal-overlay" onClick={() => !isCreating && setShowAddUser(false)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <ModalClose onClose={() => setShowAddUser(false)} disabled={isCreating} />
             <h2>Add User</h2>
             <p className="muted">Directly create a Tutor or Admin account (Students/Parents self-register).</p>
             <Alert type="error" message={formError} />

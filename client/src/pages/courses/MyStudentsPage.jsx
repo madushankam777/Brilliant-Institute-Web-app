@@ -5,6 +5,7 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
 const NAV_ITEMS = getNavItems('TUTOR');
 
@@ -158,6 +159,7 @@ function MyStudentsPage() {
       {confirmTarget && (
         <div className="modal-overlay" onClick={() => !isConfirming && closeConfirmModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <ModalClose onClose={closeConfirmModal} disabled={isConfirming} />
             <h2>{confirmTarget.action === 'suspend' ? 'Confirm Suspension' : 'Confirm Reactivation'}</h2>
             <p className="muted">
               Are you sure you want to {confirmTarget.action}{' '}

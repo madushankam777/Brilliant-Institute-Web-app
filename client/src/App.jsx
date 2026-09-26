@@ -5,6 +5,7 @@ import Navbar from './components/layout/Navbar';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import NotFoundPage from '../../shared/client/src/pages/NotFoundPage';
 import CookieConsentBanner from '../../shared/client/src/components/common/CookieConsentBanner';
+import TopProgressBar from '../../shared/client/src/components/common/TopProgressBar';
 
 import HomePage from './pages/HomePage';
 import AboutPage from './pages/public/AboutPage';
@@ -53,12 +54,58 @@ import TimetablesPage from './pages/admin/TimetablesPage';
 import ReregisterPage from './pages/auth/ReregisterPage';
 import EnquiriesPage from './pages/admin/EnquiriesPage';
 
-// a new page starts at the top (links to #sections are left alone)
+// browser tab title for each page
+const PAGE_TITLES = [
+  [/^\/$/, 'Home'],
+  [/^\/about/, 'About Us'],
+  [/^\/contact/, 'Contact Us'],
+  [/^\/privacy/, 'Privacy Policy'],
+  [/^\/terms/, 'Terms of Service'],
+  [/^\/login/, 'Log in'],
+  [/^\/register/, 'Register'],
+  [/^\/(forgot|reset)-password/, 'Reset password'],
+  [/^\/profile/, 'My Profile'],
+  [/^\/calendar/, 'Calendar'],
+  [/^\/courses\/classes\/\d+/, 'Class details'],
+  [/^\/courses\/classes/, 'Browse Classes'],
+  [/^\/courses\/tutors/, 'Tutor profile'],
+  [/^\/courses\/my-courses/, 'My Courses'],
+  [/^\/courses\/manage\/new/, 'Create Class'],
+  [/^\/courses\/manage\/\d+/, 'Edit Class'],
+  [/^\/courses\/manage/, 'Classes'],
+  [/^\/attendance\/checkin/, 'Mark Attendance'],
+  [/^\/attendance\/history/, 'Attendance'],
+  [/^\/attendance/, 'Attendance'],
+  [/^\/payments\/history/, 'Payment History'],
+  [/^\/payments\/return/, 'Payment'],
+  [/^\/payments/, 'Fees'],
+  [/^\/feedback/, 'Feedback'],
+  [/^\/reregister/, 'Re-register'],
+  [/^\/students\/mine/, 'My Students'],
+  [/^\/notify/, 'Notify Students'],
+  [/^\/reminders/, 'Reminders'],
+  [/^\/admin\/dashboard/, 'Dashboard'],
+  [/^\/admin\/users/, 'Manage Users'],
+  [/^\/admin\/timetables/, 'Timetables'],
+  [/^\/admin\/payments\/verify/, 'Payment Verification'],
+  [/^\/admin\/payments\/tutors/, 'Pay Tutors'],
+  [/^\/admin\/payments\/settings/, 'Payment Settings'],
+  [/^\/admin\/announcements/, 'Announcements'],
+  [/^\/admin\/reregistration/, 'Re-registration'],
+  [/^\/admin\/feedback/, 'Feedback'],
+  [/^\/admin\/enquiries/, 'Enquiries'],
+];
+
+// a new page starts at the top (links to #sections are left alone) and gets its tab title
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
   }, [pathname, hash]);
+  useEffect(() => {
+    const match = PAGE_TITLES.find(([pattern]) => pattern.test(pathname));
+    document.title = match ? `${match[1]} | Brilliant Institute` : 'Brilliant Institute';
+  }, [pathname]);
   return null;
 }
 
@@ -66,6 +113,7 @@ function App() {
   return (
     <AuthProvider>
       <ScrollToTop />
+      <TopProgressBar />
       <Navbar />
       <CookieConsentBanner />
       <main className="app-content">

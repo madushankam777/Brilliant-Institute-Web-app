@@ -5,6 +5,7 @@ import useClassEvents from '../../hooks/useClassEvents';
 import { useYearOfHolidays } from '../../hooks/useHolidays';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import MonthCalendar from '../../../../shared/client/src/components/common/MonthCalendar';
+import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 import {
   addDaysToKey,
   classRunsOn,
@@ -66,6 +67,7 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cancel-day-title">
       <div className="modal-dialog modal-wide">
+        <ModalClose onClose={onClose} disabled={busyId === 'new'} />
         <h2 id="cancel-day-title">Cancel a date - {classItem.subject}</h2>
         <p className="muted" style={{ marginTop: '-6px' }}>
           {classItem.dayOfWeek}s, {formatTimeRange(classItem.startTime, classItem.endTime)} at {classItem.venue}. Only the

@@ -483,7 +483,17 @@ async function upsertPaymentSettings(
   );
 }
 
+// payment methods the admin switched on
+async function saveEnabledMethods(methodsCsv, updatedBy) {
+  await pool.execute(
+    `INSERT INTO payment_settings (id, enabled_methods, updated_by, updated_at) VALUES (1, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE enabled_methods = VALUES(enabled_methods), updated_by = VALUES(updated_by), updated_at = NOW()`,
+    [methodsCsv, updatedBy]
+  );
+}
+
 module.exports = {
+  saveEnabledMethods,
   searchStudents,
   listActiveEnrollmentsForStudents,
   findEnrollmentById,
