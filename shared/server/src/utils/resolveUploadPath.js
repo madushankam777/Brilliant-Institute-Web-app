@@ -1,10 +1,12 @@
+// old uploads folder - only read while files are moved into MySQL
 const path = require('path');
 const ApiError = require('./ApiError');
-const { UPLOADS_ROOT_DIR } = require('../middleware/upload');
+
+const UPLOADS_ROOT_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 // stored /uploads path to an absolute path - never outside uploads
 function resolveUploadPath(publicPath) {
-  if (typeof publicPath !== 'string' || publicPath.length === 0) {
+  if (typeof publicPath !== 'string' || !publicPath.startsWith('/uploads/')) {
     throw ApiError.notFound('File not found.');
   }
 
@@ -19,4 +21,4 @@ function resolveUploadPath(publicPath) {
   return absolute;
 }
 
-module.exports = { resolveUploadPath };
+module.exports = { UPLOADS_ROOT_DIR, resolveUploadPath };

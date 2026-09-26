@@ -16,6 +16,7 @@ const { GRADES, nextGrade, isFinalGrade } = require('../../../../../shared/serve
 const gateway = require('./notificationGateway');
 const repository = require('./admin.repository');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
+const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -131,6 +132,10 @@ async function deleteTutorKey(adminUser, keyId) {
   }
 
   await repository.deleteTutorKey(keyId);
+  // remove the key's CV and certificates too
+  const certificatePaths =
+    typeof key.certificate_paths === 'string' ? JSON.parse(key.certificate_paths) : key.certificate_paths || [];
+  await Promise.all([key.cv_path, ...certificatePaths].filter(Boolean).map(deleteUpload));
   await recordAuditEvent({
     actorId: adminUser.id,
     action: 'TUTOR_KEY_DELETED',

@@ -7,6 +7,7 @@ const { PAYMENT_STATUS } = require('./payment.constants');
 const gateway = require('./paymentGateway');
 const payhere = require('./payhereGateway');
 const repository = require('./payment.repository');
+const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const payoutGateway = require('./payoutGateway');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const config = require('../../../../../shared/server/src/config/env');
@@ -355,6 +356,10 @@ async function editBankTransferPayment(studentUser, paymentId, { bankReference, 
   };
 
   await repository.updatePaymentDetails(paymentId, updatedDetails);
+  // new slip uploaded - remove the old one
+  if (receiptImagePath && existingDetails.receiptImagePath && existingDetails.receiptImagePath !== receiptImagePath) {
+    await deleteUpload(existingDetails.receiptImagePath);
+  }
 
   await recordAuditEvent({
     actorId: studentUser.id,

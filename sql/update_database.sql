@@ -1,5 +1,6 @@
 -- Database update: student re-registration, tutor payout tracking, class
--- start dates, cancelled / extra class days and Contact Us messages.
+-- start dates, cancelled / extra class days, Contact Us messages and
+-- uploaded files stored in MySQL.
 -- Run this once as root in MySQL Workbench (the app's own DB user has no
 -- rights to change tables). Safe to run more than once - every step checks
 -- first, and no stored procedure or DELIMITER is needed.
@@ -67,6 +68,22 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_contact_status (status, created_at),
   CONSTRAINT fk_contact_handled_by FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Uploaded files (profile pictures, bank slips, tutor documents) stored in MySQL
+CREATE TABLE IF NOT EXISTS uploaded_files (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  public_id      CHAR(32)     NOT NULL,
+  kind           ENUM('PROFILE_PICTURE', 'PAYMENT_RECEIPT', 'TUTOR_DOCUMENT') NOT NULL,
+  mime_type      VARCHAR(100) NOT NULL,
+  size_bytes     INT UNSIGNED NOT NULL,
+  original_name  VARCHAR(255) NULL,
+  data           MEDIUMBLOB   NOT NULL,
+  uploaded_by    INT UNSIGNED NULL,
+  created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_uploaded_files_public_id (public_id),
+  KEY idx_uploaded_files_kind (kind),
+  CONSTRAINT fk_uploaded_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- New columns. MySQL 8 has no "ADD COLUMN IF NOT EXISTS", so each one checks

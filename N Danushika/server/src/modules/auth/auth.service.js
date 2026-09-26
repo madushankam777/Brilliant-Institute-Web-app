@@ -9,6 +9,7 @@ const { recordAuditEvent } = require('../../../../../shared/server/src/utils/aud
 const { ROLES, SESSION_COOKIE_NAME } = require('../../../../../shared/server/src/config/roles');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
+const { deleteUpload, publicIdOf } = require('../../../../../shared/server/src/utils/fileStore');
 const { passwordVersion } = require('../../../../../shared/server/src/utils/sessionToken');
 const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
 const repository = require('./auth.repository');
@@ -174,10 +175,14 @@ function logout(res) {
 
 // Deletes an old upload, but never anything outside the uploads folder.
 function removeUploadedFile(publicPath) {
+  if (publicIdOf(publicPath)) {
+    deleteUpload(publicPath).catch(() => {});
+    return;
+  }
   try {
     fs.unlink(resolveUploadPath(publicPath), () => {});
   } catch {
-    // path was outside the uploads folder - ignore it
+    // not an old uploads path - ignore it
   }
 }
 

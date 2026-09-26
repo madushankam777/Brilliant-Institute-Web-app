@@ -1,6 +1,6 @@
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
-const { toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
+const { saveUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('./auth.service');
 
 // POST /api/auth/register
@@ -60,7 +60,7 @@ const uploadProfilePicture = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw ApiError.badRequest('Please choose an image to upload.');
   }
-  const publicPath = toPublicUploadPath(req.file.path);
+  const publicPath = await saveUpload(req.file, 'PROFILE_PICTURE', req.user.id);
   const user = await authService.updateProfilePicture(req.user.id, publicPath);
   res.status(200).json({
     success: true,

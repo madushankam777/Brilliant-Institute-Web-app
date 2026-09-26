@@ -10,7 +10,9 @@ const { isTrustedDevOrigin } = require('../../shared/server/src/utils/isTrustedD
 const { apiLimiter } = require('../../shared/server/src/middleware/rateLimiters');
 const csrfGuard = require('../../shared/server/src/middleware/csrfGuard');
 const { notFoundHandler, errorHandler } = require('../../shared/server/src/middleware/errorHandler');
-const { UPLOADS_ROOT_DIR } = require('../../shared/server/src/middleware/upload');
+const { UPLOADS_ROOT_DIR } = require('../../shared/server/src/utils/resolveUploadPath');
+const { sendUpload } = require('../../shared/server/src/utils/fileStore');
+const asyncHandler = require('../../shared/server/src/utils/asyncHandler');
 
 const authRoutes = require('../../N Danushika/server/src/modules/auth/auth.routes');
 const attendanceRoutes = require('../../M T Madushanka/server/src/modules/attendance/attendance.routes');
@@ -50,6 +52,7 @@ app.use(
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 
+// old profile pictures - only until they are moved into MySQL
 app.use(
   '/uploads/profile-pictures',
   (req, res, next) => {
@@ -70,6 +73,14 @@ app.post(
 
 app.use(apiLimiter);
 app.use(csrfGuard);
+
+// profile pictures stored in MySQL (public, like any avatar)
+app.get(
+  '/api/files/:publicId',
+  asyncHandler(async (req, res) => {
+    await sendUpload(res, `/api/files/${req.params.publicId}`, 'PROFILE_PICTURE');
+  })
+);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'API is running.' });

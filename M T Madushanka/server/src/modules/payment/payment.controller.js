@@ -1,7 +1,6 @@
 // HTTP layer for payment routes
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
-const { toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
-const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
+const { saveUpload, deleteUpload, sendUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const service = require('./payment.service');
 
 const getMyBalances = asyncHandler(async (req, res) => {
@@ -72,12 +71,20 @@ const submitBankTransferPayment = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Please attach your transfer receipt.' });
   }
   const { enrollmentId, amount, bankReference } = req.body;
-  const result = await service.submitBankTransferPayment(req.user, {
-    enrollmentId,
-    amount: Number(amount),
-    bankReference,
-    receiptImagePath: toPublicUploadPath(req.file.path),
-  });
+  const receiptImagePath = await saveUpload(req.file, 'PAYMENT_RECEIPT', req.user.id);
+  let result;
+  try {
+    result = await service.submitBankTransferPayment(req.user, {
+      enrollmentId,
+      amount: Number(amount),
+      bankReference,
+      receiptImagePath,
+    });
+  } catch (error) {
+    // payment refused - don't keep the slip
+    await deleteUpload(receiptImagePath);
+    throw error;
+  }
   res.status(202).json({
     success: true,
     message: 'Your bank transfer receipt has been submitted and is awaiting verification by an Administrator.',
@@ -89,11 +96,17 @@ const submitBankTransferPayment = asyncHandler(async (req, res) => {
 const editBankTransferPayment = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const { bankReference } = req.body;
-  const receiptImagePath = req.file ? toPublicUploadPath(req.file.path) : undefined;
-  const payment = await service.editBankTransferPayment(req.user, paymentId, {
-    bankReference,
-    receiptImagePath,
-  });
+  const receiptImagePath = req.file ? await saveUpload(req.file, 'PAYMENT_RECEIPT', req.user.id) : undefined;
+  let payment;
+  try {
+    payment = await service.editBankTransferPayment(req.user, paymentId, {
+      bankReference,
+      receiptImagePath,
+    });
+  } catch (error) {
+    if (receiptImagePath) await deleteUpload(receiptImagePath);
+    throw error;
+  }
   res.status(200).json({
     success: true,
     message: 'Your bank transfer submission has been updated.',
@@ -127,8 +140,7 @@ const rejectBankTransferPayment = asyncHandler(async (req, res) => {
 const getReceiptImage = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const publicPath = await service.getReceiptImagePath(req.user, paymentId);
-  const absolutePath = resolveUploadPath(publicPath);
-  res.sendFile(absolutePath);
+  await sendUpload(res, publicPath, 'PAYMENT_RECEIPT');
 });
 
 // checkout tabs - institute's own receiving details

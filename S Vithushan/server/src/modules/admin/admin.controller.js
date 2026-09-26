@@ -1,6 +1,5 @@
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
-const { toPublicUploadPath } = require('../../../../../shared/server/src/middleware/upload');
-const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
+const { saveUpload, deleteUpload, sendUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const service = require('./admin.service');
 const rollover = require('./yearlyRollover');
 
@@ -64,15 +63,20 @@ const createPasswordResetLink = asyncHandler(async (req, res) => {
 const generateTutorKey = asyncHandler(async (req, res) => {
   const { intendedFor, idNumber } = req.body;
   const files = req.files || {};
-  const cvPath = files.cv && files.cv[0] ? toPublicUploadPath(files.cv[0].path) : null;
-  const certificatePaths = (files.certificates || []).map((file) => toPublicUploadPath(file.path));
+  const cvPath = files.cv && files.cv[0] ? await saveUpload(files.cv[0], 'TUTOR_DOCUMENT', req.user.id) : null;
+  const certificatePaths = [];
+  for (const file of files.certificates || []) {
+    certificatePaths.push(await saveUpload(file, 'TUTOR_DOCUMENT', req.user.id));
+  }
 
-  const key = await service.generateTutorKey(req.user, {
-    intendedFor,
-    idNumber,
-    cvPath,
-    certificatePaths,
-  });
+  let key;
+  try {
+    key = await service.generateTutorKey(req.user, { intendedFor, idNumber, cvPath, certificatePaths });
+  } catch (error) {
+    // key not made - don't keep the documents
+    await Promise.all([cvPath, ...certificatePaths].filter(Boolean).map(deleteUpload));
+    throw error;
+  }
   res.status(201).json({
     success: true,
     message: 'Enrollment key generated. Copy it now - it will not be shown again.',
@@ -105,8 +109,7 @@ const downloadTutorKeyDocument = asyncHandler(async (req, res) => {
   const index = certificateMatch ? Number(certificateMatch[1]) : undefined;
 
   const publicPath = await service.getTutorKeyDocumentPath(keyId, documentType, index);
-  const absolutePath = resolveUploadPath(publicPath);
-  res.sendFile(absolutePath);
+  await sendUpload(res, publicPath, 'TUTOR_DOCUMENT');
 });
 
 const suspendUser = asyncHandler(async (req, res) => {
