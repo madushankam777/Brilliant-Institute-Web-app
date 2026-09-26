@@ -45,6 +45,9 @@ Desktop.ini
 coverage/
 .nyc_output/
 
+# automated QA tests and reports (kept local)
+tests/
+
 tmp/
 temp/
 *.tmp
