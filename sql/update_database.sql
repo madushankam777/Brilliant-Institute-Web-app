@@ -1,10 +1,3 @@
--- Database update: student re-registration, tutor payout tracking, class
--- start dates, cancelled / extra class days, Contact Us messages and
--- uploaded files stored in MySQL.
--- Run this once as root in MySQL Workbench (the app's own DB user has no
--- rights to change tables). Safe to run more than once - every step checks
--- first, and no stored procedure or DELIMITER is needed.
-
 USE brilliant_institute;
 
 CREATE TABLE IF NOT EXISTS student_reregistration_keys (
