@@ -1,0 +1,19 @@
+# search engines - public pages only
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /payments
+Disallow: /attendance
+Disallow: /courses/
+Disallow: /calendar
+Disallow: /profile
+Disallow: /feedback
+Disallow: /reregister
+Disallow: /students/
+Disallow: /notify
+Disallow: /reminders
+Disallow: /forgot-password
+Disallow: /reset-password
+
+Sitemap: https://brilliantinstitute.edu.lk/sitemap.xml

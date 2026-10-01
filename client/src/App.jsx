@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { INSTITUTE } from '../../shared/client/src/constants/institute';
 import Navbar from './components/layout/Navbar';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import NotFoundPage from '../../shared/client/src/pages/NotFoundPage';
@@ -55,6 +56,33 @@ import ReregisterPage from './pages/auth/ReregisterPage';
 import EnquiriesPage from './pages/admin/EnquiriesPage';
 
 // browser tab title for each page
+// Google text for public pages - every other page is kept out of search
+const SEARCH_DESCRIPTIONS = {
+  '/': 'Brilliant Institute is a tuition institute at 136 Sangamitha Mawatha, Colombo 13. Find classes and tutors, check timetables, track attendance and pay fees online.',
+  '/about': 'About Brilliant Institute in Colombo 13 - our vision, mission, experienced tutors and answers to common questions.',
+  '/contact': 'Contact Brilliant Institute - 136, Sangamitha Mawatha, Colombo 13. Call 0112 347 728 or send us a message.',
+  '/register': 'Create your Brilliant Institute account to enrol in classes, see your timetable and pay fees online.',
+  '/login': 'Log in to Brilliant Institute to see your classes, attendance and fees.',
+  '/privacy': 'How Brilliant Institute collects, uses and protects your personal information.',
+  '/terms': 'Terms of service for using the Brilliant Institute website.',
+};
+
+// set a <meta> / <link> tag in the page head
+function setHeadTag(selector, create, attr, value) {
+  let tag = document.head.querySelector(selector);
+  if (!tag) {
+    tag = create();
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute(attr, value);
+}
+
+function metaTag(name) {
+  const tag = document.createElement('meta');
+  tag.setAttribute('name', name);
+  return tag;
+}
+
 const PAGE_TITLES = [
   [/^\/$/, 'Home'],
   [/^\/about/, 'About Us'],
@@ -99,13 +127,22 @@ const PAGE_TITLES = [
 // a new page starts at the top (links to #sections are left alone) and gets its tab title
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
+  const { user } = useAuth();
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
   }, [pathname, hash]);
   useEffect(() => {
     const match = PAGE_TITLES.find(([pattern]) => pattern.test(pathname));
     document.title = match ? `${match[1]} | Brilliant Institute` : 'Brilliant Institute';
-  }, [pathname]);
+    // public home page title for Google
+    if (pathname === '/' && !user) document.title = 'Brilliant Institute | Tuition Classes in Colombo 13';
+
+    // search tags
+    const description = SEARCH_DESCRIPTIONS[pathname];
+    setHeadTag('meta[name="description"]', () => metaTag('description'), 'content', description || SEARCH_DESCRIPTIONS['/']);
+    setHeadTag('meta[name="robots"]', () => metaTag('robots'), 'content', description ? 'index, follow' : 'noindex');
+    setHeadTag('link[rel="canonical"]', () => Object.assign(document.createElement('link'), { rel: 'canonical' }), 'href', `${INSTITUTE.website}${pathname}`);
+  }, [pathname, user]);
   return null;
 }
 

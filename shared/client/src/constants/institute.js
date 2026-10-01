@@ -1,6 +1,7 @@
 // Institute contact details - shown in the footer and on the Contact page.
 export const INSTITUTE = {
   name: 'Brilliant Institute',
+  website: 'https://brilliantinstitute.edu.lk',
   email: 'support@brilliantinstitute.edu',
   phone: '0112 347 728',
   phoneHref: 'tel:+94112347728',

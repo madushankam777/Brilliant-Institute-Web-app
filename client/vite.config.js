@@ -47,7 +47,7 @@ export default defineConfig({
     strictPort: true,
     headers: DEV_HEADERS,
     // allow tunnel hostnames (Vite blocks unrecognized Host headers by default)
-    allowedHosts: ['.loca.lt', '.trycloudflare.com'],
+    allowedHosts: ['.loca.lt', '.trycloudflare.com', '.brilliantinstitute.edu.lk'],
     // The dev server may only read this app and shared/client
     fs: {
       strict: true,
@@ -80,7 +80,7 @@ export default defineConfig({
     port: 4173,
     strictPort: true,
     headers: SECURITY_HEADERS,
-    allowedHosts: ['.loca.lt', '.trycloudflare.com'],
+    allowedHosts: ['.loca.lt', '.trycloudflare.com', '.brilliantinstitute.edu.lk'],
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
