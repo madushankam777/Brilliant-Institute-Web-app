@@ -15,6 +15,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -211,9 +212,12 @@ function AnnouncementsPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Broadcast Announcement</h1>
-          <p className="muted">Publish instant messages, notices, and reminders to your platform.</p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Broadcast Announcement</h1>
+            <p className="muted">Publish instant messages, notices, and reminders to your platform.</p>
+          </div>
+          <ReportLink type="communications" label="Communications report" />
         </div>
 
         <div className="checkout-grid">

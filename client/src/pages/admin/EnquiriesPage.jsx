@@ -7,6 +7,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const FILTERS = [
   { key: 'NEW', label: 'New' },
@@ -76,12 +77,15 @@ function EnquiriesPage() {
   return (
     <PortalShell navItems={getNavItems(user.role)}>
       <div className="page">
-        <div className="page-header">
-          <h1>Enquiries</h1>
-          <p className="muted">
-            Messages from the public Contact Us page. Reply by email or phone, then mark them handled.
-            {newCount > 0 && ` ${newCount} new.`}
-          </p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Enquiries</h1>
+            <p className="muted">
+              Messages from the public Contact Us page. Reply by email or phone, then mark them handled.
+              {newCount > 0 && ` ${newCount} new.`}
+            </p>
+          </div>
+          <ReportLink type="enquiries" label="Enquiries report" />
         </div>
 
         <div className="choice-group" style={{ marginBottom: '18px' }}>

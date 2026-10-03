@@ -12,6 +12,7 @@ import { formatLongDate, formatTimeRange, todayKey } from '../../../../shared/cl
 import { useAuth } from '../../context/AuthContext';
 import ExtraClassModal from './ExtraClassModal';
 import CancelClassDayModal from './CancelClassDayModal';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -95,9 +96,12 @@ function ManageClassesPage() {
             </p>
           </div>
           {isAdmin && (
-            <Link to="/courses/manage/new" className="btn btn-primary">
-              <Icon name="plus" size={16} /> Create Class
-            </Link>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <ReportLink type="classes" label="Class report" />
+              <Link to="/courses/manage/new" className="btn btn-primary">
+                <Icon name="plus" size={16} /> Create Class
+              </Link>
+            </div>
           )}
         </div>
 

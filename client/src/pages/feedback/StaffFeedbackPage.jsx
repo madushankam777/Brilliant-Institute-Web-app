@@ -7,6 +7,7 @@ import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const FILTERS = [
   { key: 'ALL', label: 'All' },
@@ -108,9 +109,12 @@ function StaffFeedbackPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>{user.role === 'ADMIN' ? 'Feedback & Messages' : 'My Messages'}</h1>
-          <p className="muted">Conversations addressed to you - reply like a chat, and resolve once handled.</p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>{user.role === 'ADMIN' ? 'Feedback & Messages' : 'My Messages'}</h1>
+            <p className="muted">Conversations addressed to you - reply like a chat, and resolve once handled.</p>
+          </div>
+          {user.role === 'ADMIN' && <ReportLink type="feedback" label="Feedback report" />}
         </div>
 
         <div className="choice-group" style={{ marginBottom: '18px' }}>

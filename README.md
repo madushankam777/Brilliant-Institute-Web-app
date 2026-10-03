@@ -15,6 +15,9 @@ A full-stack web application designed to digitize and centralize the day-to-day 
 - Online fee payment with digital receipts
 - Feedback & complaint portal with a staff triage queue
 - Admin dashboard (users/classes/revenue/complaints), user management, announcements, and automated fee/attendance reminders
+- Reports centre for admins: 13 reports (institute summary, students, tutors, accounts, classes & timetable, attendance, fees & payments, tutor payouts, feedback, enquiries, announcements, re-registration, audit trail), shown on screen and downloadable as branded PDFs. Tutor and student reports include everything each person did on the site (activity log, attendance registers, messages, payments), and can be downloaded as one PDF per person in a ZIP. Every report also downloads as a formatted Excel workbook (ExcelJS)
+- Analytics dashboard for admins: interactive charts for fees, payouts, attendance (with a class-by-week heat map), tutors, classes, growth, feedback and site use, built with Apache ECharts - click a tutor or class to open its full report
+- Password reset codes emailed from the institute's official address, brilliantinstitute.edu@gmail.com
 
 ---
 
@@ -98,6 +101,7 @@ Brilliant-Institute-Web-app/
 │
 └── S Vithushan/                    Admin, Notifications & Announcements module (SRS ADM-01..ADM-04)
     ├── server/src/modules/admin/   dashboard stats, user mgmt, announcements, mock Email/SMS reminders
+    ├── server/src/modules/reports/ admin reports: PDF (pdfmake), Excel (ExcelJS), analytics data - one file per report in builders/
     └── client/src/pages/admin/     AdminDashboardPage, ManageUsersPage, AnnouncementsPage
 ```
 
@@ -171,6 +175,13 @@ cp .env.example .env         # fill in your DB password + a generated JWT_SECRET
 npm run db:seed              # creates the default Admin/Tutor/Student logins (see below) + a demo class
 npm run dev                  # http://localhost:5000
 ```
+
+> **Email (password reset codes)** is sent from brilliantinstitute.edu@gmail.com.
+> Sign in to that Gmail account, turn on 2-Step Verification, create an app
+> password (Google Account -> Security -> App passwords) and paste it into
+> `server/.env` as `SMTP_PASS`. Then check it with
+> `npm run mail:test -- you@example.com`. Until then, development uses a free
+> test inbox and the server log prints a link to each email.
 
 > **There is no separate "admin sign-up" screen** - creating the very first
 > admin account has to happen server-side, since anyone who could self-register

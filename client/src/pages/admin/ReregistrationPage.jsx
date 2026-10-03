@@ -15,6 +15,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 const THIS_YEAR = new Date().getFullYear();
@@ -263,13 +264,16 @@ function ReregistrationPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Student Re-registration</h1>
-          <p className="muted">
-            Give returning students a one-time key. They enter it under &quot;Re-register&quot; to confirm
-            their place. On 1 January, everyone who used their key moves up a grade and everyone who
-            did not has their account closed.
-          </p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Student Re-registration</h1>
+            <p className="muted">
+              Give returning students a one-time key. They enter it under &quot;Re-register&quot; to confirm
+              their place. On 1 January, everyone who used their key moves up a grade and everyone who
+              did not has their account closed.
+            </p>
+          </div>
+          <ReportLink type="reregistration" label="Re-registration report" />
         </div>
 
         <Alert type="error" message={loadError} />

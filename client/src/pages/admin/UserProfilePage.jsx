@@ -12,6 +12,7 @@ import WeeklyTimetable from '../../../../shared/client/src/components/common/Wee
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ResetLinkCard from './ResetLinkCard';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -136,11 +137,25 @@ function UserProfilePage() {
             </div>
           )}
 
-          {user.role === 'TUTOR' && (
+          {user.role !== 'ADMIN' && (
+            <div style={{ marginTop: '18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {user.role === 'TUTOR' && (
+                <Link to={`/courses/tutors/${user.id}`} className="btn btn-secondary btn-sm">
+                  View Teaching Profile & Classes
+                </Link>
+              )}
+              <ReportLink
+                type={user.role === 'TUTOR' ? 'tutors' : 'students'}
+                params={user.role === 'TUTOR' ? { tutorId: user.id } : { studentId: user.id }}
+                label={user.role === 'TUTOR' ? 'Tutor report' : 'Student report'}
+                className="btn btn-secondary btn-sm"
+              />
+              <ReportLink type="audit" params={{ userId: user.id }} label="Activity log" className="btn btn-secondary btn-sm" />
+            </div>
+          )}
+          {user.role === 'ADMIN' && (
             <div style={{ marginTop: '18px' }}>
-              <Link to={`/courses/tutors/${user.id}`} className="btn btn-secondary btn-sm">
-                View Teaching Profile & Classes
-              </Link>
+              <ReportLink type="audit" params={{ userId: user.id }} label="Activity log" className="btn btn-secondary btn-sm" />
             </div>
           )}
         </div>

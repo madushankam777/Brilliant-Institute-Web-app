@@ -12,6 +12,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import WeeklyTimetable from '../../../../shared/client/src/components/common/WeeklyTimetable';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -92,9 +93,12 @@ function TimetablesPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Timetables</h1>
-          <p className="muted">See the weekly timetable of any tutor or student.</p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Timetables</h1>
+            <p className="muted">See the weekly timetable of any tutor or student.</p>
+          </div>
+          <ReportLink type="classes" label="Timetable report" />
         </div>
 
         <Alert type="error" message={error} />

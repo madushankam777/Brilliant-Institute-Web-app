@@ -17,6 +17,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
+import { INSTITUTE } from '../../../../shared/client/src/constants/institute';
 
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
@@ -450,7 +451,7 @@ function FeeBalancePage() {
                   >
                     Try Again
                   </button>
-                  <a href="mailto:support@brilliantinstitute.edu" className="btn btn-link">
+                  <a href={`mailto:${INSTITUTE.email}`} className="btn btn-link">
                     Contact Support
                   </a>
                 </div>

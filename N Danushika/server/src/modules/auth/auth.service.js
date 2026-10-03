@@ -323,7 +323,8 @@ async function requestPasswordReset(email) {
     text:
       `Hi ${user.full_name},\n\nYour password reset code is ${code}\n\n` +
       `It works once and expires in ${RESET_CODE_TTL_MINUTES} minutes. ` +
-      'If you did not ask for this, you can ignore this email - your password stays the same.\n\nBrilliant Institute',
+      'If you did not ask for this, you can ignore this email - your password stays the same.\n\n' +
+      `Brilliant Institute\n${config.institute.address}\n${config.institute.email} | ${config.institute.phone}`,
     html: resetCodeEmail(user.full_name, code),
   }).catch((error) => {
     // eslint-disable-next-line no-console
@@ -341,14 +342,28 @@ function escapeHtml(text) {
 
 // reset code email
 function resetCodeEmail(name, code) {
+  const { institute } = config;
   return `
-  <div style="font-family:Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
-    <h2 style="margin:0 0 12px;color:#1d4ed8">Brilliant Institute</h2>
-    <p>Hi ${escapeHtml(name)},</p>
-    <p>Use this code to reset your password:</p>
-    <p style="font-size:32px;font-weight:800;letter-spacing:8px;margin:16px 0;color:#1d4ed8">${code}</p>
-    <p>It works once and expires in ${RESET_CODE_TTL_MINUTES} minutes.</p>
-    <p style="color:#64748b;font-size:13px">Didn't ask for this? Ignore this email - your password stays the same.</p>
+  <div style="background:#f1f5f9;padding:24px 12px;font-family:Segoe UI,Arial,sans-serif;color:#0f172a">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">
+      <div style="background:#1e3a8a;padding:18px 24px;border-bottom:3px solid #c9a961">
+        <div style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.5px">Brilliant Institute</div>
+        <div style="color:#cbd5e1;font-size:12px;margin-top:2px">Brilliant Makes Brilliance</div>
+      </div>
+      <div style="padding:24px">
+        <p style="margin:0 0 12px">Hi ${escapeHtml(name)},</p>
+        <p style="margin:0 0 16px">We received a request to reset your password. Enter this code on the reset page:</p>
+        <div style="text-align:center;margin:20px 0">
+          <span style="display:inline-block;font-size:32px;font-weight:800;letter-spacing:10px;color:#1e3a8a;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 20px">${code}</span>
+        </div>
+        <p style="margin:0 0 8px">The code works once and expires in ${RESET_CODE_TTL_MINUTES} minutes.</p>
+        <p style="margin:0;color:#64748b;font-size:13px">Didn't ask for this? Ignore this email - your password stays the same. Never share this code with anyone, including our staff.</p>
+      </div>
+      <div style="background:#f8fafc;padding:14px 24px;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;line-height:1.6">
+        ${escapeHtml(institute.address)}<br>
+        <a href="mailto:${institute.email}" style="color:#1d4ed8;text-decoration:none">${institute.email}</a> &nbsp;|&nbsp; ${escapeHtml(institute.phone)}
+      </div>
+    </div>
   </div>`;
 }
 

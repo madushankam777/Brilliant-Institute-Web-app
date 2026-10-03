@@ -10,6 +10,7 @@ import StatCard from '../../../../shared/client/src/components/common/StatCard';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import RevenueCard from './RevenueCard';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -51,6 +52,8 @@ const ACTIVITY_LABELS = {
   PAYOUT_SETTLED: 'Payout confirmed',
   REREGISTRATION_KEYS_ISSUED: 'Re-registration keys issued',
   REREGISTRATION_COMPLETED: 'Student re-registered',
+  REPORT_GENERATED: 'Report viewed',
+  REPORT_DOWNLOADED: 'Report downloaded (PDF)',
 };
 
 function activityLabel(entry) {
@@ -124,6 +127,10 @@ function AdminDashboardPage() {
             <p className="muted">Brilliant Institute at a glance.</p>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <Link to="/admin/analytics" className="btn btn-secondary">
+              <Icon name="spark" size={16} /> Analytics
+            </Link>
+            <ReportLink type="overview" label="Summary report" />
             <Link to="/admin/users" className="btn btn-secondary">
               <Icon name="users" size={16} /> Add User
             </Link>

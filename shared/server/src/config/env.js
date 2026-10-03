@@ -103,14 +103,25 @@ const config = {
     ),
   },
 
-  // email (password reset codes) - any SMTP server, e.g. Gmail with an app password
+  // institute details - used in emails and PDF reports
+  institute: {
+    name: 'Brilliant Institute',
+    email: process.env.INSTITUTE_EMAIL || 'brilliantinstitute.edu@gmail.com',
+    phone: '0112 347 728',
+    address: '136, Sangamitha Mawatha, Colombo - 13',
+    website: 'https://brilliantinstitute.edu.lk',
+  },
+
+  // email (password reset codes) - Gmail account + Google app password
   mail: {
     host: process.env.SMTP_HOST || '',
     port: toInt(process.env.SMTP_PORT, 587),
     secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
     user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-    from: process.env.MAIL_FROM || `Brilliant Institute <${process.env.SMTP_USER || 'no-reply@brilliantinstitute.edu'}>`,
+    pass: (process.env.SMTP_PASS || '').replace(/\s+/g, ''),
+    from:
+      process.env.MAIL_FROM ||
+      `Brilliant Institute <${process.env.SMTP_USER || process.env.INSTITUTE_EMAIL || 'brilliantinstitute.edu@gmail.com'}>`,
   },
 
   // Google Calendar's public holiday calendar (Sri Lanka by default)

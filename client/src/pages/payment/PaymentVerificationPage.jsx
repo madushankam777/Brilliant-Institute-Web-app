@@ -13,6 +13,7 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 import RecordPaymentCard from './RecordPaymentCard';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -115,12 +116,15 @@ function PaymentVerificationPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Payment Verification</h1>
-          <p className="muted">
-            Record payments made at the office, and check bank slips students upload. Each payment updates the
-            student&apos;s balance, issues a receipt and adds the amount to revenue.
-          </p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Payment Verification</h1>
+            <p className="muted">
+              Record payments made at the office, and check bank slips students upload. Each payment updates the
+              student&apos;s balance, issues a receipt and adds the amount to revenue.
+            </p>
+          </div>
+          <ReportLink type="finance" label="Payments report" />
         </div>
 
         <RecordPaymentCard onRecorded={load} />

@@ -12,6 +12,8 @@ const { notFoundHandler, errorHandler } = require('../../../shared/server/src/mi
 
 const sessionRoutes = require('./modules/session/session.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const reportRoutes = require('./modules/reports/reports.routes');
+const analyticsRoutes = require('./modules/reports/analytics.routes');
 
 const app = express();
 
@@ -49,6 +51,8 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/session', sessionRoutes); // placeholder login only
+app.use('/api/admin/reports', reportRoutes); // reports + PDF / Excel downloads
+app.use('/api/admin/analytics', analyticsRoutes); // analytics dashboard data
 app.use('/api', adminRoutes); // /api/admin/* + /api/announcements
 
 app.use(notFoundHandler);

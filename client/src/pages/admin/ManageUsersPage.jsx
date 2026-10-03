@@ -20,6 +20,7 @@ import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -210,7 +211,8 @@ function ManageUsersPage() {
             <h1>Manage Users</h1>
             <p className="muted">Verify identities, grant permissions, and suspend profiles.</p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <ReportLink type="users" label="Accounts report" />
             <button
               type="button"
               className="btn btn-secondary"

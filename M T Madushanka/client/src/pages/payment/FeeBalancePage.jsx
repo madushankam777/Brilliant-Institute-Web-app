@@ -439,7 +439,7 @@ function FeeBalancePage() {
                   >
                     Try Again
                   </button>
-                  <a href="mailto:support@brilliantinstitute.edu" className="btn btn-link">
+                  <a href="mailto:brilliantinstitute.edu@gmail.com" className="btn btn-link">
                     Contact Support
                   </a>
                 </div>

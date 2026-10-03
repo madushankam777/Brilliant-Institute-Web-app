@@ -2,7 +2,7 @@
 export const INSTITUTE = {
   name: 'Brilliant Institute',
   website: 'https://brilliantinstitute.edu.lk',
-  email: 'support@brilliantinstitute.edu',
+  email: 'brilliantinstitute.edu@gmail.com',
   phone: '0112 347 728',
   phoneHref: 'tel:+94112347728',
   address: '136, Sangamitha Mawatha, Colombo - 13',

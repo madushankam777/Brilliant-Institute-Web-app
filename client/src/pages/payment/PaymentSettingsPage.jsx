@@ -8,6 +8,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -136,12 +137,15 @@ function PaymentSettingsPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Payment Settings</h1>
-          <p className="muted">
-            Choose how students can pay, and the account they send money to. Students see changes as soon as you
-            save.
-          </p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Payment Settings</h1>
+            <p className="muted">
+              Choose how students can pay, and the account they send money to. Students see changes as soon as you
+              save.
+            </p>
+          </div>
+          <ReportLink type="finance" label="Payments report" />
         </div>
 
         <Alert type="error" message={loadError} />

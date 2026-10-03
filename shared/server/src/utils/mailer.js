@@ -1,22 +1,27 @@
-// sends email - real SMTP when set in .env, else a free Ethereal test inbox (dev only)
+// sends email - the institute Gmail account when set in .env, else a free Ethereal test inbox (dev only)
 const nodemailer = require('nodemailer');
 const config = require('../config/env');
 
 let mailerPromise = null;
 
+// Gmail needs both the address and the app password
+function isSmtpReady() {
+  return Boolean(config.mail.host && config.mail.user && config.mail.pass);
+}
+
 async function createMailer() {
-  if (config.mail.host) {
+  if (isSmtpReady()) {
     const transport = nodemailer.createTransport({
       host: config.mail.host,
       port: config.mail.port,
       secure: config.mail.secure,
-      auth: config.mail.user ? { user: config.mail.user, pass: config.mail.pass } : undefined,
+      auth: { user: config.mail.user, pass: config.mail.pass },
     });
     return { transport, isTestInbox: false };
   }
   if (config.isProduction) return null;
 
-  // dev without SMTP - Ethereal catches the email and gives a link to view it
+  // dev without Gmail - Ethereal catches the email and gives a link to view it
   const account = await nodemailer.createTestAccount();
   const transport = nodemailer.createTransport({
     host: account.smtp.host,
@@ -27,18 +32,29 @@ async function createMailer() {
   return { transport, isTestInbox: true };
 }
 
-async function sendMail({ to, subject, text, html }) {
+function getMailer() {
   if (!mailerPromise) {
     mailerPromise = createMailer().catch((error) => {
       mailerPromise = null;
       throw error;
     });
   }
-  const mailer = await mailerPromise;
+  return mailerPromise;
+}
+
+async function sendMail({ to, subject, text, html }) {
+  const mailer = await getMailer();
   if (!mailer) {
-    throw new Error('Email is not set up - add SMTP_HOST, SMTP_USER and SMTP_PASS to server/.env');
+    throw new Error('Email is not set up - add SMTP_USER and SMTP_PASS to server/.env');
   }
-  const info = await mailer.transport.sendMail({ from: config.mail.from, to, subject, text, html });
+  const info = await mailer.transport.sendMail({
+    from: config.mail.from,
+    replyTo: config.institute.email,
+    to,
+    subject,
+    text,
+    html,
+  });
   if (mailer.isTestInbox) {
     // eslint-disable-next-line no-console
     console.log(`[mail] test email to ${to} - view it here: ${nodemailer.getTestMessageUrl(info)}`);
@@ -46,4 +62,30 @@ async function sendMail({ to, subject, text, html }) {
   return info;
 }
 
-module.exports = { sendMail };
+// startup check - setup problems go to the server log, never to users
+async function checkMailer() {
+  if (!isSmtpReady()) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[setup] Emails are not going out from ${config.institute.email} yet. Put the Gmail app password in ` +
+        'server/.env as SMTP_PASS (Google Account -> Security -> 2-Step Verification -> App passwords).'
+    );
+    return false;
+  }
+  try {
+    const mailer = await getMailer();
+    await mailer.transport.verify();
+    // eslint-disable-next-line no-console
+    console.log(`[mail] Ready - emails are sent from ${config.mail.user}`);
+    return true;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[setup] Gmail refused the login for ${config.mail.user} (${error.message}). ` +
+        'SMTP_PASS must be a 16-letter Google app password, not the normal Gmail password.'
+    );
+    return false;
+  }
+}
+
+module.exports = { sendMail, checkMailer, isSmtpReady };

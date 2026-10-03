@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { INSTITUTE } from '../../shared/client/src/constants/institute';
@@ -54,6 +54,11 @@ import ReregistrationPage from './pages/admin/ReregistrationPage';
 import TimetablesPage from './pages/admin/TimetablesPage';
 import ReregisterPage from './pages/auth/ReregisterPage';
 import EnquiriesPage from './pages/admin/EnquiriesPage';
+import ReportsPage from './pages/admin/ReportsPage';
+import LoadingSpinner from '../../shared/client/src/components/common/LoadingSpinner';
+
+// charts library only downloads when the Analytics page is opened
+const AnalyticsPage = lazy(() => import('./pages/admin/AnalyticsPage'));
 
 // browser tab title for each page
 // Google text for public pages - every other page is kept out of search
@@ -223,6 +228,15 @@ function App() {
             <Route path="/admin/announcements" element={<AnnouncementsPage />} />
             <Route path="/admin/reregistration" element={<ReregistrationPage />} />
             <Route path="/admin/enquiries" element={<EnquiriesPage />} />
+            <Route path="/admin/reports" element={<ReportsPage />} />
+            <Route
+              path="/admin/analytics"
+              element={
+                <Suspense fallback={<LoadingSpinner label="Loading analytics..." />}>
+                  <AnalyticsPage />
+                </Suspense>
+              }
+            />
           </Route>
 
           {/* Catch-all */}

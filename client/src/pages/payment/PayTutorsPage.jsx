@@ -19,6 +19,7 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import { todayKey } from '../../../../shared/client/src/utils/schedule';
 import PayTutorModal from './PayTutorModal';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 const NAV_ITEMS = getNavItems('ADMIN');
 
@@ -270,12 +271,18 @@ function PayTutorsPage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        <div className="page-header">
-          <h1>Pay Tutors</h1>
-          <p className="muted">
-            Pay tutors from the institute&apos;s bank account and keep a record of every transfer. Each
-            tutor is notified when their payment is recorded.
-          </p>
+        <div className="flex-between page-header">
+          <div>
+            <h1>Pay Tutors</h1>
+            <p className="muted">
+              Pay tutors from the institute&apos;s bank account and keep a record of every transfer. Each
+              tutor is notified when their payment is recorded.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <ReportLink type="tutors" label="Tutor report" />
+            <ReportLink type="payouts" label="Payouts report" />
+          </div>
         </div>
 
         <Alert type="error" message={loadError} />

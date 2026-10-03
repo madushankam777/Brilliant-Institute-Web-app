@@ -22,6 +22,8 @@ const courseRoutes = require('../../C D Kumanan/server/src/modules/course/course
 const feedbackRoutes = require('../../H A S Hapuarachchi/server/src/modules/feedback/feedback.routes');
 const contactRoutes = require('../../H A S Hapuarachchi/server/src/modules/feedback/contact.routes');
 const adminRoutes = require('../../S Vithushan/server/src/modules/admin/admin.routes');
+const reportRoutes = require('../../S Vithushan/server/src/modules/reports/reports.routes');
+const analyticsRoutes = require('../../S Vithushan/server/src/modules/reports/analytics.routes');
 
 const app = express();
 
@@ -92,6 +94,8 @@ app.use('/api/payments', paymentRoutes); // Payments (M T Madushanka)
 app.use('/api/courses', courseRoutes); // Course Management (C D Kumanan)
 app.use('/api/feedback', feedbackRoutes); // Feedback & Complaint (H A S Hapuarachchi)
 app.use('/api/contact', contactRoutes); // Contact Us form + Admin inbox (H A S Hapuarachchi)
+app.use('/api/admin/reports', reportRoutes); // Reports + PDF / Excel downloads (S Vithushan)
+app.use('/api/admin/analytics', analyticsRoutes); // Analytics dashboard data (S Vithushan)
 app.use('/api', adminRoutes); // Admin, Notifications & Announcements (S Vithushan) - /api/admin/* + /api/announcements
 
 app.use(notFoundHandler);

@@ -104,4 +104,25 @@ const contactLimiter = rateLimit({
   },
 });
 
-module.exports = { resetRequestLimiter, authLimiter, apiLimiter, checkinLimiter, keyRedemptionLimiter, contactLimiter };
+// reports - building a PDF is heavy work, so cap how often one admin can do it
+const reportLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  keyGenerator: perUserKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many reports in a short time. Please wait a few minutes and try again.',
+  },
+});
+
+module.exports = {
+  resetRequestLimiter,
+  authLimiter,
+  apiLimiter,
+  checkinLimiter,
+  keyRedemptionLimiter,
+  contactLimiter,
+  reportLimiter,
+};
