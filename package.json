@@ -1,0 +1,13 @@
+{
+  "name": "brilliant-institute",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Brilliant Institute - cloud hosting entry point: build installs every folder and builds the website, start runs the API and serves the website",
+  "scripts": {
+    "build": "node scripts/install-all.js && npm --prefix client run build",
+    "start": "node server/src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

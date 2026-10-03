@@ -1,7 +1,7 @@
 // report endpoints
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
 const service = require('./reports.service');
-const { renderReportPdf } = require('./reportPdf');
+const { renderReportPdfInWorker } = require('./reportPdf');
 const { renderReportExcel } = require('./reportExcel');
 
 // reports page - list of reports
@@ -31,7 +31,7 @@ const generateReport = asyncHandler(async (req, res) => {
 // download pdf btn
 const downloadReportPdf = asyncHandler(async (req, res) => {
   const report = await service.buildReport(req.params.type, req.query, req.user);
-  const pdf = await renderReportPdf(report);
+  const pdf = await renderReportPdfInWorker(report);
   await service.recordUse(req.user, report, 'pdf');
   res.set({
     'Content-Type': 'application/pdf',

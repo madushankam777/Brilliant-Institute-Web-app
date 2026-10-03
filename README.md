@@ -288,7 +288,7 @@ requirements (§4.3, §6.2) and the OWASP Top 10:
 | Audit Logging | `audit_log` table records logins, profile/password changes, attendance corrections, and payment outcomes (SRS §6.2). |
 | Business rule integrity | Payments run inside DB transactions so a balance can never be decremented without a corresponding successful, committed payment/receipt (SRS §4.5). |
 
-**Before real deployment:** rotate `JWT_SECRET`, set `NODE_ENV=production`
+**Before real deployment:** follow [HOSTING.md](HOSTING.md) (domain, Railway or a Node.js host, email, Google). Rotate `JWT_SECRET`, set `NODE_ENV=production`
 (enables `Secure` cookies), point `PAYMENT_GATEWAY_*` at a real PCI-compliant
 provider, and run `npm audit` on both `server/` and `client/`.
 

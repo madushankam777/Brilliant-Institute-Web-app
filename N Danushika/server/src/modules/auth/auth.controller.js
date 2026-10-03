@@ -35,7 +35,7 @@ const login = asyncHandler(async (req, res) => {
 
 // POST /api/auth/logout - end the current session.
 const logout = asyncHandler(async (req, res) => {
-  authService.logout(res);
+  authService.logout(req, res);
   res.status(200).json({ success: true, message: 'Logged out successfully.' });
 });
 

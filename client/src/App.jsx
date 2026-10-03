@@ -16,46 +16,48 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import ProfilePage from './pages/auth/ProfilePage';
-
-import ClassSessionsPage from './pages/attendance/ClassSessionsPage';
-import MarkAttendancePage from './pages/attendance/MarkAttendancePage';
-import AttendanceHistoryPage from './pages/attendance/AttendanceHistoryPage';
-import TutorStudentHistoryPage from './pages/attendance/TutorStudentHistoryPage';
-import SelfCheckInPage from './pages/attendance/SelfCheckInPage';
-
-import FeeBalancePage from './pages/payment/FeeBalancePage';
-import PaymentHistoryPage from './pages/payment/PaymentHistoryPage';
-import PaymentReturnPage from './pages/payment/PaymentReturnPage';
-import PaymentVerificationPage from './pages/payment/PaymentVerificationPage';
-import PayTutorsPage from './pages/payment/PayTutorsPage';
-import PaymentSettingsPage from './pages/payment/PaymentSettingsPage';
-
-import BrowseClassesPage from './pages/courses/BrowseClassesPage';
-import ClassDetailsPage from './pages/courses/ClassDetailsPage';
-import TutorProfilePage from './pages/courses/TutorProfilePage';
-import MyCoursesPage from './pages/courses/MyCoursesPage';
-import ManageClassesPage from './pages/courses/ManageClassesPage';
-import CreateEditClassPage from './pages/courses/CreateEditClassPage';
-import MyStudentsPage from './pages/courses/MyStudentsPage';
-
-import SubmitFeedbackPage from './pages/feedback/SubmitFeedbackPage';
-import StaffFeedbackPage from './pages/feedback/StaffFeedbackPage';
-
-import NotifyStudentsPage from './pages/notifications/NotifyStudentsPage';
-import RemindersPage from './pages/notifications/RemindersPage';
-import CalendarPage from './pages/calendar/CalendarPage';
-
-import AdminDashboardPage from './pages/admin/AdminDashboardPage';
-import ManageUsersPage from './pages/admin/ManageUsersPage';
-import UserProfilePage from './pages/admin/UserProfilePage';
-import AnnouncementsPage from './pages/admin/AnnouncementsPage';
-import ReregistrationPage from './pages/admin/ReregistrationPage';
-import TimetablesPage from './pages/admin/TimetablesPage';
-import ReregisterPage from './pages/auth/ReregisterPage';
-import EnquiriesPage from './pages/admin/EnquiriesPage';
-import ReportsPage from './pages/admin/ReportsPage';
 import LoadingSpinner from '../../shared/client/src/components/common/LoadingSpinner';
+
+// pages behind the login download only when someone opens them, so the public pages load fast
+const ProfilePage = lazy(() => import('./pages/auth/ProfilePage'));
+
+const ClassSessionsPage = lazy(() => import('./pages/attendance/ClassSessionsPage'));
+const MarkAttendancePage = lazy(() => import('./pages/attendance/MarkAttendancePage'));
+const AttendanceHistoryPage = lazy(() => import('./pages/attendance/AttendanceHistoryPage'));
+const TutorStudentHistoryPage = lazy(() => import('./pages/attendance/TutorStudentHistoryPage'));
+const SelfCheckInPage = lazy(() => import('./pages/attendance/SelfCheckInPage'));
+
+const FeeBalancePage = lazy(() => import('./pages/payment/FeeBalancePage'));
+const PaymentHistoryPage = lazy(() => import('./pages/payment/PaymentHistoryPage'));
+const PaymentReturnPage = lazy(() => import('./pages/payment/PaymentReturnPage'));
+const PaymentVerificationPage = lazy(() => import('./pages/payment/PaymentVerificationPage'));
+const PayTutorsPage = lazy(() => import('./pages/payment/PayTutorsPage'));
+const PaymentSettingsPage = lazy(() => import('./pages/payment/PaymentSettingsPage'));
+
+const BrowseClassesPage = lazy(() => import('./pages/courses/BrowseClassesPage'));
+const ClassDetailsPage = lazy(() => import('./pages/courses/ClassDetailsPage'));
+const TutorProfilePage = lazy(() => import('./pages/courses/TutorProfilePage'));
+const MyCoursesPage = lazy(() => import('./pages/courses/MyCoursesPage'));
+const ManageClassesPage = lazy(() => import('./pages/courses/ManageClassesPage'));
+const CreateEditClassPage = lazy(() => import('./pages/courses/CreateEditClassPage'));
+const MyStudentsPage = lazy(() => import('./pages/courses/MyStudentsPage'));
+
+const SubmitFeedbackPage = lazy(() => import('./pages/feedback/SubmitFeedbackPage'));
+const StaffFeedbackPage = lazy(() => import('./pages/feedback/StaffFeedbackPage'));
+
+const NotifyStudentsPage = lazy(() => import('./pages/notifications/NotifyStudentsPage'));
+const RemindersPage = lazy(() => import('./pages/notifications/RemindersPage'));
+const CalendarPage = lazy(() => import('./pages/calendar/CalendarPage'));
+
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const ManageUsersPage = lazy(() => import('./pages/admin/ManageUsersPage'));
+const UserProfilePage = lazy(() => import('./pages/admin/UserProfilePage'));
+const AnnouncementsPage = lazy(() => import('./pages/admin/AnnouncementsPage'));
+const ReregistrationPage = lazy(() => import('./pages/admin/ReregistrationPage'));
+const TimetablesPage = lazy(() => import('./pages/admin/TimetablesPage'));
+const ReregisterPage = lazy(() => import('./pages/auth/ReregisterPage'));
+const EnquiriesPage = lazy(() => import('./pages/admin/EnquiriesPage'));
+const ReportsPage = lazy(() => import('./pages/admin/ReportsPage'));
 
 // charts library only downloads when the Analytics page is opened
 const AnalyticsPage = lazy(() => import('./pages/admin/AnalyticsPage'));
@@ -159,6 +161,7 @@ function App() {
       <Navbar />
       <CookieConsentBanner />
       <main className="app-content">
+        <Suspense fallback={<LoadingSpinner label="Loading..." />}>
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<HomePage />} />
@@ -242,6 +245,7 @@ function App() {
           {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </Suspense>
       </main>
     </AuthProvider>
   );

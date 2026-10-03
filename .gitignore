@@ -55,3 +55,5 @@ temp/
 
 .cache/
 .parcel-cache/
+# copies of the database made for cloud hosting (real accounts and payments)
+database-export/

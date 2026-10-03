@@ -4,6 +4,7 @@ const path = require('path');
 const pdfmake = require('pdfmake');
 const robotoFonts = require('pdfmake/fonts/Roboto');
 const config = require('../../../../../shared/server/src/config/env');
+const { runInWorker } = require('../../../../../shared/server/src/utils/workerPool');
 
 const NAVY = '#1e3a8a';
 const INK = '#0f172a';
@@ -536,4 +537,9 @@ async function renderReportPdf(report) {
   return doc.getBuffer();
 }
 
-module.exports = { renderReportPdf };
+// the same, built on a worker thread so other people's pages stay fast
+function renderReportPdfInWorker(report) {
+  return runInWorker(__filename, 'renderReportPdf', [report]);
+}
+
+module.exports = { renderReportPdf, renderReportPdfInWorker };

@@ -1,6 +1,6 @@
 // warns if a staff account still uses the demo password
-const bcrypt = require('bcryptjs');
 const { pool } = require('../../../shared/server/src/config/db');
+const { comparePassword } = require('../../../shared/server/src/utils/passwordHasher');
 
 const DEMO_PASSWORD = 'Demo@1234';
 
@@ -8,10 +8,8 @@ async function warnAboutDemoPasswords() {
   const [rows] = await pool.execute(
     `SELECT email, role, password_hash FROM users WHERE status = 'ACTIVE' AND role IN ('ADMIN', 'TUTOR')`
   );
-  const exposed = [];
-  for (const row of rows) {
-    if (await bcrypt.compare(DEMO_PASSWORD, row.password_hash)) exposed.push(`${row.email} (${row.role})`);
-  }
+  const matches = await Promise.all(rows.map((row) => comparePassword(DEMO_PASSWORD, row.password_hash)));
+  const exposed = rows.filter((row, index) => matches[index]).map((row) => `${row.email} (${row.role})`);
   if (exposed.length > 0) {
     // eslint-disable-next-line no-console
     console.warn(

@@ -6,7 +6,7 @@ const { recordAuditEvent } = require('../../../../../shared/server/src/utils/aud
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { zipSync } = require('fflate');
 const parts = require('./reportParts');
-const { renderReportPdf } = require('./reportPdf');
+const { renderReportPdfInWorker } = require('./reportPdf');
 
 const BUILDERS = {
   overview: require('./builders/overview'),
@@ -236,7 +236,7 @@ async function buildPeopleZip(type, query, adminUser) {
   for (const person of list) {
     const report = await buildReport(type, { ...params, detail: undefined, grade: undefined, [people.idKey]: person.id }, adminUser);
     if (!first) first = report;
-    const pdf = await renderReportPdf(report);
+    const pdf = await renderReportPdfInWorker(report);
     const name = `${person.full_name}${person.student_code ? `-${person.student_code}` : ''}`.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
     files[`${name || 'person'}-${person.id}.pdf`] = new Uint8Array(pdf);
   }

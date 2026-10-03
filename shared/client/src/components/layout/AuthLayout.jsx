@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import Icon from '../common/Icon';
 import Logo from '../common/Logo';
-import authArtImg from '../../assets/auth-panel-art.png';
+import authArtImg from '../../assets/auth-panel-art.webp';
 
 function AuthLayout({ children, quote, backTo = '/', backLabel = 'Back to Home', imageSrc }) {
   return (

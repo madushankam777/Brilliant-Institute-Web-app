@@ -8,7 +8,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import Footer from '../../../../shared/client/src/components/layout/Footer';
 
 // image from shared/client/public
-const ABOUT_IMAGE = '/about%20us.jpg';
+const ABOUT_IMAGE = '/about-us.webp';
 
 const MISSION = [
   'Teach clear, syllabus-focused lessons with tutors who know their students.',

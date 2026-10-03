@@ -1,7 +1,7 @@
 // Admin module - business logic
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const config = require('../../../../../shared/server/src/config/env');
+const { hashPassword } = require('../../../../../shared/server/src/utils/passwordHasher');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const {
@@ -35,7 +35,7 @@ async function createUser(adminUser, { fullName, email, password, role }) {
     throw ApiError.conflict('An account with this email already exists.');
   }
 
-  const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
+  const passwordHash = await hashPassword(password, config.auth.bcryptSaltRounds);
   const userId = await repository.createUser({ fullName, email, passwordHash, role });
 
   await recordAuditEvent({

@@ -264,22 +264,19 @@ function AnalyticsPage() {
               <ChartCard
                 wide
                 title="Attendance by class"
+                empty={data.heatmap.cells.length === 0 && 'No attendance was marked in this period.'}
                 hint="Each square is one class in one week - red is low, green is high. Click a class to open its report."
                 report={reportLink('attendance')}
               >
-                {data.heatmap.cells.length === 0 ? (
-                  <p className="muted">No attendance was marked in this period.</p>
-                ) : (
-                  <EChart
-                    option={options.heatmap}
-                    height={Math.max(260, 90 + data.heatmap.classes.length * 34)}
-                    label="Attendance by class and week"
-                    onClick={(p) => {
-                      const cls = data.heatmap.classes[p.value[1]];
-                      if (cls) navigate(reportLink('classes', { classId: cls.id }));
-                    }}
-                  />
-                )}
+                <EChart
+                  option={options.heatmap}
+                  height={Math.max(260, 90 + data.heatmap.classes.length * 34)}
+                  label="Attendance by class and week"
+                  onClick={(p) => {
+                    const cls = data.heatmap.classes[p.value[1]];
+                    if (cls) navigate(reportLink('classes', { classId: cls.id }));
+                  }}
+                />
               </ChartCard>
 
               <ChartCard

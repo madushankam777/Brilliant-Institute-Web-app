@@ -10,12 +10,13 @@ const { ROLES, SESSION_COOKIE_NAME } = require('../../../../../shared/server/src
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
 const { deleteUpload, publicIdOf } = require('../../../../../shared/server/src/utils/fileStore');
-const { passwordVersion } = require('../../../../../shared/server/src/utils/sessionToken');
+const { passwordVersion, revokeToken } = require('../../../../../shared/server/src/utils/sessionToken');
 const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
+const { hashPassword, comparePassword, hashNow } = require('../../../../../shared/server/src/utils/passwordHasher');
 const repository = require('./auth.repository');
 
 // Same cost as real hashes
-const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', config.auth.bcryptSaltRounds);
+const DUMMY_PASSWORD_HASH = hashNow('not-a-real-password', config.auth.bcryptSaltRounds);
 
 // student code, e.g. ST0000001
 function buildStudentCode(userId) {
@@ -55,7 +56,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     normalizedGrade = grade;
   }
 
-  const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
+  const passwordHash = await hashPassword(password, config.auth.bcryptSaltRounds);
   let userId;
   try {
     userId = await repository.createUser({
@@ -132,7 +133,7 @@ async function loginWithEmailAndPassword({ email, password }, res) {
     );
   }
 
-  const passwordMatches = await bcrypt.compare(
+  const passwordMatches = await comparePassword(
     password || '',
     isAccountUsable ? user.password_hash : DUMMY_PASSWORD_HASH
   );
@@ -169,7 +170,17 @@ async function loginWithEmailAndPassword({ email, password }, res) {
   return toSafeUser(user);
 }
 
-function logout(res) {
+// logout btn - also ends the token on the server, so a copied cookie stops working
+function logout(req, res) {
+  const token = req.cookies && req.cookies[SESSION_COOKIE_NAME];
+  if (token) {
+    try {
+      const payload = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] });
+      revokeToken(token, payload.exp);
+    } catch {
+      // expired or invalid - nothing to end
+    }
+  }
   clearSessionCookie(res);
 }
 
@@ -251,12 +262,12 @@ async function changePassword(userId, { currentPassword, newPassword }) {
     throw ApiError.notFound('User not found.');
   }
 
-  const passwordMatches = await bcrypt.compare(currentPassword, user.password_hash);
+  const passwordMatches = await comparePassword(currentPassword, user.password_hash);
   if (!passwordMatches) {
     throw ApiError.badRequest('Your current password is incorrect.');
   }
 
-  const newHash = await bcrypt.hash(newPassword, config.auth.bcryptSaltRounds);
+  const newHash = await hashPassword(newPassword, config.auth.bcryptSaltRounds);
   await repository.updatePasswordHash(userId, newHash);
   await repository.invalidateResetTokensForUser(userId);
   await recordAuditEvent({
@@ -388,7 +399,7 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
     throw ApiError.badRequest(invalid);
   }
 
-  const newHash = await bcrypt.hash(newPassword, config.auth.bcryptSaltRounds);
+  const newHash = await hashPassword(newPassword, config.auth.bcryptSaltRounds);
   await repository.updatePasswordHash(user.id, newHash);
   await repository.markResetTokenUsed(resetToken.id);
   await repository.invalidateResetTokensForUser(user.id);
@@ -428,7 +439,7 @@ async function resetPasswordWithToken(rawToken, newPassword) {
     throw ApiError.badRequest('This password reset link is invalid or has expired.');
   }
 
-  const newHash = await bcrypt.hash(newPassword, config.auth.bcryptSaltRounds);
+  const newHash = await hashPassword(newPassword, config.auth.bcryptSaltRounds);
   await repository.updatePasswordHash(resetToken.user_id, newHash);
   await repository.markResetTokenUsed(resetToken.id);
   await repository.invalidateResetTokensForUser(resetToken.user_id);

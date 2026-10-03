@@ -2,7 +2,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const ApiError = require('../utils/ApiError');
-const { passwordVersion } = require('../utils/sessionToken');
+const { passwordVersion, isTokenRevoked } = require('../utils/sessionToken');
 const { SESSION_COOKIE_NAME, USER_STATUS } = require('../config/roles');
 const { pool } = require('../config/db');
 
@@ -19,6 +19,10 @@ async function authenticate(req, res, next) {
     payload = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] });
   } catch (error) {
     // Covers both expired tokens and tampered/invalid signatures.
+    return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
+  }
+  // this session was logged out
+  if (isTokenRevoked(token)) {
     return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
   }
 

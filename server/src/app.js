@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const helmet = require('helmet');
+const compression = require('compression');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
@@ -29,7 +30,28 @@ const app = express();
 
 app.set('trust proxy', config.trustProxy);
 
-app.use(helmet());
+// security headers - same rules as the website preview (client/vite.config.js)
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'default-src': ["'self'"],
+        'script-src': ["'self'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", 'data:', 'blob:'],
+        'font-src': ["'self'", 'data:'],
+        'connect-src': ["'self'"],
+        // the Contact page shows a Google Map
+        'frame-src': ['https://www.google.com', 'https://maps.google.com'],
+        'form-action': ["'self'", 'https://sandbox.payhere.lk', 'https://www.payhere.lk'],
+        'frame-ancestors': ["'none'"],
+        'upgrade-insecure-requests': null,
+      },
+    },
+    frameguard: { action: 'deny' },
+  })
+);
 
 app.use(
   cors({
@@ -51,6 +73,9 @@ app.use(
   })
 );
 
+// smaller downloads - pages, scripts and JSON are sent zipped (PDF and Excel files already are)
+app.use(compression());
+
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 
@@ -65,6 +90,29 @@ app.use(
 );
 
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
+
+// built website - cloud hosting runs the site and the API on one address (SERVE_CLIENT=true)
+if (config.serveClient) {
+  const CLIENT_DIST = path.resolve(__dirname, '../../client/dist');
+  app.use(
+    express.static(CLIENT_DIST, {
+      index: false,
+      setHeaders(res, filePath) {
+        // file names in assets/ change with every build, so they can be kept long
+        const longCache = filePath.includes(`${path.sep}assets${path.sep}`);
+        res.setHeader('Cache-Control', longCache ? 'public, max-age=31536000, immutable' : 'public, max-age=3600');
+      },
+    })
+  );
+  // every page address that is not the API is the React app
+  app.get(/^\/(?!api\/|uploads\/).*/, (req, res, next) => {
+    // a missing file gets a real 404, not the home page
+    if (req.path.startsWith('/assets/') || path.extname(req.path)) return next();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    res.sendFile(path.join(CLIENT_DIST, 'index.html'));
+  });
+}
 
 // PayHere's server-to-server payment notification
 app.post(

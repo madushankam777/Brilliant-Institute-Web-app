@@ -66,6 +66,8 @@ const config = {
     .filter(Boolean),
   // trust X-Forwarded-For only behind a real proxy
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
+  // cloud hosting - the API server also serves the built website (client/dist)
+  serveClient: process.env.SERVE_CLIENT === 'true',
 
   db: {
     host: process.env.DB_HOST,
@@ -74,6 +76,10 @@ const config = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     connectionLimit: toInt(process.env.DB_CONNECTION_LIMIT, 10),
+    // cloud databases need an encrypted connection - DB_SSL=true
+    ssl: process.env.DB_SSL === 'true',
+    // the provider's CA certificate: file path, or the PEM text itself
+    sslCa: process.env.DB_SSL_CA || '',
   },
 
   auth: {
@@ -119,6 +125,8 @@ const config = {
     secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
     user: process.env.SMTP_USER || '',
     pass: (process.env.SMTP_PASS || '').replace(/\s+/g, ''),
+    // cloud hosts that block email ports (Railway) - Resend sends over HTTPS instead
+    resendApiKey: process.env.RESEND_API_KEY || '',
     from:
       process.env.MAIL_FROM ||
       `Brilliant Institute <${process.env.SMTP_USER || process.env.INSTITUTE_EMAIL || 'brilliantinstitute.edu@gmail.com'}>`,

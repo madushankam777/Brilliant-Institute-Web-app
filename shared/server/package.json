@@ -4,11 +4,12 @@
   "private": true,
   "description": "Packages needed by shared/server/src code. Node resolves require() by walking up from the file that calls it, so files in here can't see a sibling app's node_modules - run npm install in this folder once, in addition to each app's own server/.",
   "dependencies": {
+    "bcryptjs": "2.4.3",
     "dotenv": "16.4.5",
     "express-rate-limit": "7.4.0",
     "express-validator": "7.3.2",
     "jsonwebtoken": "9.0.2",
-    "multer": "2.3.0",
+    "multer": "2.4.0",
     "mysql2": "3.24.3",
     "nodemailer": "10.0.10",
     "qrcode": "1.5.4"

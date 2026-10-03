@@ -20,7 +20,7 @@ import {
   occurrencesOn,
   todayKey,
 } from '../../../shared/client/src/utils/schedule';
-import heroMediaImg from '../../../shared/client/src/assets/hero-media.png';
+import heroMediaImg from '../../../shared/client/src/assets/hero-media.webp';
 import ModalClose from '../../../shared/client/src/components/common/ModalClose';
 
 const FEATURES = [
