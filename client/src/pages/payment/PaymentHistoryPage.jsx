@@ -12,18 +12,22 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
+// the side menu for a student
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// badge colour for Successful, Pending or Failed
 function statusBadgeClass(status) {
   if (status === 'SUCCESSFUL') return 'badge badge-success';
   if (status === 'PENDING') return 'badge badge-warning';
   return 'badge badge-danger';
 }
 
+// the status words - a pending bank transfer shows as Awaiting Verification
 function statusLabel(payment) {
   if (payment.status === 'PENDING' && payment.paymentMethod === 'BANK_TRANSFER') {
     return 'Awaiting Verification';
@@ -31,6 +35,7 @@ function statusLabel(payment) {
   return payment.status;
 }
 
+// the words shown for each payment method
 const METHOD_LABELS = {
   CARD: 'Card',
   EZ_CASH: 'eZ Cash',
@@ -56,12 +61,15 @@ function paymentMethodSummary(payment) {
   return METHOD_LABELS[payment.paymentMethod] || payment.paymentMethod;
 }
 
+// payment history - my payments and receipts; retry a pending one or fix a pending bank transfer
 function PaymentHistoryPage() {
+  // the payments and the page state
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [retryingId, setRetryingId] = useState(null);
 
+  // the edit pop-up - the payment being fixed and its fields
   const [editTarget, setEditTarget] = useState(null);
   const [editReference, setEditReference] = useState('');
   const [editReceiptFile, setEditReceiptFile] = useState(null);
@@ -69,6 +77,7 @@ function PaymentHistoryPage() {
   const [editFieldError, setEditFieldError] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  // load my payments
   const loadHistory = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -82,10 +91,12 @@ function PaymentHistoryPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
 
+  // retry btn - try a pending payment again
   async function handleRetry(paymentId) {
     setRetryingId(paymentId);
     setErrorMessage('');
@@ -107,6 +118,7 @@ function PaymentHistoryPage() {
     setEditError('');
   }
 
+  // close the edit pop-up and clear it
   function closeEditModal() {
     setEditTarget(null);
     setEditReference('');
@@ -114,6 +126,7 @@ function PaymentHistoryPage() {
     setEditError('');
   }
 
+  // save changes btn - fix the reference or replace the receipt of a pending bank transfer
   async function handleSaveEdit(event) {
     event.preventDefault();
     setEditError('');
@@ -142,6 +155,7 @@ function PaymentHistoryPage() {
     }
   }
 
+  // the page - title, the payments table and the edit pop-up
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -152,6 +166,7 @@ function PaymentHistoryPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* a spinner, an empty message, or the payments table */}
         {isLoading ? (
           <LoadingSpinner label="Loading payment history..." />
         ) : payments.length === 0 ? (
@@ -183,8 +198,10 @@ function PaymentHistoryPage() {
                       </td>
                       <td>{payment.receiptNumber || '-'}</td>
                       <td>
+                        {/* pending bank transfer - view the receipt or edit the submission */}
                         {payment.status === 'PENDING' && payment.paymentMethod === 'BANK_TRANSFER' && (
                           <div style={{ display: 'flex', gap: '6px' }}>
+                            {/* view receipt link - opens the receipt photo */}
                             <a
                               href={getReceiptImageUrl(payment.id)}
                               target="_blank"
@@ -193,6 +210,7 @@ function PaymentHistoryPage() {
                             >
                               View Receipt
                             </a>
+                            {/* edit btn - opens the edit pop-up */}
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"
@@ -202,6 +220,7 @@ function PaymentHistoryPage() {
                             </button>
                           </div>
                         )}
+                        {/* pending card, wallet or online payment - retry btn */}
                         {payment.status === 'PENDING' && payment.paymentMethod !== 'BANK_TRANSFER' && (
                           <button
                             type="button"
@@ -222,6 +241,7 @@ function PaymentHistoryPage() {
         )}
       </div>
 
+      {/* edit pop-up - the reference and receipt of a pending bank transfer */}
       {editTarget && (
         <div className="modal-overlay" onClick={() => !isSavingEdit && closeEditModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>

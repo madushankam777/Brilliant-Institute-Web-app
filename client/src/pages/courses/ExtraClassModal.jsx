@@ -24,26 +24,32 @@ for (let minutes = 6 * 60; minutes <= 22 * 60; minutes += 30) {
   TIME_SLOTS.push(fromMinutes(minutes));
 }
 
+// keeps a time that is not on the list selectable
 function withValue(options, value) {
   return options.includes(value) ? options : [...options, value].sort();
 }
 
+// minutes since midnight right now
 function nowMinutes() {
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
 }
 
+// do an existing class and the chosen times overlap
 function overlaps(item, startTime, endTime) {
   return toMinutes(item.startTime) < toMinutes(endTime) && toMinutes(item.endTime) > toMinutes(startTime);
 }
 
+// extra class pop-up - add a one-off class on a chosen date; the students are told
 function ExtraClassModal({ classItem, onClose, onSaved }) {
   const today = todayKey();
+  // every class, class events and holidays - used to find clashes
   const [allClasses, setAllClasses] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [events] = useClassEvents(today, addDaysToKey(today, 365));
   const holidays = useYearOfHolidays();
 
+  // the form - date, times, hall and note
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState(classItem.startTime.slice(0, 5));
   const [endTime, setEndTime] = useState(classItem.endTime.slice(0, 5));
@@ -52,6 +58,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
   const [isSaving, setIsSaving] = useState(false);
   const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
 
+  // load every class to list the halls and find clashes
   useEffect(() => {
     browseClasses()
       .then(setAllClasses)
@@ -68,6 +75,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
   const isPast = (time) => date === today && toMinutes(time) <= nowMinutes();
   const startIsPast = Boolean(startTime) && isPast(startTime);
   const startOptions = withValue(TIME_SLOTS.slice(0, -1), startTime);
+  // end time choices - only after the start time
   const endOptions = withValue(TIME_SLOTS, endTime).filter((time) => toMinutes(time) > toMinutes(startTime));
 
   // new start keeps the same length of class
@@ -90,6 +98,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
         (item.venue.toLowerCase() === room.toLowerCase() || item.tutorId === classItem.tutorId)
     );
 
+  // add btn - check the form, then add the extra class
   async function handleSubmit(event) {
     event.preventDefault();
     const ok = validate({
@@ -111,6 +120,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
     }
   }
 
+  // the pop-up - calendar, the day's classes, times, hall, note and buttons
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="extra-class-title">
       <div className="modal-dialog modal-wide">
@@ -124,8 +134,10 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
         <Alert type="error" message={loadError || formError} />
 
         <form onSubmit={handleSubmit} noValidate>
+          {/* calendar and the classes booked on the chosen day */}
           <div className="schedule-picker">
             <div>
+              {/* calendar - a dot marks the days the hall is already in use */}
               <MonthCalendar
                 selectedDate={date}
                 onSelectDate={(dateKey) => {
@@ -146,6 +158,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
               {fieldErrors.date && <p className="field-error">{fieldErrors.date}</p>}
             </div>
 
+            {/* classes booked on the chosen day */}
             <div className="day-agenda">
               {!date ? (
                 <p className="muted" style={{ margin: 0 }}>
@@ -184,6 +197,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
             </div>
           </div>
 
+          {/* start and end time */}
           <div className="card-field-row">
             <div className="form-field">
               <label htmlFor="extra-start">Start time</label>
@@ -227,6 +241,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
             </div>
           </div>
 
+          {/* hall / venue - suggests the halls already used */}
           <div className="form-field">
             <label htmlFor="extra-venue">Hall / venue</label>
             <input
@@ -248,6 +263,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
             {fieldErrors.venue && <p className="field-error">{fieldErrors.venue}</p>}
           </div>
 
+          {/* note for students */}
           <div className="form-field">
             <label htmlFor="extra-note">Note for students (optional)</label>
             <input
@@ -259,6 +275,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
             />
           </div>
 
+          {/* clash warning - the hall or the tutor is already busy */}
           {clash && (
             <p className="field-error" role="alert">
               {clash.venue.toLowerCase() === room.toLowerCase()
@@ -268,6 +285,7 @@ function ExtraClassModal({ classItem, onClose, onSaved }) {
             </p>
           )}
 
+          {/* close and add buttons */}
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSaving}>
               Close

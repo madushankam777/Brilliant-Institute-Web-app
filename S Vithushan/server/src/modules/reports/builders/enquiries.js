@@ -3,9 +3,12 @@ const parts = require('../reportParts');
 
 const { num, percent, kpi, table, bars, section, rows } = parts;
 
+// the Contact Us topics
 const TOPICS = ['ADMISSIONS', 'CLASSES', 'FEES', 'TECHNICAL', 'OTHER'];
 
+// enquiries report - messages from the Contact Us page, by topic, with reply times
 async function build(params, { period }) {
+  // messages received in the period, with the hours until they were handled
   const messages = await rows(
     `SELECT m.created_at, m.full_name, m.email, m.phone, m.topic, m.status, m.handled_at, u.full_name AS handled_by,
             TIMESTAMPDIFF(MINUTE, m.created_at, m.handled_at) / 60 AS hours
@@ -14,12 +17,17 @@ async function build(params, { period }) {
      ORDER BY m.created_at ASC`,
     [period.start, period.end]
   );
+  // messages still NEW, from any date
   const waitingAll = await rows(`SELECT COUNT(*) AS total FROM contact_messages WHERE status = 'NEW'`);
 
+  // answered messages
   const handled = messages.filter((item) => item.status === 'HANDLED');
+  // messages not answered yet
   const waiting = messages.filter((item) => item.status !== 'HANDLED');
+  // answered messages that have a reply time
   const timed = handled.filter((item) => item.hours !== null);
   const averageHours = timed.length ? timed.reduce((sum, item) => sum + num(item.hours), 0) / timed.length : null;
+  // per topic - received, handled and waiting
   const topicRows = TOPICS.map((topic) => {
     const list = messages.filter((item) => item.topic === topic);
     return {
@@ -30,12 +38,14 @@ async function build(params, { period }) {
     };
   });
 
+  // the key findings
   const highlights = [`${messages.length} enquiry message(s) arrived and ${handled.length} were answered.`];
   const top = [...topicRows].sort((a, b) => b.received - a.received)[0];
   if (top && top.received > 0) highlights.push(`Most enquiries were about ${top.topic.toLowerCase()} (${top.received}).`);
   if (averageHours !== null) highlights.push(`Messages were answered in ${parts.formatHours(averageHours)} on average.`);
   if (num(waitingAll[0]?.total) > 0) highlights.push(`${num(waitingAll[0].total)} message(s) are still waiting for a reply.`);
 
+  // the report - title, key figures, key findings and sections
   return {
     title: 'Enquiries Report',
     subtitle: 'Messages sent from the Contact Us page',

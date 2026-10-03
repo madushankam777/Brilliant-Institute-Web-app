@@ -11,12 +11,15 @@ import Alert from '../../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// payment verification - check the bank slips students upload, and record office payments
 function PaymentVerificationPage() {
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,6 +39,7 @@ function PaymentVerificationPage() {
       setErrorMessage(error.message);
     } finally {
       setIsLoading(false);
+    // fail silently, not critical
     }
   }, []);
 
@@ -128,6 +132,7 @@ function PaymentVerificationPage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px' }}>
+                          {/* mark attendance btn - opens today's attendance sheet */}
                           <button
                             type="button"
                             className="btn btn-primary btn-sm"
@@ -135,6 +140,7 @@ function PaymentVerificationPage() {
                           >
                             Approve
                           </button>
+                          {/* delete key btn - asks to confirm */}
                           <button
                             type="button"
                             className="btn btn-danger btn-sm"

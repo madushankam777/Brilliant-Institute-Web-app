@@ -10,6 +10,7 @@ import { todayKey } from '../../../../shared/client/src/utils/schedule';
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
+// a blank bank details form
 const EMPTY_BANK_FORM = { bankName: '', accountHolder: '', accountNumber: '', branch: '' };
 
 // this month and the 11 before it, e.g. "September 2026"
@@ -23,9 +24,11 @@ function recentMonths() {
   return months;
 }
 
+// copy btn - copies the text and shows Copied for 1.5 seconds
 function CopyButton({ value }) {
   const [copied, setCopied] = useState(false);
 
+  // copy the value to the clipboard
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);
@@ -43,7 +46,9 @@ function CopyButton({ value }) {
   );
 }
 
+// pay a tutor pop-up - the institute's account, the tutor's bank account, then the payout form
 function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
+  // the tutor's bank account and the bank form
   const [account, setAccount] = useState(null);
   const [accountError, setAccountError] = useState('');
   const [isEditingBank, setIsEditingBank] = useState(!tutor.hasBankDetails);
@@ -51,6 +56,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
   const [isSavingBank, setIsSavingBank] = useState(false);
   const bankErrors = useFormErrors();
 
+  // the payout form - how it is paid, amount, month, note and bank reference
   const [method, setMethod] = useState('BANK_TRANSFER');
   const [amount, setAmount] = useState('');
   const [periodLabel, setPeriodLabel] = useState(recentMonths()[0]);
@@ -60,6 +66,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
 
+  // load the tutor's payout account into the bank form
   const loadAccount = useCallback(() => {
     fetchTutorPayoutAccount(tutor.id)
       .then((data) => {
@@ -74,12 +81,14 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
       .catch((error) => setAccountError(error.message));
   }, [tutor.id]);
 
+  // load it when the pop-up opens
   useEffect(() => {
     loadAccount();
   }, [loadAccount]);
 
   const hasAccount = Boolean(account && account.accountNumber);
 
+  // save bank details btn - update the tutor's account (the tutor is told)
   async function handleSaveBank() {
     const isValid = bankErrors.validate({
       bankName: !bankForm.bankName.trim() && 'Enter the bank name.',
@@ -105,6 +114,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
     }
   }
 
+  // pay btn - check the form, then record the tutor's payout
   async function handleSubmit(event) {
     event.preventDefault();
     const value = Number(amount);
@@ -141,12 +151,15 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
     }
   }
 
+  // the ways it can be paid - bank transfer, bank file or a payout api when set up
   const methods = [{ value: 'BANK_TRANSFER', label: 'Paid by bank transfer' }];
   if (options && options.bulkFileAvailable) methods.push({ value: 'BANK_FILE', label: 'Add to bank file' });
   if (options && options.apiAvailable) methods.push({ value: 'PAYOUT_API', label: `Send via ${options.apiName}` });
 
+  // the institute's account the money is paid from
   const source = options ? options.sourceAccount : null;
 
+  // the pop-up - the two accounts, then the payout form
   return (
     <div className="modal-overlay" onClick={() => !isSubmitting && onClose()}>
       <div
@@ -166,6 +179,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
         </div>
         <p className="muted" style={{ marginTop: 0 }}>{tutor.email}</p>
 
+        {/* from - the institute's bank account */}
         <div className="transfer-box soft">
           <p className="transfer-box-title">
             <span>
@@ -194,6 +208,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
           )}
         </div>
 
+        {/* to - the tutor's bank account, with a change btn */}
         <div className="transfer-box">
           <p className="transfer-box-title">
             <span>
@@ -208,6 +223,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
 
           <Alert type="error" message={accountError} />
 
+          {/* bank form, a loading text, the saved account, or a no account message */}
           {isEditingBank ? (
             <>
               <p className="muted" style={{ fontSize: '0.84rem', marginTop: 0 }}>
@@ -319,6 +335,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
           {fieldErrors.account && <p className="field-error">{fieldErrors.account}</p>}
         </div>
 
+        {/* payout form - amount, month, note and how it is paid */}
         <form onSubmit={handleSubmit} noValidate>
           <div className="card-field-row">
             <div className="form-field">
@@ -360,6 +377,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
             />
           </div>
 
+          {/* how it is paid - shown only when there is more than one way */}
           {methods.length > 1 && (
             <div className="form-field">
               <label>How is it being paid?</label>
@@ -380,6 +398,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
             </div>
           )}
 
+          {/* bank reference and transfer date */}
           {method === 'BANK_TRANSFER' && (
             <>
               <p className="field-help" style={{ marginTop: 0, marginBottom: '12px' }}>
@@ -422,6 +441,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
             </>
           )}
 
+          {/* bank file note - download the file, upload it to the bank, then mark it paid */}
           {method === 'BANK_FILE' && (
             <p className="field-help" style={{ marginTop: 0 }}>
               The payout waits in the bank file. Download the file from this page, upload it to your
@@ -431,6 +451,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
 
           <Alert type="error" message={formError} />
 
+          {/* cancel and record payment btns */}
           <div className="flex-between" style={{ marginTop: '18px' }}>
             <button type="button" className="btn btn-secondary" disabled={isSubmitting} onClick={onClose}>
               Cancel

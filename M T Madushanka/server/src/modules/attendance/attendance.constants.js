@@ -5,6 +5,7 @@ const ATTENDANCE_STATUS = Object.freeze({
   LATE: 'LATE',
 });
 
+// the allowed statuses as a list, for validation
 const VALID_ATTENDANCE_STATUSES = Object.values(ATTENDANCE_STATUS);
 
 // attendance key stays valid this many minutes after the tutor generates it

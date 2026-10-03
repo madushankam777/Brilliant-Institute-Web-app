@@ -6,6 +6,7 @@ const robotoFonts = require('pdfmake/fonts/Roboto');
 const config = require('../../../../../shared/server/src/config/env');
 const { runInWorker } = require('../../../../../shared/server/src/utils/workerPool');
 
+// report colours - navy, ink, muted grey, line, soft and zebra backgrounds, gold and bar blue
 const NAVY = '#1e3a8a';
 const INK = '#0f172a';
 const MUTED = '#64748b';
@@ -14,14 +15,20 @@ const SOFT = '#f4f6fb';
 const ZEBRA = '#f8fafc';
 const GOLD = '#c9a961';
 const BAR = '#2563eb';
+// status colours - green, amber, red and grey
 const TONE_COLORS = { success: '#15803d', warning: '#b45309', danger: '#b91c1c', neutral: '#475569', default: NAVY };
 
+// left and right page margin
 const MARGIN_X = 40;
+// A4 size in points, portrait and landscape
 const PAGE = { portrait: [595.28, 841.89], landscape: [841.89, 595.28] };
 
+// folder of the Roboto fonts - the only place the PDF code may read from
 const FONT_DIR = path.dirname(robotoFonts.Roboto.normal);
+// the institute logo as an embedded image
 const LOGO = `data:image/jpeg;base64,${fs.readFileSync(path.join(__dirname, 'assets', 'logo.jpeg')).toString('base64')}`;
 
+// use the Roboto fonts
 pdfmake.setFonts(robotoFonts);
 // no web downloads, and only the font folder may be read from disk
 pdfmake.setUrlAccessPolicy(() => false);
@@ -45,6 +52,7 @@ const tableLayout = {
   paddingBottom: (i, node) => (i < (node.table.captionRows || 0) ? 0 : 3.5),
 };
 
+// a table with no lines and no padding - used to lay things out side by side
 const plainLayout = {
   hLineWidth: () => 0,
   vLineWidth: () => 0,
@@ -54,6 +62,7 @@ const plainLayout = {
   paddingBottom: () => 0,
 };
 
+// usable page width inside the margins
 function contentWidth(orientation) {
   return PAGE[orientation][0] - MARGIN_X * 2;
 }
@@ -190,6 +199,7 @@ function findingsBox(highlights) {
   };
 }
 
+// a data table - title rows, a navy header row, striped rows and an optional totals row
 function tableBlock(block, caption = '') {
   if (block.rows.length === 0) {
     const empty = [
@@ -208,6 +218,7 @@ function tableBlock(block, caption = '') {
   const captions = [];
   if (caption) captions.push(spanRow(caption, 'subheading'));
   if (block.title) captions.push(spanRow(block.title, 'blockTitle'));
+  // the column headings
   const header = block.columns.map((column) => ({ text: column.label, style: 'th', alignment: column.align }));
   const body = [...captions, header];
   block.rows.forEach((row) => {
@@ -255,6 +266,7 @@ function barsBlock(block, width) {
   const labelWidth = Math.min(170, width * 0.32);
   const valueWidth = 78;
   const barWidth = width - labelWidth - valueWidth - 16;
+  // one row per item - a label, a bar and the value
   const body = block.items.map((item) => {
     const length = Math.max(1.5, (item.value / block.max) * barWidth);
     return [
@@ -287,12 +299,14 @@ function columnsBlock(block, width) {
   const cellWidth = width / count;
   const barWidth = Math.max(4, Math.min(34, cellWidth * 0.62));
   const small = count > 14;
+  // the values above the columns
   const valueRow = block.items.map((item) => ({
     text: small ? '' : item.display,
     fontSize: 6.8,
     color: MUTED,
     alignment: 'center',
   }));
+  // the columns themselves, scaled to the highest value
   const barRow = block.items.map((item) => {
     const height = Math.max(item.value > 0 ? 1.5 : 0, (item.value / block.max) * chartHeight);
     return {
@@ -302,6 +316,7 @@ function columnsBlock(block, width) {
       ],
     };
   });
+  // the labels under the columns
   const labelRow = block.items.map((item, index) => ({
     text: small && index % Math.ceil(count / 12) !== 0 ? '' : item.label,
     fontSize: 6.8,
@@ -313,6 +328,7 @@ function columnsBlock(block, width) {
     layout: { ...plainLayout, paddingTop: () => 1, paddingBottom: () => 1 },
   });
   if (small) {
+    // the highest column
     const peak = block.items.reduce((best, item) => (item.value > best.value ? item : best), block.items[0]);
     parts.push({ text: `Highest: ${peak.label} (${peak.display})`, style: 'tableNote' });
   }
@@ -348,6 +364,7 @@ function factsBlock(block) {
   return { stack: parts.filter(Boolean), margin: [0, 2, 0, 12], unbreakable: true };
 }
 
+// signature lines - Prepared by, Checked by, Approved by
 function signaturesBlock(block) {
   return {
     columns: block.items.map((role) => ({
@@ -364,6 +381,7 @@ function signaturesBlock(block) {
   };
 }
 
+// pick the right drawing function for a block type
 function renderBlock(block, width, orientation) {
   if (block.type === 'table') return tableBlock(block);
   if (block.type === 'bars') return barsBlock(block, width);
@@ -403,6 +421,7 @@ function renderBlocks(blocks, width, orientation) {
   return content.filter(Boolean);
 }
 
+// a section - numbered heading with a gold number and a rule, its intro, then its blocks
 function sectionContent(section, index, width, orientation) {
   const heading = {
     stack: [
@@ -419,6 +438,7 @@ function sectionContent(section, index, width, orientation) {
   return [heading, ...renderBlocks(section.blocks, width, orientation)];
 }
 
+// the whole PDF - title, details box, key figures, key findings, the sections, and the page header and footer
 function buildDocDefinition(report) {
   const orientation = report.orientation === 'landscape' ? 'landscape' : 'portrait';
   const width = contentWidth(orientation);

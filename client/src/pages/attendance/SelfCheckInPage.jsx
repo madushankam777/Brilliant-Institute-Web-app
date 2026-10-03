@@ -7,6 +7,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// check-in page - the student types the 6-digit key the tutor shows in class
 function SelfCheckInPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
@@ -16,6 +17,7 @@ function SelfCheckInPage() {
   const [codeError, setCodeError] = useState('');
   const [result, setResult] = useState(null); // { success, message }
 
+  // check in btn - the key must be exactly 6 digits, then it is sent to the server
   async function handleSubmit(event) {
     event.preventDefault();
     setResult(null);
@@ -46,6 +48,7 @@ function SelfCheckInPage() {
     }
   }
 
+  // the page - the key form and the result
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -55,6 +58,7 @@ function SelfCheckInPage() {
 
           {result && <Alert type={result.success ? 'success' : 'error'} message={result.message} />}
 
+          {/* key form */}
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-field">
             <label htmlFor="checkinCode">Attendance key</label>

@@ -11,6 +11,7 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import { useAuth } from '../../context/AuthContext';
 import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
+// mark attendance page - the classes I teach, one click opens today's attendance sheet
 function ClassSessionsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -23,6 +24,7 @@ function ClassSessionsPage() {
   const [openingId, setOpeningId] = useState(null);
   const [openError, setOpenError] = useState('');
 
+  // load the classes I teach
   useEffect(() => {
     let isMounted = true;
     fetchMyTaughtClasses()
@@ -53,6 +55,7 @@ function ClassSessionsPage() {
     }
   }
 
+  // the page - the classes table with a Mark attendance button on each class
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">

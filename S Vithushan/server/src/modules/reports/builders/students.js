@@ -11,6 +11,7 @@ const { num, percent, kpi, table, bars, facts, tiles, heading, section, rows, on
 // more than this in one file is too slow - filter by grade instead
 const MAX_FULL = 150;
 
+// student report - one student in full, or every student (with a full report for each when asked)
 async function build(params, context) {
   if (params.studentId) return buildOne(params.studentId, context);
   return buildAll(params, context);
@@ -18,6 +19,7 @@ async function build(params, context) {
 
 // --- one student's complete picture, used for single and "every student" reports ---
 async function studentDetail(student, { period, threshold }) {
+  // the student's classes with fees and balance
   const enrolments = await rows(
     `SELECT e.status, e.balance, e.payment_status, e.enrolled_at, e.drop_date, c.subject, c.level, c.venue,
             c.day_of_week, c.start_time, c.end_time, c.fee, u.full_name AS tutor_name
@@ -28,6 +30,7 @@ async function studentDetail(student, { period, threshold }) {
      ORDER BY e.status, c.subject`,
     [student.id]
   );
+  // the student's payments in the period
   const payments = await rows(
     `SELECT COALESCE(p.paid_at, p.created_at) AS date, p.amount, p.status, p.payment_method, r.receipt_number, c.subject
      FROM payments p
@@ -38,10 +41,12 @@ async function studentDetail(student, { period, threshold }) {
      ORDER BY date ASC`,
     [student.id, period.start, period.end]
   );
+  // everything the student has paid since joining
   const allTime = await one(
     `SELECT COUNT(*) AS payments, COALESCE(SUM(amount), 0) AS total FROM payments WHERE student_id = ? AND status = 'SUCCESSFUL'`,
     [student.id]
   );
+  // attendance per class in the period
   const attendance = await rows(
     `SELECT c.subject, COUNT(*) AS marks, SUM(ar.status = 'PRESENT') AS present, SUM(ar.status = 'LATE') AS late,
             SUM(ar.status = 'ABSENT') AS absent, SUM(ar.marked_by = ar.student_id) AS self_checkins
@@ -53,6 +58,7 @@ async function studentDetail(student, { period, threshold }) {
      ORDER BY c.subject`,
     [student.id, period.from, period.to]
   );
+  // the latest 100 attendance marks
   const log = await rows(
     `SELECT cs.session_date, c.subject, ar.status, ar.remarks, ar.marked_at, ar.marked_by, mu.full_name AS marked_by_name
      FROM attendance_records ar
@@ -64,17 +70,20 @@ async function studentDetail(student, { period, threshold }) {
      LIMIT 100`,
     [student.id, period.from, period.to]
   );
+  // feedback tickets the student sent
   const tickets = await rows(
     `SELECT ticket_number, created_at, category, subject, priority, status, resolved_at, JSON_LENGTH(responses) AS replies
      FROM feedback_complaints WHERE submitted_by = ? ORDER BY created_at DESC LIMIT 50`,
     [student.id]
   );
+  // notifications sent to the student in the period
   const notices = await rows(
     `SELECT sent_at, type, message FROM notification_log
      WHERE recipient_id = ? AND sent_at >= ? AND sent_at < ? AND sent_at <= NOW()
      ORDER BY sent_at DESC`,
     [student.id, period.start, period.end]
   );
+  // re-registration keys (only when that update is applied)
   let rereg = null;
   if (await schema.hasReregistration()) {
     rereg = await rows(
@@ -83,19 +92,26 @@ async function studentDetail(student, { period, threshold }) {
       [student.id]
     );
   }
+  // what the student did on the site, and what staff did on their account
   const activity = await getActivity(student.id, period);
   const staffActions = await getStaffActions(student.id, period);
 
+  // the classes the student is in now
   const active = enrolments.filter((item) => item.status === 'ACTIVE');
+  // total balance owed
   const owed = active.reduce((sum, item) => sum + num(item.balance), 0);
+  // paid in the period
   const paid = payments.filter((item) => item.status === 'SUCCESSFUL').reduce((sum, item) => sum + num(item.amount), 0);
+  // attendance marks, and how many were attended
   const marks = attendance.reduce((sum, item) => sum + num(item.marks), 0);
   const attended = attendance.reduce((sum, item) => sum + num(item.present) + num(item.late), 0);
+  // times the student checked in with the class code
   const selfCheckins = attendance.reduce((sum, item) => sum + num(item.self_checkins), 0);
   const rate = percent(attended, marks);
   const openTickets = tickets.filter((item) => item.status !== 'RESOLVED').length;
   const signIns = activity.filter((item) => item.action === 'LOGIN_SUCCESS').length;
 
+  // the key findings
   const highlights = [
     `${student.full_name} is enrolled in ${active.length} active class${active.length === 1 ? '' : 'es'}.`,
     owed > 0 ? `An unpaid balance of LKR ${money(owed)} is outstanding.` : 'All class fees are fully paid.',
@@ -114,6 +130,7 @@ async function studentDetail(student, { period, threshold }) {
   const noticeTypes = new Map();
   notices.forEach((item) => noticeTypes.set(item.type, (noticeTypes.get(item.type) || 0) + 1));
 
+  // the parts of the report - profile, classes, fees, attendance, feedback, messages, activity
   const groups = [
     {
       title: 'Student profile',
@@ -267,6 +284,7 @@ async function studentDetail(student, { period, threshold }) {
     },
   ].filter(Boolean);
 
+  // what the report needs from this student - the figures, key findings and groups
   return {
     kpis: [
       kpi('Active classes', active.length),
@@ -283,6 +301,7 @@ async function studentDetail(student, { period, threshold }) {
 
 // one student, each part as its own numbered section
 async function buildOne(studentId, context) {
+  // the student must exist and not be deleted
   const student = await one(`SELECT * FROM users WHERE id = ? AND role = 'STUDENT_PARENT' AND status <> 'DELETED'`, [studentId]);
   if (!student.id) throw ApiError.notFound('Student not found.');
   const detail = await studentDetail(student, context);
@@ -300,39 +319,47 @@ async function buildOne(studentId, context) {
 // --- all students ---
 async function buildAll(params, context) {
   const { period, threshold } = context;
+  // a full report for every student, when asked
   const full = params.detail === 'full';
   const filter = params.grade ? 'AND grade = ?' : '';
+  // the students to report on, optionally only one grade
   const students = await rows(
     `SELECT * FROM users
      WHERE role = 'STUDENT_PARENT' AND status <> 'DELETED' ${filter}
      ORDER BY full_name`,
     params.grade ? [params.grade] : []
   );
+  // a full report for too many students is slow - ask for a grade
   if (full && students.length > MAX_FULL) {
     throw ApiError.badRequest(`${students.length} students is too many for one file. Choose a grade to split the report.`, [
       { field: 'grade', message: `Choose a grade - full reports are limited to ${MAX_FULL} students per file.` },
     ]);
   }
+  // classes and unpaid balances per student
   const enrolments = await rows(
     `SELECT student_id, COUNT(*) AS classes, SUM(balance) AS owed, SUM(balance > 0) AS owing_classes
      FROM enrollments WHERE status = 'ACTIVE' GROUP BY student_id`
   );
+  // fees paid per student in the period
   const paid = await rows(
     `SELECT student_id, COUNT(*) AS payments, SUM(amount) AS total
      FROM payments WHERE status = 'SUCCESSFUL' AND paid_at >= ? AND paid_at < ?
      GROUP BY student_id`,
     [period.start, period.end]
   );
+  // sign-ins per student in the period
   const signIns = await rows(
     `SELECT actor_id, COUNT(*) AS total FROM audit_log
      WHERE action = 'LOGIN_SUCCESS' AND created_at >= ? AND created_at < ? GROUP BY actor_id`,
     [period.start, period.end]
   );
+  // attendance rate per student
   const attendance = await data.getAttendanceByStudent(period);
   const enrolmentMap = data.byId(enrolments, 'student_id');
   const paidMap = data.byId(paid, 'student_id');
   const signInMap = data.byId(signIns, 'actor_id');
 
+  // one row per student for the register table
   const register = students.map((student) => {
     const enrolment = enrolmentMap.get(student.id) || {};
     return {
@@ -351,6 +378,7 @@ async function buildAll(params, context) {
     };
   });
 
+  // headline figures
   const active = students.filter((item) => item.status === 'ACTIVE').length;
   const newStudents = students.filter((item) => item.created_at >= period.start && item.created_at < period.end).length;
   const totalPaid = register.reduce((sum, item) => sum + item.paid, 0);
@@ -364,12 +392,16 @@ async function buildAll(params, context) {
     attended += value.attended;
   });
   const averageAttendance = percent(attended, marks);
+  // students below the attendance target
   const low = (await data.getLowAttendance(period, threshold)).filter((item) => ids.has(item.id));
+  // students who owe fees, biggest debt first
   const owing = register.filter((item) => item.owed > 0).sort((a, b) => b.owed - a.owed);
   const neverSignedIn = register.filter((item) => item.signIns === 0 && item.status === 'ACTIVE').length;
+  // active students per grade, for the bar chart
   const gradeCounts = GRADES.map((grade) => ({ label: grade, value: students.filter((item) => item.grade === grade && item.status === 'ACTIVE').length }))
     .filter((item) => item.value > 0);
 
+  // the key findings
   const highlights = [
     `${active} active student${active === 1 ? '' : 's'}${params.grade ? ` in ${params.grade}` : ''}; ${newStudents} joined during the period.`,
     `Students paid LKR ${money(totalPaid)} in fees during the period.`,
@@ -378,6 +410,7 @@ async function buildAll(params, context) {
   if (low.length > 0) highlights.push(`${new Set(low.map((item) => item.id)).size} student(s) are below the ${threshold}% attendance target.`);
   if (neverSignedIn > 0) highlights.push(`${neverSignedIn} active student(s) did not sign in to the site during the period.`);
 
+  // the sections - students by grade, the register, outstanding balances and low attendance
   const sections = [
     section('Students by grade', [bars('Active students in each grade', gradeCounts, 'number', { emptyText: 'No active students.' })]),
     section('Student register', [
@@ -448,6 +481,7 @@ async function buildAll(params, context) {
     }
   }
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'Student Report',
     subtitle: `${params.grade ? `${params.grade} students` : 'All students'} - ${full ? 'register plus a full report for each student' : 'enrolments, fees, attendance and activity'}`,

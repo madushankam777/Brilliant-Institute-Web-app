@@ -14,6 +14,7 @@ const ACCOUNT_NUMBER_REGEX = /^[0-9 -]{4,34}$/;
 // Sri Lankan mobile number - what eZ Cash / mCash are actually tied to.
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
+// a blank settings form
 const EMPTY_FORM = {
   bankName: '',
   bankAccountName: '',
@@ -33,6 +34,7 @@ function PaymentSettingsPage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // load the saved settings when the page opens
   useEffect(() => {
     let isMounted = true;
     fetchPaymentSettings()
@@ -113,6 +115,7 @@ function PaymentSettingsPage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* a spinner, or the settings form */}
         {isLoading ? (
           <LoadingSpinner label="Loading payment settings..." />
         ) : (
@@ -161,6 +164,7 @@ function PaymentSettingsPage() {
                 />
               </div>
 
+              {/* mobile wallet numbers - eZ Cash and mCash */}
               <h2 style={{ fontSize: '0.95rem', marginTop: '24px' }}>Mobile wallets</h2>
               <p className="field-help" style={{ marginTop: '-8px' }}>
                 Shown to students so they know which number to send their eZ Cash / mCash payment to.
@@ -187,6 +191,7 @@ function PaymentSettingsPage() {
                 />
               </div>
 
+              {/* save btn */}
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
                 {isSaving ? 'Saving...' : 'Save payment settings'}
               </button>

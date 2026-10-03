@@ -4,8 +4,10 @@ const bcrypt = require('bcryptjs');
 const config = require('../../shared/server/src/config/env');
 const { pool } = require('../../shared/server/src/config/db');
 
+// password for every sample account
 const PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Demo@1234';
 
+// sample tutors with their bank details (for tutor payouts)
 const TUTORS = [
   {
     email: 'tutor@brilliant.test',
@@ -28,6 +30,7 @@ const TUTORS = [
   },
 ];
 
+// sample students in different grades
 const STUDENTS = [
   { email: 'student@brilliant.test', fullName: 'Demo Student', grade: 'Grade 10' },
   { email: 'amaya.fernando@brilliant.test', fullName: 'Amaya Fernando', grade: 'Grade 6', phone: '+94 70 111 2233' },
@@ -38,6 +41,7 @@ const STUDENTS = [
   { email: 'pasindu.gamage@brilliant.test', fullName: 'Pasindu Gamage', grade: 'A/L', phone: '+94 77 666 7788' },
 ];
 
+// sample classes and the students enrolled in each
 const CLASSES = [
   { tutor: 'nimal.perera@brilliant.test', subject: 'A/L Physics - Theory', area: 'Physics', level: 'A/L',
     venue: 'Hall B', day: 'Sunday', start: '08:00', end: '11:00', fee: 4500, students: ['pasindu.gamage@brilliant.test'] },
@@ -49,18 +53,22 @@ const CLASSES = [
     students: ['amaya.fernando@brilliant.test', 'dinuk.jayasinghe@brilliant.test', 'sithmi.rathnayake@brilliant.test'] },
 ];
 
+// sample tutor payouts that are already paid
 const PAYOUTS = [
   { tutor: 'nimal.perera@brilliant.test', amount: 36000, period: 'August 2026', note: 'Monthly class fees share' },
   { tutor: 'kavindi.silva@brilliant.test', amount: 28500, period: 'August 2026', note: 'Monthly class fees share' },
 ];
 
+// counts the rows this run added
 let added = 0;
 
+// user id for an email, or null
 async function idByEmail(email) {
   const [rows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
   return rows[0] ? rows[0].id : null;
 }
 
+// create the user if the email is new
 async function ensureUser({ email, fullName, role, phone, bio, grade }) {
   const existing = await idByEmail(email);
   if (existing) return existing;
@@ -74,10 +82,13 @@ async function ensureUser({ email, fullName, role, phone, bio, grade }) {
   return result.insertId;
 }
 
+// add the sample tutors, students, classes, enrolments and payouts - nothing is overwritten
 async function main() {
+  // an admin to record the payouts against
   const [admins] = await pool.execute("SELECT id FROM users WHERE role = 'ADMIN' ORDER BY id LIMIT 1");
   const adminId = admins[0] ? admins[0].id : null;
 
+  // tutors
   for (const tutor of TUTORS) {
     const id = await ensureUser({ ...tutor, role: 'TUTOR' });
     // only fill bank details that are missing - never overwrite real ones
@@ -88,6 +99,7 @@ async function main() {
     );
   }
 
+  // students - grade and ST code
   for (const student of STUDENTS) {
     const id = await ensureUser({ ...student, role: 'STUDENT_PARENT' });
     await pool.execute(
@@ -98,6 +110,7 @@ async function main() {
     );
   }
 
+  // classes and their enrolments
   for (const c of CLASSES) {
     const tutorId = await idByEmail(c.tutor);
     const [existing] = await pool.execute('SELECT id FROM classes WHERE subject = ? AND tutor_id = ?', [c.subject, tutorId]);
@@ -128,6 +141,7 @@ async function main() {
     }
   }
 
+  // payouts - recorded as paid 20 days ago
   if (adminId) {
     for (const p of PAYOUTS) {
       const tutorId = await idByEmail(p.tutor);
@@ -149,6 +163,7 @@ async function main() {
   console.log(`Sample data ready (${added} new row(s)). Every sample account's password: ${PASSWORD}`);
 }
 
+// run it, then close the database connection
 main()
   .catch((error) => {
     console.error('Seeding failed:', error.message);

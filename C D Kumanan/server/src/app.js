@@ -1,3 +1,4 @@
+// this module's own small API (course routes) - the combined site uses server/src/app.js
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -13,11 +14,15 @@ const { notFoundHandler, errorHandler } = require('../../../shared/server/src/mi
 const sessionRoutes = require('./modules/session/session.routes');
 const courseRoutes = require('./modules/course/course.routes');
 
+// create the web server
 const app = express();
 
+// behind a proxy or tunnel, trust it for the real visitor address
 app.set('trust proxy', config.trustProxy);
+// standard security headers
 app.use(helmet());
 
+// CORS - only our own website may call the API (with cookies)
 app.use(
   cors({
     // CLIENT_ORIGIN can list more than one allowed origin
@@ -37,20 +42,26 @@ app.use(
   })
 );
 
+// read JSON request bodies (max 100 KB) and cookies
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
+// log every request
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
 
+// rate limit and CSRF check for every request below this line
 app.use(apiLimiter);
 app.use(csrfGuard);
 
+// health check - is the API up? (returns no data)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'API is running.' });
 });
 
 app.use('/api/session', sessionRoutes); // placeholder login only
+// this module's routes
 app.use('/api/courses', courseRoutes);
 
+// unknown address gives a 404, any other error gives a JSON error reply
 app.use(notFoundHandler);
 app.use(errorHandler);
 

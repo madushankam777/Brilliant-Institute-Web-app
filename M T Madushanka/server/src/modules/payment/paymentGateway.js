@@ -1,7 +1,10 @@
+// payment simulator - used when PayHere is not set up (no real money moves)
 const { randomUUID } = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 
+// pretend to charge - amounts divisible by 13 are declined, divisible by 17 time out, the rest are approved
 async function chargePaymentToken({ amount }) {
+  // a fake transaction id
   const gatewayTransactionId = `${config.paymentGateway.providerName}_${randomUUID()}`;
 
   if (amount <= 0) {

@@ -17,18 +17,23 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import { GRADES } from '../../../../shared/client/src/constants/grades';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
+// this year, and the years keys can be issued for
 const THIS_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = [THIS_YEAR, THIS_YEAR + 1];
 
+// how the admin chooses students - by class, grade or student
 const MODES = [
   { value: 'CLASS', label: 'By class', placeholder: 'Search classes or tutors...' },
   { value: 'GRADE', label: 'By grade', placeholder: 'Search grades...' },
   { value: 'STUDENTS', label: 'By student', placeholder: 'Search by name, grade, class or student code...' },
 ];
 
+// the status tabs for the issued keys
 const KEY_FILTERS = ['ALL', 'UNUSED', 'USED', 'REVOKED'];
 
+// a date as, for example, 12 Oct 2026
 function formatDate(value) {
   if (!value) return '-';
   return new Date(String(value).replace(' ', 'T')).toLocaleDateString('en-GB', {
@@ -38,15 +43,18 @@ function formatDate(value) {
   });
 }
 
+// does any of the values contain the search text
 function matches(term, values) {
   return values.filter(Boolean).some((value) => String(value).toLowerCase().includes(term));
 }
 
+// one value made safe for a csv file
 function csvCell(value) {
   const text = String(value === null || value === undefined ? '' : value);
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+// download list btn - save the new keys as a csv file
 function downloadKeysCsv(keys) {
   const header = ['Student', 'Student code', 'From grade', 'To grade', 'Academic year', 'Key', 'Valid until'];
   const rows = keys.map((key) => [
@@ -69,7 +77,9 @@ function downloadKeysCsv(keys) {
   URL.revokeObjectURL(url);
 }
 
+// re-registration - issue one-time keys to returning students, then preview or run the January roll-over
 function ReregistrationPage() {
+  // the academic year, the lists and the page state
   const [year, setYear] = useState(THIS_YEAR + 1);
   const [options, setOptions] = useState({ students: [], classes: [], grades: [] });
   const [keys, setKeys] = useState([]);
@@ -88,22 +98,26 @@ function ReregistrationPage() {
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
 
+  // the issued keys list - search, tab and messages
   const [keySearch, setKeySearch] = useState('');
   const [keyFilter, setKeyFilter] = useState('ALL');
   const [listMessage, setListMessage] = useState(null); // { type, text }
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
+  // the roll-over preview and its state
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
+  // load the keys issued for the year
   const loadKeys = useCallback(async () => {
     setKeys(await fetchReregistrationKeys(year));
   }, [year]);
 
+  // load the choices and the keys when the page opens or the year changes
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -121,12 +135,14 @@ function ReregistrationPage() {
     };
   }, [year]);
 
+  // tab - choose students by class, grade or student
   function changeMode(nextMode) {
     setMode(nextMode);
     setSearch('');
     setGenerateError('');
   }
 
+  // the classes, grades and students that match the search box
   const term = search.trim().toLowerCase();
   const visibleClasses = options.classes.filter((item) => matches(term, [item.subject, item.level, item.tutorName]));
   const visibleGrades = options.grades.filter((item) => matches(term, [item.grade]));
@@ -134,22 +150,26 @@ function ReregistrationPage() {
     matches(term, [item.fullName, item.email, item.studentCode, item.grade, item.classNames])
   );
 
+  // the chosen class or grade, and how many students will get a key
   const chosenClass = options.classes.find((item) => item.id === classId);
   const chosenGrade = options.grades.find((item) => item.grade === grade);
   let chosenCount = studentIds.length;
   if (mode === 'CLASS') chosenCount = chosenClass ? chosenClass.studentCount : 0;
   if (mode === 'GRADE') chosenCount = chosenGrade ? chosenGrade.studentCount : 0;
 
+  // tick or untick one student
   function toggleStudent(studentId) {
     setStudentIds((previous) =>
       previous.includes(studentId) ? previous.filter((id) => id !== studentId) : [...previous, studentId]
     );
   }
 
+  // select all shown btn - tick every student in the list
   function selectAllShown() {
     setStudentIds((previous) => [...new Set([...previous, ...visibleStudents.map((item) => item.id)])]);
   }
 
+  // generate keys btn - ask the server to make one key per chosen student
   async function handleGenerate() {
     setGenerateError('');
     setResult(null);
@@ -185,6 +205,7 @@ function ReregistrationPage() {
     }
   }
 
+  // copy all btn - copy every new key
   async function copyAllKeys() {
     const text = result.issued.map((key) => `${key.studentName} (${key.toGrade}): ${key.keyCode}`).join('\n');
     try {
@@ -195,6 +216,7 @@ function ReregistrationPage() {
     }
   }
 
+  // confirm delete btn - delete a key
   async function handleDelete(keyId) {
     setListMessage(null);
     setDeletingId(keyId);
@@ -210,6 +232,7 @@ function ReregistrationPage() {
     }
   }
 
+  // revoke btn - cancel an unused key so a new one can be issued
   async function handleRevoke(keyId) {
     setListMessage(null);
     try {
@@ -221,6 +244,7 @@ function ReregistrationPage() {
     }
   }
 
+  // preview btn - show who the roll-over would move up, close or graduate
   async function handlePreview() {
     setPreviewError('');
     setIsPreviewing(true);
@@ -233,6 +257,7 @@ function ReregistrationPage() {
     }
   }
 
+  // run roll-over btn - run the 1 January roll-over now
   async function handleRun() {
     setPreviewError('');
     setIsRunning(true);
@@ -253,14 +278,17 @@ function ReregistrationPage() {
     }
   }
 
+  // the issued keys matching the search and the tab
   const keyTerm = keySearch.trim().toLowerCase();
   const visibleKeys = keys.filter(
     (key) =>
       (keyFilter === 'ALL' || key.status === keyFilter) &&
       matches(keyTerm, [key.studentName, key.studentEmail, key.studentCode, key.fromGrade, key.toGrade, key.classNames])
   );
+  // the text for the chosen tab
   const modeInfo = MODES.find((item) => item.value === mode);
 
+  // the page - academic year, issue keys, the new keys, the issued keys and the roll-over
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -278,6 +306,7 @@ function ReregistrationPage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* academic year */}
         <div className="card">
           <div className="form-field" style={{ maxWidth: '240px', marginBottom: 0 }}>
             <label htmlFor="academicYear">Academic year</label>
@@ -299,13 +328,16 @@ function ReregistrationPage() {
           </div>
         </div>
 
+        {/* a spinner, or the cards */}
         {isLoading ? (
           <LoadingSpinner label="Loading students..." />
         ) : (
           <>
+            {/* issue keys - choose students, then generate */}
             <div className="card">
               <h2>Issue keys</h2>
 
+              {/* tabs - by class, by grade, by student */}
               <div className="form-field">
                 <label>Choose students</label>
                 <div className="period-tabs" role="tablist" aria-label="Choose students">
@@ -324,6 +356,7 @@ function ReregistrationPage() {
                 </div>
               </div>
 
+              {/* search box */}
               <div className="search-input">
                 <span className="input-icon">
                   <Icon name="search" size={16} />
@@ -337,6 +370,7 @@ function ReregistrationPage() {
                 />
               </div>
 
+              {/* select all shown and clear btns */}
               {mode === 'STUDENTS' && (
                 <div className="pick-toolbar">
                   <span>{studentIds.length} selected</span>
@@ -351,6 +385,7 @@ function ReregistrationPage() {
                 </div>
               )}
 
+              {/* the list to pick from - classes, grades or students */}
               <div className="pick-list">
                 {mode === 'CLASS' &&
                   (visibleClasses.length === 0 ? (
@@ -403,6 +438,7 @@ function ReregistrationPage() {
                   ))}
               </div>
 
+              {/* the grade they move into, and the generate btn */}
               <div className="inline-form" style={{ marginTop: '16px' }}>
                 <div className="form-field" style={{ flex: 1, minWidth: '220px', marginBottom: 0 }}>
                   <label htmlFor="toGrade">Moving into</label>
@@ -429,6 +465,7 @@ function ReregistrationPage() {
               <Alert type="error" message={generateError} />
             </div>
 
+            {/* the new keys - shown once, with Copy all and Download list */}
             {result && (
               <div className="card">
                 <div className="flex-between" style={{ marginBottom: '8px' }}>
@@ -447,6 +484,7 @@ function ReregistrationPage() {
                   )}
                 </div>
 
+                {/* the new keys table */}
                 {result.issued.length > 0 && (
                   <>
                     <Alert type="warning" message="Copy or download these keys now - they will not be shown again." />
@@ -480,6 +518,7 @@ function ReregistrationPage() {
                   </>
                 )}
 
+                {/* students who were skipped, and why */}
                 {result.skipped.length > 0 && (
                   <div style={{ marginTop: '12px' }}>
                     <p style={{ fontWeight: 600, marginBottom: '4px' }}>Skipped ({result.skipped.length})</p>
@@ -495,6 +534,7 @@ function ReregistrationPage() {
               </div>
             )}
 
+            {/* keys issued - tabs, search, and each key's status with Revoke and Delete btns */}
             <div className="card">
               <div className="flex-between" style={{ marginBottom: '12px' }}>
                 <h2 style={{ margin: 0 }}>Keys issued for {year}</h2>
@@ -514,6 +554,7 @@ function ReregistrationPage() {
                 </div>
               </div>
 
+              {/* search the keys */}
               <div className="search-input">
                 <span className="input-icon">
                   <Icon name="search" size={16} />
@@ -527,8 +568,10 @@ function ReregistrationPage() {
                 />
               </div>
 
+              {/* message after a delete or revoke */}
               {listMessage && <Alert type={listMessage.type} message={listMessage.text} />}
 
+              {/* an empty message, or the keys table */}
               {visibleKeys.length === 0 ? (
                 <p className="muted" style={{ margin: 0 }}>
                   {keys.length === 0 ? `No keys have been issued for ${year} yet.` : 'No keys match your search.'}
@@ -567,6 +610,7 @@ function ReregistrationPage() {
                           <td>{formatDate(key.usedAt)}</td>
                           <td style={{ textAlign: 'right' }}>
                             <div className="row-actions">
+                              {/* delete btn - asks Confirm delete or Keep first */}
                               {confirmDeleteId === key.id ? (
                                 <>
                                   <button
@@ -583,6 +627,7 @@ function ReregistrationPage() {
                                 </>
                               ) : (
                                 <>
+                                  {/* revoke btn - only for an unused key */}
                                   {key.status === 'UNUSED' && (
                                     <button type="button" className="btn btn-sm btn-secondary" onClick={() => handleRevoke(key.id)}>
                                       Revoke
@@ -608,6 +653,7 @@ function ReregistrationPage() {
               )}
             </div>
 
+            {/* 1 January roll-over - preview, then run */}
             <div className="card">
               <h2>1 January roll-over</h2>
               <p className="muted" style={{ fontSize: '0.88rem' }}>
@@ -617,10 +663,12 @@ function ReregistrationPage() {
 
               <Alert type="error" message={previewError} />
 
+              {/* preview btn */}
               <button type="button" className="btn btn-secondary" onClick={handlePreview} disabled={isPreviewing}>
                 {isPreviewing ? 'Checking...' : `Preview the ${year} roll-over`}
               </button>
 
+              {/* the preview - how many move up, graduate or close */}
               {preview && (
                 <div style={{ marginTop: '18px' }}>
                   {preview.alreadyRun && (
@@ -638,6 +686,7 @@ function ReregistrationPage() {
                     </li>
                   </ul>
 
+                  {/* the accounts that will close */}
                   {preview.remove.length > 0 && (
                     <>
                       <p style={{ fontWeight: 600, marginBottom: '4px' }}>Accounts that will close:</p>
@@ -647,6 +696,7 @@ function ReregistrationPage() {
                     </>
                   )}
 
+                  {/* type RUN to confirm, then run it */}
                   {!preview.alreadyRun && (
                     <div className="inline-form" style={{ marginTop: '14px' }}>
                       <div className="form-field" style={{ minWidth: '200px', marginBottom: 0 }}>

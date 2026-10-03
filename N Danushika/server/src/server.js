@@ -3,6 +3,7 @@ const config = require('../../../shared/server/src/config/env');
 const { verifyDatabaseConnection } = require('../../../shared/server/src/config/db');
 const app = require('./app');
 
+// start - check the database connection, then listen on the port
 async function start() {
   try {
     await verifyDatabaseConnection();
@@ -20,4 +21,5 @@ async function start() {
   });
 }
 
+// run the server
 start();

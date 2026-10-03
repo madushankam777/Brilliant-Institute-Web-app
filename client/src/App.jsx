@@ -1,3 +1,4 @@
+// the website's pages and routes - which address shows which page, and who may open it
 import { lazy, Suspense, useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -21,12 +22,14 @@ import LoadingSpinner from '../../shared/client/src/components/common/LoadingSpi
 // pages behind the login download only when someone opens them, so the public pages load fast
 const ProfilePage = lazy(() => import('./pages/auth/ProfilePage'));
 
+// attendance pages
 const ClassSessionsPage = lazy(() => import('./pages/attendance/ClassSessionsPage'));
 const MarkAttendancePage = lazy(() => import('./pages/attendance/MarkAttendancePage'));
 const AttendanceHistoryPage = lazy(() => import('./pages/attendance/AttendanceHistoryPage'));
 const TutorStudentHistoryPage = lazy(() => import('./pages/attendance/TutorStudentHistoryPage'));
 const SelfCheckInPage = lazy(() => import('./pages/attendance/SelfCheckInPage'));
 
+// fees and payment pages
 const FeeBalancePage = lazy(() => import('./pages/payment/FeeBalancePage'));
 const PaymentHistoryPage = lazy(() => import('./pages/payment/PaymentHistoryPage'));
 const PaymentReturnPage = lazy(() => import('./pages/payment/PaymentReturnPage'));
@@ -34,6 +37,7 @@ const PaymentVerificationPage = lazy(() => import('./pages/payment/PaymentVerifi
 const PayTutorsPage = lazy(() => import('./pages/payment/PayTutorsPage'));
 const PaymentSettingsPage = lazy(() => import('./pages/payment/PaymentSettingsPage'));
 
+// class pages - browse, details, tutors, my courses and class management
 const BrowseClassesPage = lazy(() => import('./pages/courses/BrowseClassesPage'));
 const ClassDetailsPage = lazy(() => import('./pages/courses/ClassDetailsPage'));
 const TutorProfilePage = lazy(() => import('./pages/courses/TutorProfilePage'));
@@ -42,13 +46,16 @@ const ManageClassesPage = lazy(() => import('./pages/courses/ManageClassesPage')
 const CreateEditClassPage = lazy(() => import('./pages/courses/CreateEditClassPage'));
 const MyStudentsPage = lazy(() => import('./pages/courses/MyStudentsPage'));
 
+// feedback pages
 const SubmitFeedbackPage = lazy(() => import('./pages/feedback/SubmitFeedbackPage'));
 const StaffFeedbackPage = lazy(() => import('./pages/feedback/StaffFeedbackPage'));
 
+// messages, reminders and the calendar
 const NotifyStudentsPage = lazy(() => import('./pages/notifications/NotifyStudentsPage'));
 const RemindersPage = lazy(() => import('./pages/notifications/RemindersPage'));
 const CalendarPage = lazy(() => import('./pages/calendar/CalendarPage'));
 
+// admin pages - dashboard, users, announcements, re-registration, timetables, enquiries and reports
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
 const ManageUsersPage = lazy(() => import('./pages/admin/ManageUsersPage'));
 const UserProfilePage = lazy(() => import('./pages/admin/UserProfilePage'));
@@ -84,12 +91,14 @@ function setHeadTag(selector, create, attr, value) {
   tag.setAttribute(attr, value);
 }
 
+// make a <meta> tag with a name
 function metaTag(name) {
   const tag = document.createElement('meta');
   tag.setAttribute('name', name);
   return tag;
 }
 
+// browser tab title for each page address
 const PAGE_TITLES = [
   [/^\/$/, 'Home'],
   [/^\/about/, 'About Us'],
@@ -135,9 +144,11 @@ const PAGE_TITLES = [
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
   const { user } = useAuth();
+  // scroll to the top on each new page
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
   }, [pathname, hash]);
+  // set the tab title and the Google tags for the page
   useEffect(() => {
     const match = PAGE_TITLES.find(([pattern]) => pattern.test(pathname));
     document.title = match ? `${match[1]} | Brilliant Institute` : 'Brilliant Institute';
@@ -153,6 +164,7 @@ function ScrollToTop() {
   return null;
 }
 
+// the whole website - the top bar, then the page that matches the address
 function App() {
   return (
     <AuthProvider>

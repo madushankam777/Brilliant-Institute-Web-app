@@ -1,3 +1,4 @@
+// logo - the crest and the institute name
 import logoImg from '../../assets/logo.jpeg';
 
 // Crest mark + wordmark used in every navbar/footer/auth panel

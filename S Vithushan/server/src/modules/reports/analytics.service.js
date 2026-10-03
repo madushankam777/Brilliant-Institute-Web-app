@@ -5,6 +5,7 @@ const parts = require('./reportParts');
 const data = require('./reportData');
 
 const { num, percent, change, kpi, rows, one } = parts;
+// short month names
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // days for short periods, weeks for a few months, months for longer
@@ -39,6 +40,7 @@ function bucketKeys(period, granularity) {
   return keys;
 }
 
+// the text on the chart for a bucket - a day, a week (w/c = week commencing) or a month
 function bucketLabel(key, granularity) {
   if (granularity === 'month') return parts.monthLabel(key);
   const [, m, d] = key.split('-');
@@ -52,7 +54,9 @@ function series(keys, list, field = 'total') {
   return keys.map((key) => map.get(key) || 0);
 }
 
+// all the numbers for the Analytics page - money, attendance, classes, tutors, students, feedback and site use
 async function getAnalytics({ from, to }) {
+  // the date range, and a bucket size (day, week or month) that suits its length
   const period = parts.resolvePeriod(from, to);
   const granularity = granularityFor(period);
   const keys = bucketKeys(period, granularity);
@@ -108,7 +112,9 @@ async function getAnalytics({ from, to }) {
              WHERE c.tutor_id = u.id AND e.status = 'ACTIVE' AND c.status = 'ACTIVE') AS students
      FROM users u WHERE u.role = 'TUTOR' AND u.status = 'ACTIVE' ORDER BY u.full_name`
   );
+  // per tutor - students, classes, fees collected, paid out and attendance
   const tutors = tutorRows.map((tutor) => {
+    // this tutor's active classes
     const own = classes.filter((item) => item.tutor_id === tutor.id);
     let marks = 0;
     let attended = 0;
@@ -121,6 +127,7 @@ async function getAnalytics({ from, to }) {
       }
       collected += collections.get(cls.id)?.collected || 0;
     });
+    // what this tutor was paid in the period
     const paid = payouts.filter((item) => item.tutor_id === tutor.id && data.isPaid(item)).reduce((sum, item) => sum + item.amount, 0);
     return { id: tutor.id, name: tutor.name, students: num(tutor.students), classes: own.length, collected, paid, attendance: percent(attended, marks) };
   });
@@ -130,6 +137,7 @@ async function getAnalytics({ from, to }) {
     `SELECT COALESCE(grade, 'Not set') AS name, COUNT(*) AS value
      FROM users WHERE role = 'STUDENT_PARENT' AND status = 'ACTIVE' GROUP BY grade`
   );
+  // grades in school order, unknown ones last
   const gradeOrder = (name) => (GRADES.includes(name) ? GRADES.indexOf(name) : 99);
   grades.sort((a, b) => gradeOrder(a.name) - gradeOrder(b.name));
   const subjects = await rows(
@@ -171,6 +179,7 @@ async function getAnalytics({ from, to }) {
   // headline figures
   const collectedTotal = collectedRows.reduce((sum, item) => sum + num(item.total), 0);
   const previous = await data.getCollectedTotal(period.previous);
+  // headline figures - unpaid fees, paid to tutors, attendance
   const owedTotal = [...outstanding.values()].reduce((sum, item) => sum + item.owed, 0);
   const paidOut = [...payoutMap.values()].reduce((sum, value) => sum + value, 0);
   const marks = attendanceRows.reduce((sum, item) => sum + num(item.marks), 0);
@@ -183,6 +192,7 @@ async function getAnalytics({ from, to }) {
   const growth = change(collectedTotal, previous.total);
   const threshold = config.business.lowAttendanceThresholdPercent;
 
+  // the answer - the KPI tiles, then the data for each chart
   return {
     period: { from: period.from, to: period.to, label: period.label, granularity },
     kpis: [

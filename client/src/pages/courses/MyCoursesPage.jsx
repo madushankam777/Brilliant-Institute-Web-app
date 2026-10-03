@@ -9,12 +9,15 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
+// the side menu for a student
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// my courses - active enrolments, past ones, drop, re-enrol and remove from history
 function MyCoursesPage() {
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +31,7 @@ function MyCoursesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  // load my enrolments
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -41,10 +45,12 @@ function MyCoursesPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // drop btn - leave a class (the payment history stays)
   async function handleDrop(enrollmentId) {
     setDroppingId(enrollmentId);
     setErrorMessage('');
@@ -59,6 +65,7 @@ function MyCoursesPage() {
     }
   }
 
+  // re-add btn - join a class I dropped before
   async function handleReEnroll(course) {
     setReEnrollingId(course.enrollmentId);
     setErrorMessage('');
@@ -72,18 +79,21 @@ function MyCoursesPage() {
     }
   }
 
+  // delete btn - open the confirm pop-up
   function openDeleteModal(course) {
     setDeleteTarget(course);
     setDeleteConfirmText('');
     setDeleteError('');
   }
 
+  // close the confirm pop-up
   function closeDeleteModal() {
     setDeleteTarget(null);
     setDeleteConfirmText('');
     setDeleteError('');
   }
 
+  // confirm btn - remove the dropped class from my history (DELETE must be typed)
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -99,9 +109,11 @@ function MyCoursesPage() {
     }
   }
 
+  // enrolments I am still in, and past ones (dropped or cancelled)
   const activeCourses = courses.filter((c) => c.enrollmentStatus === 'ACTIVE');
   const pastCourses = courses.filter((c) => c.enrollmentStatus !== 'ACTIVE');
 
+  // the page - active enrolments, past enrolments and the remove pop-up
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -116,6 +128,7 @@ function MyCoursesPage() {
           <LoadingSpinner label="Loading your courses..." />
         ) : (
           <>
+            {/* active enrolments */}
             <div className="card">
               <h2>Active enrolments</h2>
               {activeCourses.length === 0 ? (
@@ -252,6 +265,7 @@ function MyCoursesPage() {
         )}
       </div>
 
+      {/* remove from history pop-up */}
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => !isDeleting && closeDeleteModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>

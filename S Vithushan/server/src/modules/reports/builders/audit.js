@@ -14,6 +14,7 @@ const SENSITIVE = [
   'TUTOR_KEY_DELETED', 'CLASS_CANCELLED', 'YEARLY_ROLLOVER_RUN', 'ATTENDANCE_CORRECTED',
 ];
 
+// audit trail report - everything recorded in the period, for everyone or one person
 async function build(params, { period }) {
   // one person only, when chosen
   let person = null;
@@ -21,6 +22,7 @@ async function build(params, { period }) {
     person = await one('SELECT id, full_name, role FROM users WHERE id = ?', [params.userId]);
     if (!person.id) throw ApiError.notFound('That person was not found.');
   }
+  // the audit log entries in the period
   const events = await rows(
     `SELECT a.created_at, a.action, a.entity_type, a.entity_id, u.full_name, u.role
      FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
@@ -28,8 +30,10 @@ async function build(params, { period }) {
      ORDER BY a.created_at ASC, a.id ASC`,
     person ? [period.start, period.end, person.id] : [period.start, period.end]
   );
+  // count how many times each action happened
   const byAction = new Map();
   events.forEach((item) => byAction.set(item.action, (byAction.get(item.action) || 0) + 1));
+  // the counts as table rows, biggest first
   const actionRows = [...byAction.entries()].map(([action, total]) => ({ action: actionName(action), total })).sort((a, b) => b.total - a.total);
 
   const people = new Set(events.filter((item) => item.full_name).map((item) => item.full_name)).size;
@@ -37,8 +41,10 @@ async function build(params, { period }) {
   const failedLogins = byAction.get('LOGIN_FAILED') || 0;
   const resets = (byAction.get('PASSWORD_RESET_REQUESTED') || 0) + (byAction.get('PASSWORD_RESET_COMPLETED') || 0);
   const adminActions = events.filter((item) => item.role === 'ADMIN').length;
+  // the changes worth a second look
   const sensitive = events.filter((item) => SENSITIVE.includes(item.action));
 
+  // one audit entry as a table row
   const toRow = (item) => ({
     created_at: item.created_at,
     who: item.full_name || 'System',
@@ -47,11 +53,13 @@ async function build(params, { period }) {
     item: item.entity_id ? `${parts.label(item.entity_type)} #${item.entity_id}` : parts.label(item.entity_type),
   });
 
+  // the key findings
   const highlights = [`${events.length} recorded action(s) by ${people} people during the period.`];
   if (failedLogins > 0) highlights.push(`${failedLogins} wrong-password attempt(s) were recorded against ${logins} successful login(s).`);
   if (sensitive.length > 0) highlights.push(`${sensitive.length} sensitive change(s) - account, payment and payout actions - are listed for review.`);
   if (actionRows.length > 0) highlights.push(`Most frequent action: ${actionRows[0].action.toLowerCase()} (${actionRows[0].total}).`);
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'Audit Trail Report',
     subtitle: person ? `Everything ${person.full_name} did on the site` : 'Recorded actions across the system',

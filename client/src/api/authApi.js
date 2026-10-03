@@ -32,6 +32,7 @@ export async function login({ email, password }) {
   return response.data.data.user;
 }
 
+// POST /auth/logout - end the session
 export async function logout() {
   await httpClient.post('/auth/logout');
 }

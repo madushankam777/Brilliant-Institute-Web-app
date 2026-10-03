@@ -1,3 +1,4 @@
+// auth database queries - users, password reset codes and tutor enrollment keys
 const { pool } = require('../../../../../shared/server/src/config/db');
 
 // Insert a brand new user account.
@@ -27,6 +28,7 @@ async function findUserById(id) {
   return rows[0] || null;
 }
 
+// profile save - updates name, phone and bio
 async function updateUserProfile(id, { fullName, phone, bio }) {
   await pool.execute(
     `UPDATE users SET full_name = ?, phone = ?, bio = ?, updated_at = NOW() WHERE id = ?`,
@@ -35,6 +37,7 @@ async function updateUserProfile(id, { fullName, phone, bio }) {
   return findUserById(id);
 }
 
+// find a student by their ST code
 async function findUserByStudentCode(studentCode) {
   const [rows] = await pool.execute(`SELECT * FROM users WHERE student_code = ? LIMIT 1`, [
     studentCode,
@@ -67,6 +70,7 @@ async function recordFailedLogin(id, attempts, lockedUntil) {
   );
 }
 
+// login success - clears failed tries and the lock, saves the last login time
 async function resetFailedLoginCounter(id) {
   await pool.execute(
     `UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW()
@@ -153,6 +157,7 @@ async function claimTutorKey(keyId) {
   return result.affectedRows === 1;
 }
 
+// gives a claimed tutor key back when the account could not be created
 async function releaseTutorKey(keyId) {
   await pool.execute(
     `UPDATE tutor_enrollment_keys SET status = 'UNUSED', used_at = NULL WHERE id = ? AND used_by IS NULL`,

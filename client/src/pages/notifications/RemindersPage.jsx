@@ -16,8 +16,10 @@ import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import { useYearOfHolidays } from '../../hooks/useHolidays';
 import { formatLongDate, toDateKey, todayKey } from '../../../../shared/client/src/utils/schedule';
 
+// the side menu for a tutor
 const NAV_ITEMS = getNavItems('TUTOR');
 
+// who a reminder can go to
 const AUDIENCES = [
   { value: 'SELF', label: 'Only me' },
   { value: 'CLASS', label: 'One of my classes' },
@@ -31,6 +33,7 @@ function nextFullHour() {
   return { date: toDateKey(next), time: `${String(next.getHours()).padStart(2, '0')}:00` };
 }
 
+// a send time as, for example, Mon, 12 Oct 2026, 3:30 PM
 function formatSendAt(sendAt) {
   return new Date(sendAt.replace(' ', 'T')).toLocaleString('en-GB', {
     weekday: 'short',
@@ -42,16 +45,20 @@ function formatSendAt(sendAt) {
   });
 }
 
+// who a reminder goes to, as text
 function audienceText(reminder) {
   return reminder.isPersonal ? 'Only you' : `${reminder.recipientCount} student(s)`;
 }
 
+// reminders - a tutor schedules a reminder for a date and time, for themselves or their students
 function RemindersPage() {
+  // my classes, my reminders and the page state
   const [classes, setClasses] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // the new reminder form - date, time, who gets it, class, title and message
   const [date, setDate] = useState(() => nextFullHour().date);
   const [time, setTime] = useState(() => nextFullHour().time);
   const [audience, setAudience] = useState('SELF');
@@ -66,10 +73,12 @@ function RemindersPage() {
   const [listError, setListError] = useState('');
   const holidays = useYearOfHolidays();
 
+  // reload my reminders
   const loadReminders = useCallback(async () => {
     setReminders(await fetchMyReminders());
   }, []);
 
+  // load my classes and reminders together (one failing does not blank the page)
   useEffect(() => {
     let isMounted = true;
     Promise.allSettled([fetchMyClassesForMessaging(), fetchMyReminders()]).then(([classList, reminderList]) => {
@@ -85,12 +94,14 @@ function RemindersPage() {
     };
   }, []);
 
+  // reminders still to be sent, and the ones already sent
   const upcoming = reminders.filter((item) => item.status === 'SCHEDULED');
   const sent = reminders.filter((item) => item.status === 'SENT').reverse();
 
   // a time that has already passed today
   const timeIsPast = Boolean(date && time) && new Date(`${date}T${time}`) <= new Date();
 
+  // schedule btn - check the form, then schedule the reminder
   async function handleSubmit(event) {
     event.preventDefault();
     setSuccessMessage('');
@@ -125,6 +136,7 @@ function RemindersPage() {
     }
   }
 
+  // cancel btn - cancel a scheduled reminder
   async function handleCancel(reminderId) {
     setListError('');
     try {
@@ -136,6 +148,7 @@ function RemindersPage() {
     }
   }
 
+  // the page - title, the new reminder form, upcoming and sent reminders
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -149,10 +162,12 @@ function RemindersPage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* a spinner, or the page content */}
         {isLoading ? (
           <LoadingSpinner label="Loading reminders..." />
         ) : (
           <>
+            {/* new reminder - pick the day on the calendar, then the time, who gets it and the text */}
             <div className="card">
               <h2>New reminder</h2>
               <Alert type="success" message={successMessage} />
@@ -160,6 +175,7 @@ function RemindersPage() {
 
               <form onSubmit={handleSubmit} noValidate>
                 <div className="schedule-picker">
+                  {/* calendar - a dot marks the days that already have a reminder */}
                   <MonthCalendar
                     selectedDate={date}
                     onSelectDate={(dateKey) => {
@@ -173,6 +189,7 @@ function RemindersPage() {
                   />
 
                   <div>
+                    {/* date and time */}
                     <div className="card-field-row">
                       <div className="form-field">
                         <label htmlFor="reminder-date">Date</label>
@@ -198,6 +215,7 @@ function RemindersPage() {
                       </div>
                     </div>
 
+                    {/* who gets it - only me, one class or all my students */}
                     <div className="form-field">
                       <label>Send to</label>
                       <div className="period-tabs" role="radiogroup" aria-label="Send to">
@@ -219,6 +237,7 @@ function RemindersPage() {
                       </div>
                     </div>
 
+                    {/* class choice - only when sending to one class */}
                     {audience === 'CLASS' && (
                       <div className="form-field">
                         <label htmlFor="reminder-class">Class</label>
@@ -243,6 +262,7 @@ function RemindersPage() {
                       </div>
                     )}
 
+                    {/* title */}
                     <div className="form-field">
                       <label htmlFor="reminder-title">Title</label>
                       <input
@@ -260,6 +280,7 @@ function RemindersPage() {
                       {fieldErrors.title && <p className="field-error">{fieldErrors.title}</p>}
                     </div>
 
+                    {/* message - up to 300 characters */}
                     <div className="form-field">
                       <label htmlFor="reminder-message">Message (optional)</label>
                       <textarea
@@ -273,6 +294,7 @@ function RemindersPage() {
                       {fieldErrors.message && <p className="field-error">{fieldErrors.message}</p>}
                     </div>
 
+                    {/* schedule btn */}
                     <button type="submit" className="btn btn-primary" disabled={isSaving}>
                       <Icon name="clock" size={16} /> {isSaving ? 'Saving...' : 'Schedule reminder'}
                     </button>
@@ -281,6 +303,7 @@ function RemindersPage() {
               </form>
             </div>
 
+            {/* upcoming reminders - each with a Cancel btn that asks Cancel it or Keep first */}
             <div className="card">
               <h2>Upcoming</h2>
               <Alert type="error" message={listError} />
@@ -297,6 +320,7 @@ function RemindersPage() {
                         {formatSendAt(reminder.sendAt)} &middot; {audienceText(reminder)}
                       </div>
                     </div>
+                    {/* cancel btn - asks Cancel it or Keep first */}
                     {confirmCancelId === reminder.id ? (
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                         <button type="button" className="btn btn-danger btn-sm" onClick={() => handleCancel(reminder.id)}>
@@ -320,6 +344,7 @@ function RemindersPage() {
               )}
             </div>
 
+            {/* reminders already sent in the last 2 weeks */}
             {sent.length > 0 && (
               <div className="card">
                 <h2>Sent in the last 2 weeks</h2>

@@ -1,3 +1,4 @@
+// public holidays hook - holidays for a date range, by date
 import { useEffect, useState } from 'react';
 import { fetchHolidays } from '../api/courseApi';
 import { addDaysToKey, startOfWeek, todayKey } from '../../../shared/client/src/utils/schedule';
@@ -6,6 +7,7 @@ import { addDaysToKey, startOfWeek, todayKey } from '../../../shared/client/src/
 function useHolidays(fromDate, toDate) {
   const [holidays, setHolidays] = useState({});
 
+  // load the holidays whenever the dates change
   useEffect(() => {
     let isCurrent = true;
     fetchHolidays(fromDate, toDate)

@@ -1,6 +1,8 @@
+// avatar - a round profile picture, or the user's initials when there is no picture
 import { getAssetUrl } from '../../api/assetUrl';
 import Icon from './Icon';
 
+// the first letters of the first two names
 function initialsOf(fullName) {
   return (fullName || '')
     .trim()
@@ -10,6 +12,7 @@ function initialsOf(fullName) {
     .join('');
 }
 
+// avatar - the picture, else the initials, else a user icon
 function Avatar({ name, pictureUrl, size = 36, className = '', style }) {
   const dimensionStyle = { width: size, height: size, fontSize: Math.round(size * 0.4) };
 

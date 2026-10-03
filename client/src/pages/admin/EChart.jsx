@@ -14,6 +14,7 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
+// register only the chart parts that are used (keeps the bundle small)
 echarts.use([
   BarChart,
   LineChart,
@@ -34,6 +35,7 @@ echarts.use([
 // brand colours: navy, blue, gold, green, teal, amber, purple, red
 const PALETTE = ['#1e3a8a', '#2563eb', '#c9a961', '#15803d', '#0f766e', '#b45309', '#7c3aed', '#b91c1c'];
 
+// chart component - draws the option it is given; onClick gets the clicked item
 function EChart({ option, height = 320, onClick, label }) {
   const boxRef = useRef(null);
   const chartRef = useRef(null);

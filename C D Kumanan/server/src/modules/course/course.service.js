@@ -10,11 +10,13 @@ const {
   migrationRequired,
 } = require('../../../../../shared/server/src/utils/schemaFeatures');
 
+// search page - active classes matching the filters
 async function browseClasses(filters) {
   const rows = await repository.listActiveClasses(filters);
   return rows.map(toSafeClass);
 }
 
+// all tutors (id, name, email, photo)
 async function listTutors() {
   const rows = await repository.listAllTutors();
   return rows.map((row) => ({
@@ -25,6 +27,7 @@ async function listTutors() {
   }));
 }
 
+// a tutor's public profile plus the active classes they teach
 async function getTutorProfile(tutorId) {
   const tutorRow = await repository.findTutorProfile(tutorId);
   if (!tutorRow) {
@@ -37,6 +40,7 @@ async function getTutorProfile(tutorId) {
   };
 }
 
+// one class with its tutor and the number of students enrolled
 async function getClassDetails(classId) {
   const row = await repository.findClassWithTutorAndCount(classId);
   if (!row) {
@@ -45,6 +49,7 @@ async function getClassDetails(classId) {
   return toSafeClass(row);
 }
 
+// only the class's own tutor (or an admin) may change it
 function assertOwnsClass(user, classRow) {
   if (!classRow) {
     throw ApiError.notFound('Class not found.');
@@ -55,6 +60,7 @@ function assertOwnsClass(user, classRow) {
   }
 }
 
+// weekday names in JavaScript's order (Sunday first)
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // "15:00:00" -> "3:00 PM"
@@ -64,6 +70,7 @@ function formatTime(time) {
   return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${suffix}`;
 }
 
+// today's date as YYYY-MM-DD in local time
 function todayDateString() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -71,6 +78,7 @@ function todayDateString() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+// check the first class date - not in the past, the right weekday, not a public holiday
 async function assertValidStartDate(startDate, dayOfWeek, startTime) {
   if (!startDate) return;
   if (startDate < todayDateString()) {
@@ -94,6 +102,7 @@ async function assertValidStartDate(startDate, dayOfWeek, startTime) {
 
 // A tutor or a venue can only hold one class at a time.
 async function assertNoScheduleConflicts({ tutorId, venue, dayOfWeek, startTime, endTime, excludeClassId }) {
+  // the tutor cannot teach two classes at the same time
   const tutorClash = await repository.findConflictingTutorClass({
     tutorId,
     dayOfWeek,
@@ -108,6 +117,7 @@ async function assertNoScheduleConflicts({ tutorId, venue, dayOfWeek, startTime,
     );
   }
 
+  // the venue cannot hold two classes at the same time
   const venueClash = await repository.findConflictingVenueClass({
     venue,
     dayOfWeek,
@@ -138,6 +148,7 @@ async function resolveTutorForNewClass(actingUser, requestedTutorId) {
   return tutor.id;
 }
 
+// create class btn - pick the tutor, check the date and clashes, save it, log it
 async function createClass(actingUser, data) {
   const tutorId = await resolveTutorForNewClass(actingUser, data.tutorId);
   await assertValidStartDate(data.startDate, data.dayOfWeek, data.startTime);
@@ -174,6 +185,7 @@ function hasFieldChanged(field, before, after) {
   return String(before) !== String(after);
 }
 
+// what changed that students should hear about, e.g. 'venue is now Hall B'
 function describeClassChanges(existing, data) {
   return NOTIFIABLE_FIELDS.filter((field) =>
     hasFieldChanged(field, existing[field.column], data[field.key])
@@ -198,6 +210,7 @@ async function notifyEnrolledStudents(classId, message, actorId) {
   }
 }
 
+// save class btn - check clashes, save, log it and tell the enrolled students what changed
 async function updateClass(tutorUser, classId, data) {
   const existing = await repository.findClassById(classId);
   assertOwnsClass(tutorUser, existing);
@@ -211,6 +224,7 @@ async function updateClass(tutorUser, classId, data) {
     excludeClassId: classId,
   });
 
+  // what changed that students should hear about
   const changes = describeClassChanges(existing, data);
 
   await repository.updateClass(classId, data);
@@ -235,6 +249,7 @@ async function updateClass(tutorUser, classId, data) {
   return { classData: toSafeClass(updated), notifiedCount };
 }
 
+// cancel class btn - tell the students, then mark the class CANCELLED
 async function cancelClass(tutorUser, classId) {
   const existing = await repository.findClassById(classId);
   assertOwnsClass(tutorUser, existing);
@@ -265,6 +280,7 @@ async function listMyTaughtClasses(user) {
   return rows.map(toSafeClass);
 }
 
+// enrol btn - the class must be active, not already joined and not full (a dropped class is reused)
 async function enrollInClass(studentUser, classId) {
   const classRow = await repository.findClassById(classId);
   if (!classRow || classRow.status !== 'ACTIVE') {
@@ -276,6 +292,7 @@ async function enrollInClass(studentUser, classId) {
     throw ApiError.conflict('You are already enrolled in this class.');
   }
 
+  // is there a free place?
   const enrolledCount = await repository.countActiveEnrollments(classId);
   if (enrolledCount >= classRow.capacity) {
     throw ApiError.conflict('This class is full. Please check back later or choose another class.');
@@ -301,8 +318,10 @@ async function enrollInClass(studentUser, classId) {
   return { enrollmentId, classId, subject: classRow.subject, fee: Number(classRow.fee) };
 }
 
+// drop btn - mark the enrolment DROPPED (the payment history stays)
 async function dropClass(studentUser, enrollmentId) {
   const rows = await repository.listMyEnrollments(studentUser.id);
+  // find it among the student's own enrolments, so nobody can drop another student's class
   const enrollment = rows.find((row) => row.enrollment_id === enrollmentId);
   if (!enrollment) {
     throw ApiError.notFound('Enrollment not found.');
@@ -327,6 +346,7 @@ async function deleteEnrollmentRecord(studentUser, enrollmentId, confirmText) {
   }
 
   const rows = await repository.listMyEnrollments(studentUser.id);
+  // the enrolment must be the student's own and already dropped
   const enrollment = rows.find((row) => row.enrollment_id === enrollmentId);
   if (!enrollment) {
     throw ApiError.notFound('Enrollment not found.');
@@ -344,6 +364,7 @@ async function deleteEnrollmentRecord(studentUser, enrollmentId, confirmText) {
   });
 }
 
+// my courses page - each enrolment with its class, tutor, balance and status
 async function listMyCourses(studentUser) {
   const rows = await repository.listMyEnrollments(studentUser.id);
   return rows.map((row) => ({
@@ -379,9 +400,11 @@ async function listPublicTutors() {
 
 // --- Cancelled days and extra classes ---
 
+// month names for messages
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
   'August', 'September', 'October', 'November', 'December'];
 
+// weekday name of a YYYY-MM-DD date
 function weekdayOf(dateString) {
   return DAY_NAMES[new Date(`${dateString}T00:00:00`).getDay()];
 }
@@ -392,6 +415,7 @@ function formatDate(dateString) {
   return `${DAY_NAMES[date.getDay()]}, ${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+// one cancelled day or extra class as the website shows it (an extra class has its own time and venue)
 function toSafeClassEvent(row) {
   const isExtra = row.type === 'EXTRA';
   return {
@@ -412,6 +436,7 @@ function toSafeClassEvent(row) {
   };
 }
 
+// stop with a set-up message if the class_events table is missing
 async function requireClassEvents() {
   if (!(await hasClassEvents())) throw migrationRequired();
 }
@@ -424,6 +449,7 @@ async function listClassEvents(user, fromDate, toDate) {
   return rows.map(toSafeClassEvent);
 }
 
+// load a class the user may manage, and make sure it is still active
 async function findActiveOwnedClass(user, classId) {
   const classRow = await repository.findClassById(classId);
   assertOwnsClass(user, classRow);
@@ -433,6 +459,7 @@ async function findActiveOwnedClass(user, classId) {
   return classRow;
 }
 
+// cancel one class day - checks the date, saves it, logs it and tells the students
 async function cancelClassDay(user, classId, { date, note }) {
   await requireClassEvents();
   const classRow = await findActiveOwnedClass(user, classId);
@@ -498,6 +525,7 @@ async function assertExtraClassSlotFree({ date, startTime, endTime, venue, tutor
   throw ApiError.conflict(`${clash.tutor_name} already teaches "${clash.subject}" from ${time} that day.`);
 }
 
+// add a one-off class - checks the date, holidays and a free room and tutor, saves it and tells the students
 async function addExtraClass(user, classId, { date, startTime, endTime, venue, note }) {
   await requireClassEvents();
   const classRow = await findActiveOwnedClass(user, classId);

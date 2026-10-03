@@ -4,10 +4,12 @@ const { recordAuditEvent } = require('../../../../../shared/server/src/utils/aud
 const { hasTable, migrationRequired } = require('../../../../../shared/server/src/utils/schemaFeatures');
 const repository = require('./contact.repository');
 
+// stop with a set-up message if the contact_messages table is missing
 async function requireTable() {
   if (!(await hasTable('contact_messages'))) throw migrationRequired();
 }
 
+// one message as the website shows it
 function toSafeMessage(row) {
   return {
     id: row.id,
@@ -23,18 +25,21 @@ function toSafeMessage(row) {
   };
 }
 
+// save a message from the Contact Us form
 async function sendMessage(data) {
   await requireTable();
   const id = await repository.createMessage(data);
   return { id };
 }
 
+// admin inbox - the messages and how many are still new
 async function listMessages(status) {
   await requireTable();
   const [rows, newCount] = await Promise.all([repository.listMessages(status), repository.countNewMessages()]);
   return { messages: rows.map(toSafeMessage), newCount };
 }
 
+// handled btn - mark a message handled or reopen it, and log it
 async function setMessageStatus(admin, messageId, status) {
   await requireTable();
   const existing = await repository.findMessage(messageId);

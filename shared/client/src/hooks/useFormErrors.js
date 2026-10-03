@@ -1,3 +1,4 @@
+// form errors hook - one error per field, plus a form-level error
 import { useCallback, useState } from 'react';
 
 // per-field form errors, including errors from the API
@@ -5,6 +6,7 @@ function useFormErrors() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
 
+  // clear every error
   const clearErrors = useCallback(() => {
     setFieldErrors({});
     setFormError('');

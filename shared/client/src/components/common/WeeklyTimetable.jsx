@@ -1,3 +1,4 @@
+// weekly timetable - Monday to Sunday columns with each day's classes, holidays, cancelled and extra classes
 import {
   WEEK_DAYS,
   dayNameOf,
@@ -9,6 +10,7 @@ import {
   weekDates,
 } from '../../utils/schedule';
 
+// css class for a class slot - cancelled or holiday, extra, or normal
 function slotClass(item, holiday) {
   if (holiday || item.kind === 'cancelled') return 'timetable-slot is-cancelled';
   if (item.kind === 'extra') return 'timetable-slot is-extra';
@@ -27,6 +29,7 @@ function dayItems(classes, events, day, dateKey) {
   ]);
 }
 
+// one day of the week - its name, holiday and class slots
 function DayColumn({ day, classes, isToday, holiday, showTutor, today }) {
   const classNames = [
     'timetable-day',
@@ -48,6 +51,7 @@ function DayColumn({ day, classes, isToday, holiday, showTutor, today }) {
         {holiday && <span className="timetable-holiday">{holiday}</span>}
       </div>
 
+      {/* the day's classes, or No classes */}
       <div className="timetable-day-slots">
         {classes.length === 0 ? (
           <p className="timetable-free">No classes</p>

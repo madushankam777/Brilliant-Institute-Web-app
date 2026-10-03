@@ -1,3 +1,4 @@
+// auth logic - register, login, sessions, profile, password change and reset codes
 const fs = require('fs');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
@@ -23,15 +24,19 @@ function buildStudentCode(userId) {
   return `ST${String(userId).padStart(7, '0')}`;
 }
 
+// register btn - makes a student or tutor account (a tutor needs a one-time enrollment key)
 async function registerUser({ fullName, email, password, phone, role, enrollmentKey, grade }) {
+  // no two accounts with the same email
   const existing = await repository.findUserByEmail(email);
   if (existing) {
     // sign-up can say the email is taken
     throw ApiError.conflict('An account with this email already exists. Try logging in instead.');
   }
 
+  // anyone who is not a tutor is a student - nobody can sign up as admin
   const targetRole = role === ROLES.TUTOR ? ROLES.TUTOR : ROLES.STUDENT_PARENT;
 
+  // tutor sign-up - check the enrollment key and claim it so it works only once
   let consumedKey = null;
   if (targetRole === ROLES.TUTOR) {
     const normalizedKey = String(enrollmentKey || '').trim().toUpperCase();
@@ -48,6 +53,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     }
   }
 
+  // student sign-up - the grade must be one of the allowed grades
   let normalizedGrade = null;
   if (targetRole === ROLES.STUDENT_PARENT) {
     if (!grade || !GRADES.includes(grade)) {
@@ -56,6 +62,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     normalizedGrade = grade;
   }
 
+  // only the hashed password is saved
   const passwordHash = await hashPassword(password, config.auth.bcryptSaltRounds);
   let userId;
   try {
@@ -73,14 +80,17 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     throw error;
   }
 
+  // students get their ST code
   if (targetRole === ROLES.STUDENT_PARENT) {
     await repository.setStudentCode(userId, buildStudentCode(userId));
   }
 
+  // tutor sign-up - the key is now tied to the new account
   if (consumedKey) {
     await repository.markTutorKeyUsed(consumedKey.id, userId);
   }
 
+  // audit log - who registered
   await recordAuditEvent({
     actorId: userId,
     action: targetRole === ROLES.TUTOR ? 'TUTOR_REGISTERED' : 'USER_REGISTERED',
@@ -89,6 +99,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     details: consumedKey ? { enrollmentKeyId: consumedKey.id } : undefined,
   });
 
+  // reply with the safe user (no password hash)
   const user = await repository.findUserById(userId);
   return toSafeUser(user);
 }
@@ -115,29 +126,34 @@ function attachSessionCookie(res, token) {
   });
 }
 
+// logout - removes the session cookie from the browser
 function clearSessionCookie(res) {
   res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
 }
 
 // login - locks the account after too many failed attempts
 async function loginWithEmailAndPassword({ email, password }, res) {
+  // find the account by email
   const user = await repository.findUserByEmail(email);
 
   // Same error for "no such user" and "wrong password" on purpose
   const genericError = 'Invalid email or password.';
   const isAccountUsable = Boolean(user) && user.status === 'ACTIVE';
 
+  // stop if the account is locked after too many wrong passwords
   if (isAccountUsable && user.locked_until && new Date(user.locked_until) > new Date()) {
     throw ApiError.tooMany(
       'This account is temporarily locked due to repeated failed logins. Please try again later.'
     );
   }
 
+  // check the password - an unknown email is checked against a dummy hash so it takes the same time
   const passwordMatches = await comparePassword(
     password || '',
     isAccountUsable ? user.password_hash : DUMMY_PASSWORD_HASH
   );
 
+  // wrong password - count the failure and lock the account after too many
   if (!isAccountUsable || !passwordMatches) {
     if (user) {
       const attempts = (user.failed_login_attempts || 0) + 1;
@@ -156,6 +172,7 @@ async function loginWithEmailAndPassword({ email, password }, res) {
     throw ApiError.unauthorized(genericError);
   }
 
+  // right password - clear the failed tries and log the login
   await repository.resetFailedLoginCounter(user.id);
   await recordAuditEvent({
     actorId: user.id,
@@ -164,6 +181,7 @@ async function loginWithEmailAndPassword({ email, password }, res) {
     entityId: user.id,
   });
 
+  // start the session - a signed token in an httpOnly cookie
   const token = signSessionToken(user);
   attachSessionCookie(res, token);
 
@@ -206,6 +224,7 @@ async function getProfile(userId) {
   return toSafeUser(user);
 }
 
+// profile save btn - saves name, phone and bio
 async function updateProfile(userId, { fullName, phone, bio }) {
   const user = await repository.updateUserProfile(userId, { fullName, phone, bio });
   await recordAuditEvent({
@@ -217,6 +236,7 @@ async function updateProfile(userId, { fullName, phone, bio }) {
   return toSafeUser(user);
 }
 
+// profile picture upload - saves the new photo and deletes the old one
 async function updateProfilePicture(userId, publicPath) {
   const existing = await repository.findUserById(userId);
   const user = await repository.updateProfilePicture(userId, publicPath);
@@ -284,6 +304,7 @@ function refreshSession(res, userRow) {
   attachSessionCookie(res, signSessionToken(userRow));
 }
 
+// reset settings - token size, link life (min), code life (min), wrong tries allowed, resend wait (s)
 const RESET_TOKEN_BYTES = 32;
 const RESET_TOKEN_TTL_MINUTES = 30;
 const RESET_CODE_TTL_MINUTES = 15;
@@ -294,6 +315,7 @@ const RESET_CODE_RESEND_SECONDS = 60;
 const codeTries = new Map();
 const lastCodeSentAt = new Map();
 
+// admin reset link - only the sha256 hash of the token is stored
 function hashResetToken(rawToken) {
   return crypto.createHash('sha256').update(rawToken).digest('hex');
 }
@@ -305,6 +327,7 @@ function hashResetCode(userId, code) {
 
 // forgot password btn - email a 6-digit code (same answer whether or not the email exists)
 async function requestPasswordReset(email) {
+  // unknown email or inactive account - do nothing, so the reply looks the same
   const user = await repository.findUserByEmail(email);
   if (!user || user.status !== 'ACTIVE') return;
 
@@ -313,13 +336,16 @@ async function requestPasswordReset(email) {
   if (Date.now() - last < RESET_CODE_RESEND_SECONDS * 1000) return;
   lastCodeSentAt.set(user.id, Date.now());
 
+  // make the random 6-digit reset code
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  // save only the hash of the code with its expiry - older codes stop working
   const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60 * 1000);
   await repository.invalidateResetTokensForUser(user.id);
   await repository.deleteOldResetTokensForUser(user.id);
   await repository.createPasswordResetToken(user.id, hashResetCode(user.id, code), expiresAt);
   codeTries.delete(user.id);
 
+  // audit log - reset requested
   await recordAuditEvent({
     actorId: user.id,
     action: 'PASSWORD_RESET_REQUESTED',
@@ -347,6 +373,7 @@ async function requestPasswordReset(email) {
   });
 }
 
+// makes text safe to put inside the email
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 }
@@ -381,11 +408,13 @@ function resetCodeEmail(name, code) {
 // reset with code btn - check the emailed code, set the new password and log in
 async function resetPasswordWithCode({ email, code, newPassword }, res) {
   const invalid = 'That code is wrong or has expired. Check the latest email or ask for a new code.';
+  // find the account
   const user = await repository.findUserByEmail(email);
   if (!user || user.status !== 'ACTIVE') {
     throw ApiError.badRequest(invalid);
   }
 
+  // check the code - right user, not used, not expired
   const resetToken = await repository.findValidResetTokenForUser(user.id, hashResetCode(user.id, code));
   if (!resetToken) {
     // too many wrong codes - the current code stops working
@@ -399,6 +428,7 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
     throw ApiError.badRequest(invalid);
   }
 
+  // save the new password and use up the code
   const newHash = await hashPassword(newPassword, config.auth.bcryptSaltRounds);
   await repository.updatePasswordHash(user.id, newHash);
   await repository.markResetTokenUsed(resetToken.id);
@@ -406,6 +436,7 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
   await repository.resetFailedLoginCounter(user.id);
   codeTries.delete(user.id);
 
+  // audit log - reset completed
   await recordAuditEvent({
     actorId: user.id,
     action: 'PASSWORD_RESET_COMPLETED',
@@ -422,6 +453,7 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
 
 // one-time reset token; only its hash is stored
 async function createResetToken(userId) {
+  // make the random reset link token (32 bytes = 64 hex characters)
   const rawToken = crypto.randomBytes(RESET_TOKEN_BYTES).toString('hex');
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
   await repository.invalidateResetTokensForUser(userId);
@@ -432,6 +464,7 @@ async function createResetToken(userId) {
 
 // Finish the "forgot password" flow by using the token to set a new password.
 async function resetPasswordWithToken(rawToken, newPassword) {
+  // look the token up by its hash
   const tokenHash = hashResetToken(rawToken);
   const resetToken = await repository.findValidResetTokenByHash(tokenHash);
 
@@ -439,6 +472,7 @@ async function resetPasswordWithToken(rawToken, newPassword) {
     throw ApiError.badRequest('This password reset link is invalid or has expired.');
   }
 
+  // save the new password and use up the link
   const newHash = await hashPassword(newPassword, config.auth.bcryptSaltRounds);
   await repository.updatePasswordHash(resetToken.user_id, newHash);
   await repository.markResetTokenUsed(resetToken.id);
@@ -446,6 +480,7 @@ async function resetPasswordWithToken(rawToken, newPassword) {
   // a new password also lifts any lockout from earlier failed logins
   await repository.resetFailedLoginCounter(resetToken.user_id);
 
+  // audit log - reset completed
   await recordAuditEvent({
     actorId: resetToken.user_id,
     action: 'PASSWORD_RESET_COMPLETED',

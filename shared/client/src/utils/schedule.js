@@ -1,30 +1,38 @@
 // Date and time helpers for timetables and calendars
 
+// the days of the week, Monday first
 export const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+// day names in the order javascript counts them, Sunday first
 const JS_DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// a number as two digits, like 07
 function pad2(value) {
   return String(value).padStart(2, '0');
 }
 
+// a date as 2026-10-03
 export function toDateKey(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
+// 2026-10-03 back to a date
 export function parseDateKey(dateKey) {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day);
 }
 
+// today's date as 2026-10-03
 export function todayKey() {
   return toDateKey(new Date());
 }
 
+// the weekday name of a date
 export function dayNameOf(dateKey) {
   return JS_DAY_NAMES[parseDateKey(dateKey).getDay()];
 }
 
+// a date some days later (or earlier)
 export function addDaysToKey(dateKey, days) {
   const date = parseDateKey(dateKey);
   date.setDate(date.getDate() + days);
@@ -101,10 +109,12 @@ export function classRunsOn(classItem, dateKey) {
   return !classItem.startDate || dateKey >= classItem.startDate;
 }
 
+// classes in time order
 export function sortByStartTime(classes) {
   return [...classes].sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
 }
 
+// the classes that run on a date, in time order
 export function classesOn(classes, dateKey) {
   return sortByStartTime(classes.filter((item) => classRunsOn(item, dateKey)));
 }
@@ -112,12 +122,15 @@ export function classesOn(classes, dateKey) {
 // One day's classes with that day's changes applied
 export function occurrencesOn(classes, events, dateKey) {
   const classById = new Map(classes.map((item) => [item.id, item]));
+  // this day's changes - cancelled and extra classes
   const dayEvents = events.filter((event) => event.date === dateKey && classById.has(event.classId));
 
+  // the weekly classes of the day, marked cancelled when they are
   const weekly = classesOn(classes, dateKey).map((item) => {
     const cancelled = dayEvents.find((event) => event.type === 'CANCELLED' && event.classId === item.id);
     return { ...item, key: `class-${item.id}`, kind: cancelled ? 'cancelled' : 'regular', event: cancelled || null };
   });
+  // extra classes added for the day
   const extras = dayEvents
     .filter((event) => event.type === 'EXTRA')
     .map((event) => ({
@@ -139,6 +152,7 @@ export function findNextClass(classes, now = new Date(), holidays = {}, events =
     const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     const dateKey = toDateKey(date);
     if (holidays[dateKey]) continue;
+    // the classes that day that have not started and are not cancelled
     const upcoming = occurrencesOn(classes, events, dateKey).filter(
       (item) => item.kind !== 'cancelled' && (offset > 0 || toMinutes(item.startTime) > nowMinutes)
     );

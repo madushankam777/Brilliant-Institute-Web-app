@@ -10,15 +10,19 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// the three marks a student can get
 const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
 
+// the words shown for each mark
 const STATUS_LABEL = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent' };
 
+// attendance sheet - mark each student present, late or absent, or open a check-in key
 function MarkAttendancePage() {
   const { sessionId } = useParams();
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
+  // the sheet - the session details and one row per student
   const [sessionInfo, setSessionInfo] = useState(null);
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,12 +32,14 @@ function MarkAttendancePage() {
   const [saveError, setSaveError] = useState('');
   const [search, setSearch] = useState('');
 
+  // the attendance key panel
   const [showCheckin, setShowCheckin] = useState(false);
   const [checkinCode, setCheckinCode] = useState('');
   const [checkinExpiresAt, setCheckinExpiresAt] = useState('');
   const [isStartingCheckin, setIsStartingCheckin] = useState(false);
   const [checkinError, setCheckinError] = useState('');
 
+  // load the sheet - students not marked yet start as Present
   const loadSheet = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -54,10 +60,12 @@ function MarkAttendancePage() {
     }
   }, [sessionId]);
 
+  // load the sheet when the page opens
   useEffect(() => {
     loadSheet();
   }, [loadSheet]);
 
+  // change one student's mark or remarks
   function updateRow(studentId, field, value) {
     setRows((previousRows) =>
       previousRows.map((row) => (row.studentId === studentId ? { ...row, [field]: value } : row))
@@ -88,12 +96,14 @@ function MarkAttendancePage() {
     }
   }
 
+  // save btn - save the whole sheet
   async function handleSave(event) {
     event.preventDefault();
     setSaveMessage('');
     setSaveError('');
     setIsSaving(true);
 
+    // the marks to send to the server
     const records = rows.map((row) => ({
       studentId: row.studentId,
       status: row.status,
@@ -111,10 +121,12 @@ function MarkAttendancePage() {
     }
   }
 
+  // the students matching the search box
   const filteredRows = rows.filter((row) =>
     row.studentName.toLowerCase().includes(search.trim().toLowerCase())
   );
 
+  // how many students have each mark
   const counts = STATUS_OPTIONS.reduce((acc, status) => {
     acc[status] = rows.filter((row) => row.status === status).length;
     return acc;
@@ -139,6 +151,7 @@ function MarkAttendancePage() {
           </button>
         </div>
 
+        {/* attendance key panel - the 6-digit key students type to check in */}
         {showCheckin && (
           <div className="card" style={{ textAlign: 'center' }}>
             <h3 style={{ marginTop: 0 }}>Attendance Key</h3>

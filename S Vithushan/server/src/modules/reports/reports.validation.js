@@ -3,10 +3,13 @@ const { param, query } = require('express-validator');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { REPORT_TYPES } = require('./reports.service');
 
+// a report period can be at most 5 years
 const MAX_DAYS = 366 * 5;
 
+// the report type in the address must exist
 const reportTypeRules = [param('type').isIn(REPORT_TYPES).withMessage('That report does not exist.')];
 
+// report filters - dates (5 years at most), student, tutor, class, person, grade, role, status, year
 const reportQueryRules = [
   query('from')
     .optional({ values: 'falsy' })

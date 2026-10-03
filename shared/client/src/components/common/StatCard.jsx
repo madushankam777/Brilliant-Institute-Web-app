@@ -1,3 +1,4 @@
+// stat card - a number with a label and an icon, used on the dashboards
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 

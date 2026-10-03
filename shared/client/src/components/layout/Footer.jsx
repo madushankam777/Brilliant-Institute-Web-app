@@ -1,7 +1,9 @@
+// site footer - logo, links, contact details and the legal links
 import { Link } from 'react-router-dom';
 import Logo from '../common/Logo';
 import { INSTITUTE } from '../../constants/institute';
 
+// the link columns in the footer
 const DEFAULT_LINK_GROUPS = [
   {
     heading: 'Institute',
@@ -21,11 +23,13 @@ const DEFAULT_LINK_GROUPS = [
   },
 ];
 
+// footer - shown on the public pages
 function Footer({ linkGroups = DEFAULT_LINK_GROUPS }) {
   return (
     <footer className="site-footer">
       <div className="container">
         <div className="footer-grid">
+          {/* logo and a short description */}
           <div className="footer-brand">
             <Logo dark />
             <p>
@@ -34,6 +38,7 @@ function Footer({ linkGroups = DEFAULT_LINK_GROUPS }) {
             </p>
           </div>
 
+          {/* the link columns */}
           {linkGroups.map((group) => (
             <div key={group.heading}>
               <h4 className="footer-heading">{group.heading}</h4>
@@ -47,6 +52,7 @@ function Footer({ linkGroups = DEFAULT_LINK_GROUPS }) {
             </div>
           ))}
 
+          {/* contact details - email, phone and address */}
           <div>
             <h4 className="footer-heading">Contact</h4>
             <ul className="footer-list">
@@ -63,6 +69,7 @@ function Footer({ linkGroups = DEFAULT_LINK_GROUPS }) {
           </div>
         </div>
 
+        {/* copyright and the privacy and terms links */}
         <div className="footer-bottom">
           <span>&copy; {new Date().getFullYear()} Brilliant Institute. All rights reserved.</span>
           <div className="footer-bottom-links">

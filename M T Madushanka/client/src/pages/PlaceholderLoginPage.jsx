@@ -41,6 +41,7 @@ function PlaceholderLoginPage() {
 
       {error && <Alert type="error" message={error} />}
 
+      {/* login form - email, password and the forgot password link */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="email"

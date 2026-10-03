@@ -4,11 +4,14 @@ const path = require('path');
 const ExcelJS = require('exceljs');
 const config = require('../../../../../shared/server/src/config/env');
 
+// institute colours and greys, as Excel colour codes
 const NAVY = 'FF1E3A8A';
 const GOLD = 'FFC9A961';
 const MUTED = 'FF64748B';
 const SOFT = 'FFF4F6FB';
+// status colours - green, amber and red
 const TONE_COLORS = { success: 'FF15803D', warning: 'FFB45309', danger: 'FFB91C1C', default: NAVY };
+// the institute logo, embedded in the Summary sheet
 const LOGO = fs.readFileSync(path.join(__dirname, 'assets', 'logo.jpeg')).toString('base64');
 
 // Excel number formats for each report format
@@ -22,7 +25,9 @@ const NUMBER_FORMATS = {
   date: 'dd mmm yyyy',
   datetime: 'dd mmm yyyy hh:mm',
 };
+// formats that are written as real numbers
 const NUMERIC = ['money', 'lkr', 'lkr0', 'number', 'percent', 'hours'];
+// a column is at most 60 characters wide
 const MAX_WIDTH = 60;
 
 // "2026-10-02 15:30:00" -> Date that Excel shows as the same wall-clock time
@@ -59,6 +64,7 @@ function trackWidth(widths, col, value) {
   widths[col] = Math.max(widths[col] || 8, length);
 }
 
+// set each column to the width worked out from its content
 function applyWidths(ws, widths) {
   Object.entries(widths).forEach(([col, width]) => {
     ws.getColumn(Number(col)).width = width;
@@ -80,6 +86,7 @@ function printSetup(ws, report) {
 }
 
 // --- cover sheet ---
+// the Summary sheet - logo, report details, key figures, key findings and links to each sheet
 function buildSummary(workbook, report, sheets) {
   const ws = workbook.addWorksheet('Summary', { views: [{ showGridLines: false }] });
   printSetup(ws, report);
@@ -87,6 +94,7 @@ function buildSummary(workbook, report, sheets) {
     ws.getColumn(index + 1).width = width;
   });
 
+  // the logo and the institute name, address and contacts
   const logo = workbook.addImage({ base64: LOGO, extension: 'jpeg' });
   ws.addImage(logo, { tl: { col: 0.1, row: 0.2 }, ext: { width: 58, height: 58 } });
   ws.mergeCells('B1:D1');
@@ -105,6 +113,7 @@ function buildSummary(workbook, report, sheets) {
     ws.getCell(ref).border = { bottom: { style: 'medium', color: { argb: GOLD } } };
   });
 
+  // the report title and subtitle
   let row = 6;
   ws.mergeCells(`A${row}:D${row}`);
   ws.getCell(`A${row}`).value = report.title;
@@ -208,6 +217,7 @@ function buildSummary(workbook, report, sheets) {
 }
 
 // --- one section per sheet ---
+// write a bold title in the first column
 function writeTitle(ws, row, text, size, color = NAVY) {
   const cell = ws.getCell(row, 1);
   cell.value = text;
@@ -225,6 +235,7 @@ function writeTable(ws, row, block, widths, nextTableName) {
   }
 
   const used = new Set();
+  // the table's columns - unique names, filter buttons, and a Total sum where the column has a total
   const columns = block.columns.map((column, index) => {
     let name = column.label || `Column ${index + 1}`;
     for (let n = 2; used.has(name); n += 1) name = `${column.label} (${n})`;
@@ -236,6 +247,7 @@ function writeTable(ws, row, block, widths, nextTableName) {
     trackWidth(widths, index + 1, name);
     return column_;
   });
+  // the table's cell values - real numbers and dates where we have them
   const rows = block.rows.map((cells) => cells.map((cell, index) => {
     const value = cellValue(cell, block.columns[index].format);
     trackWidth(widths, index + 1, value);
@@ -273,6 +285,7 @@ function writeTable(ws, row, block, widths, nextTableName) {
   return row + 1;
 }
 
+// write one report block (table, chart data, facts, note or signature lines) and return the next free row
 function writeBlock(ws, row, block, widths, nextTableName) {
   if (block.type === 'table') return writeTable(ws, row, block, widths, nextTableName);
   if (block.type === 'heading') return writeTitle(ws, row, block.text, 12);
@@ -327,6 +340,7 @@ function writeBlock(ws, row, block, widths, nextTableName) {
 
 // Excel file bytes for a finished report
 async function renderReportExcel(report) {
+  // a new workbook with the institute as its author
   const workbook = new ExcelJS.Workbook();
   workbook.creator = config.institute.name;
   workbook.company = config.institute.name;
@@ -335,15 +349,18 @@ async function renderReportExcel(report) {
   workbook.created = new Date();
 
   const used = new Set(['summary']);
+  // one sheet per report section
   const names = report.sections.map((section, index) => sheetName(`${index + 1} ${section.title}`, used));
   buildSummary(workbook, report, names);
 
   let tableCount = 0;
+  // Excel tables need unique names
   const nextTableName = () => {
     tableCount += 1;
     return `Table${tableCount}`;
   };
 
+  // write each section on its own sheet
   report.sections.forEach((section, index) => {
     const ws = workbook.addWorksheet(names[index], { views: [{ showGridLines: false }] });
     printSetup(ws, report);

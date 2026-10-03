@@ -17,17 +17,22 @@ import { GRADES } from '../../../../shared/client/src/constants/grades';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// who an announcement can go to
 const AUDIENCES = [
   { value: 'ALL', label: 'All Users' },
   { value: 'STUDENT_PARENT', label: 'Students & Parents' },
   { value: 'TUTOR', label: 'Tutors' },
 ];
 
+// a blank announcement form
 const emptyForm = { title: '', body: '', priority: 'NORMAL', targetAudience: 'ALL', targetGrade: '' };
 
+// broadcast announcements - publish, edit and remove them, and send fee-due or low-attendance reminders
 function AnnouncementsPage() {
+  // the announcement form and its state
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [formError, setFormError] = useState('');
@@ -35,10 +40,12 @@ function AnnouncementsPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishSuccess, setPublishSuccess] = useState('');
 
+  // the published announcements and their state
   const [announcements, setAnnouncements] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // the reminder panel - the type, the students it would reach and the ones ticked
   const [reminderType, setReminderType] = useState(null); // 'FEE_DUE' | 'LOW_ATTENDANCE' | null
   const [candidates, setCandidates] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
@@ -48,10 +55,12 @@ function AnnouncementsPage() {
   const [reminderStatus, setReminderStatus] = useState('');
   const [reminderError, setReminderError] = useState('');
 
+  // the remove pop-up state
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  // load the published announcements
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -65,14 +74,17 @@ function AnnouncementsPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // change one form field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // edit btn - put an announcement into the form
   function startEdit(announcement) {
     setEditingId(announcement.id);
     setForm({
@@ -88,6 +100,7 @@ function AnnouncementsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // cancel edit btn - clear the form
   function cancelEdit() {
     setEditingId(null);
     setForm(emptyForm);
@@ -95,6 +108,7 @@ function AnnouncementsPage() {
     setFormErrors({});
   }
 
+  // publish btn - check the form, then publish or save the announcement
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -133,6 +147,7 @@ function AnnouncementsPage() {
     }
   }
 
+  // confirm remove btn - remove the announcement
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -167,6 +182,7 @@ function AnnouncementsPage() {
     }
   }
 
+  // close the reminder panel and clear it
   function closeReminderPanel() {
     setReminderType(null);
     setCandidates([]);
@@ -174,18 +190,21 @@ function AnnouncementsPage() {
     setCandidatesError('');
   }
 
+  // tick or untick one student
   function toggleCandidate(studentId) {
     setSelectedStudentIds((previous) =>
       previous.includes(studentId) ? previous.filter((id) => id !== studentId) : [...previous, studentId]
     );
   }
 
+  // select all / clear all
   function toggleSelectAllCandidates() {
     setSelectedStudentIds((previous) =>
       previous.length === candidates.length ? [] : candidates.map((c) => c.studentId)
     );
   }
 
+  // send to selected btn - send the reminder to the ticked students
   async function handleSendReminders() {
     if (!reminderType) return;
     setReminderError('');
@@ -209,6 +228,7 @@ function AnnouncementsPage() {
     }
   }
 
+  // the page - the broadcast form, the reminders panel, recent broadcasts and the remove pop-up
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -220,11 +240,14 @@ function AnnouncementsPage() {
           <ReportLink type="communications" label="Communications report" />
         </div>
 
+        {/* two columns - the form and reminders, and the recent broadcasts */}
         <div className="checkout-grid">
           <div>
+            {/* new / edit broadcast - title, audience, grade, priority and message */}
             <div className="card">
               <div className="flex-between">
                 <h2>{editingId ? 'Edit Broadcast' : 'New Broadcast'}</h2>
+                {/* cancel edit btn - only while editing */}
                 {editingId && (
                   <button type="button" className="btn btn-ghost btn-sm" onClick={cancelEdit}>
                     Cancel Edit
@@ -268,6 +291,7 @@ function AnnouncementsPage() {
                   </div>
                 </div>
 
+                {/* grade choice - not for tutor notices */}
                 {form.targetAudience !== 'TUTOR' && (
                   <div className="form-field">
                     <label htmlFor="targetGrade">Grade (optional)</label>
@@ -322,6 +346,7 @@ function AnnouncementsPage() {
               </form>
             </div>
 
+            {/* send reminders - fee-due or low-attendance, to the chosen students */}
             <div className="card">
               <h2>Send Reminders</h2>
               <p className="muted" style={{ fontSize: '0.88rem' }}>
@@ -331,6 +356,7 @@ function AnnouncementsPage() {
               {reminderStatus && <Alert type="success" message={reminderStatus} />}
               {!reminderType && <Alert type="error" message={reminderError} />}
 
+              {/* two buttons to pick a reminder type, or the students it would reach */}
               {!reminderType ? (
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button type="button" className="btn btn-secondary" onClick={() => handleOpenReminderType('FEE_DUE')}>
@@ -358,6 +384,7 @@ function AnnouncementsPage() {
                   <Alert type="error" message={candidatesError} />
                   <Alert type="error" message={reminderError} />
 
+                  {/* a spinner, an empty message, or the students to pick from */}
                   {isLoadingCandidates ? (
                     <LoadingSpinner label="Finding students..." />
                   ) : candidates.length === 0 ? (
@@ -368,6 +395,7 @@ function AnnouncementsPage() {
                     </p>
                   ) : (
                     <>
+                      {/* select all */}
                       <label
                         style={{
                           display: 'flex',
@@ -387,6 +415,7 @@ function AnnouncementsPage() {
                         Select all ({candidates.length})
                       </label>
 
+                      {/* one tick box per student */}
                       <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
                         {candidates.map((candidate) => (
                           <label
@@ -417,6 +446,7 @@ function AnnouncementsPage() {
                         ))}
                       </div>
 
+                      {/* send to selected btn */}
                       <button
                         type="button"
                         className="btn btn-primary btn-block"
@@ -435,9 +465,11 @@ function AnnouncementsPage() {
             </div>
           </div>
 
+          {/* recent broadcasts - each with Edit and Remove btns */}
           <div className="card">
             <h2>Recent Broadcasts</h2>
             <Alert type="error" message={loadError} />
+            {/* a spinner, an empty message, or one block per announcement */}
             {isLoading ? (
               <LoadingSpinner label="Loading announcements..." />
             ) : announcements.length === 0 ? (
@@ -485,6 +517,7 @@ function AnnouncementsPage() {
         </div>
       </div>
 
+      {/* remove pop-up */}
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => !isDeleting && setDeleteTarget(null)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>

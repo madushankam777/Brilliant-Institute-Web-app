@@ -6,6 +6,7 @@ const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const { STATUSES } = require('./feedback.constants');
 const repository = require('./feedback.repository');
 
+// tutors and admins are staff
 function isStaff(user) {
   return user.role === ROLES.TUTOR || user.role === ROLES.ADMIN;
 }
@@ -24,6 +25,7 @@ function isAddressedTo(ticket, user) {
   return false;
 }
 
+// a ticket can be opened by the person who sent it, or by the staff member it is addressed to
 function assertCanView(user, ticket) {
   if (!ticket) {
     throw ApiError.notFound('Ticket not found.');
@@ -33,7 +35,9 @@ function assertCanView(user, ticket) {
   throw ApiError.forbidden('You can only view tickets addressed to you.');
 }
 
+// submit btn - save a new ticket (a tutor can be chosen as the recipient)
 async function submitFeedback(user, { category, recipientType, recipientTutorId, subject, message }) {
+  // if a tutor is the recipient, they must be an active tutor
   let normalizedTutorId = null;
   if (recipientType === 'TUTOR' || recipientType === 'ADMIN_TUTOR') {
     if (!recipientTutorId) {
@@ -55,6 +59,7 @@ async function submitFeedback(user, { category, recipientType, recipientTutorId,
     subject,
     message,
   });
+  // ticket number such as FB-0001, made from the row id
   const ticketNumber = `FB-${String(ticketId).padStart(4, '0')}`;
   await repository.setTicketNumber(ticketId, ticketNumber);
 
@@ -70,27 +75,32 @@ async function submitFeedback(user, { category, recipientType, recipientTutorId,
   return toSafeFeedback(ticket);
 }
 
+// the tickets I submitted
 async function getMyTickets(user) {
   const rows = await repository.listTicketsBySubmitter(user.id);
   return rows.map(toSafeFeedback);
 }
 
+// the staff inbox - an admin sees tickets for admins, a tutor sees tickets addressed to them
 async function getAllTickets(staffUser, { status }) {
   const rows = await repository.listTicketsForStaff({ role: staffUser.role, userId: staffUser.id, status });
   return rows.map(toSafeFeedback);
 }
 
+// one ticket - only its sender or its recipient may open it
 async function getTicketDetails(user, ticketId) {
   const ticket = await repository.findTicketById(ticketId);
   assertCanView(user, ticket);
   return toSafeFeedback(ticket);
 }
 
+// send reply btn - add a reply to the ticket's thread
 async function replyToTicket(user, ticketId, message) {
   const ticket = await repository.findTicketById(ticketId);
   if (!ticket) {
     throw ApiError.notFound('Ticket not found.');
   }
+  // only the sender or the recipient may reply
   const isOwner = ticket.submitted_by === user.id;
   if (!isOwner && !isAddressedTo(ticket, user)) {
     throw ApiError.forbidden('This ticket is not addressed to you.');
@@ -121,6 +131,7 @@ async function replyToTicket(user, ticketId, message) {
   return toSafeFeedback(updated);
 }
 
+// resolve btn - only the staff member the ticket is addressed to can resolve it
 async function resolveTicket(staffUser, ticketId) {
   const ticket = await repository.findTicketById(ticketId);
   if (!ticket) {
@@ -145,6 +156,7 @@ async function resolveTicket(staffUser, ticketId) {
   return toSafeFeedback(updated);
 }
 
+// how many tickets are in each state
 async function getTicketStatusCounts() {
   const rows = await repository.countTicketsByStatus();
   const counts = { PENDING: 0, IN_PROGRESS: 0, RESOLVED: 0 };

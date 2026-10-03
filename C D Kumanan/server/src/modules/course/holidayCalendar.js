@@ -1,11 +1,16 @@
 // Sri Lankan public holidays from Google Calendar (cached 12 hours)
 const config = require('../../../../../shared/server/src/config/env');
 
+// holidays are kept for 12 hours
 const CACHE_MS = 12 * 60 * 60 * 1000;
+// after a failed download, try again in 10 minutes
 const RETRY_MS = 10 * 60 * 1000;
+// Google's public holiday calendar (iCal feed)
 const FEED_URL = `https://calendar.google.com/calendar/ical/${encodeURIComponent(config.holidays.calendarId)}/public/basic.ics`;
 
+// the last good copy of the holidays
 let cache = { holidays: [], loadedAt: 0 };
+// the download in progress, if any
 let pending = null;
 
 // iCal wraps long lines: a line starting with a space continues the one before
@@ -13,6 +18,7 @@ function unfoldLines(text) {
   return text.replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '').split('\n');
 }
 
+// undo the iCal text escaping
 function unescapeText(value) {
   return value.replace(/\\n/gi, '\n').replace(/\\([,;\\])/g, '$1').trim();
 }
@@ -22,6 +28,7 @@ function toDateKey(value) {
   return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
 }
 
+// a date key plus some days
 function addDays(dateKey, days) {
   const [year, month, day] = dateKey.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
@@ -33,6 +40,7 @@ function parseHolidays(icsText) {
   const namesByDate = new Map();
   let event = null;
 
+  // go through the calendar line by line, collecting each event's start, end, summary and description
   unfoldLines(icsText).forEach((line) => {
     if (line === 'BEGIN:VEVENT') {
       event = {};
@@ -68,6 +76,7 @@ function parseHolidays(icsText) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// download and parse the calendar - on failure keep the last good copy and retry later
 async function fetchFeed() {
   try {
     const response = await fetch(FEED_URL, { signal: AbortSignal.timeout(8000) });
@@ -80,6 +89,7 @@ async function fetchFeed() {
   }
 }
 
+// the holidays, downloaded again only when the copy is older than 12 hours
 async function loadHolidays() {
   if (Date.now() - cache.loadedAt >= CACHE_MS) {
     // one download at a time, however many requests arrive together

@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const config = require('../config/env');
 
+// a short fingerprint of the password hash - a new password changes it and ends old sessions
 function passwordVersion(passwordHash) {
   return crypto
     .createHmac('sha256', config.auth.jwtSecret)
@@ -13,6 +14,7 @@ function passwordVersion(passwordHash) {
 // logged-out tokens, kept only until they would have expired anyway
 const loggedOut = new Map();
 
+// the ended-session list keeps a hash of the token, never the token itself
 const tokenKey = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
 // logout - the token stops working on the server, not just in the browser

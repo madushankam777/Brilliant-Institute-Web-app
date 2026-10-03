@@ -2,6 +2,7 @@
 const nodemailer = require('nodemailer');
 const config = require('../config/env');
 
+// the email connection, made once and reused
 let mailerPromise = null;
 
 // Gmail needs both the address and the app password
@@ -22,6 +23,7 @@ async function sendWithResend({ to, subject, text, html }) {
   return body;
 }
 
+// makes the email connection - Gmail when it is set up, else a free test inbox in development
 async function createMailer() {
   if (isSmtpReady()) {
     const transport = nodemailer.createTransport({
@@ -45,6 +47,7 @@ async function createMailer() {
   return { transport, isTestInbox: true };
 }
 
+// the shared email connection (made on first use)
 function getMailer() {
   if (!mailerPromise) {
     mailerPromise = createMailer().catch((error) => {
@@ -55,12 +58,15 @@ function getMailer() {
   return mailerPromise;
 }
 
+// send one email - used for the password reset codes
 async function sendMail({ to, subject, text, html }) {
+  // cloud hosting - send through Resend instead
   if (config.mail.resendApiKey) return sendWithResend({ to, subject, text, html });
   const mailer = await getMailer();
   if (!mailer) {
     throw new Error('Email is not set up - add SMTP_USER and SMTP_PASS to server/.env');
   }
+  // send it from the institute address, replies go to the institute email
   const info = await mailer.transport.sendMail({
     from: config.mail.from,
     replyTo: config.institute.email,

@@ -1,5 +1,6 @@
 // ECharts settings for each Analytics chart
 
+// chart colours
 const NAVY = '#1e3a8a';
 const BLUE = '#2563eb';
 const GOLD = '#c9a961';
@@ -14,8 +15,11 @@ export function esc(text) {
   return String(text ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 }
 
+// a number as LKR money
 export const lkr = (value) => `LKR ${Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+// a short number, like 1.2K
 const compact = (value) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+// a percent, or - when there is no value
 const pct = (value) => (value === null || value === undefined ? '-' : `${Number(value).toFixed(1)}%`);
 
 // save as image + view the numbers behind the chart
@@ -37,10 +41,12 @@ function zoom(count) {
   return count > 16 ? [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 6 }] : [];
 }
 
+// the chart's place inside its box
 function grid(count, extra = {}) {
   return { left: 8, right: 16, top: 46, bottom: count > 16 ? 46 : 8, containLabel: true, ...extra };
 }
 
+// an axis with named columns
 const categoryAxis = (data) => ({ type: 'category', data, axisTick: { alignWithLabel: true }, axisLabel: { hideOverlap: true } });
 
 // money in vs money paid to tutors
@@ -242,6 +248,7 @@ export function classesOption(a) {
   };
 }
 
+// active students in each grade
 export function gradesOption(a) {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
@@ -263,6 +270,7 @@ export function gradesOption(a) {
   };
 }
 
+// active enrolments in each subject area
 export function subjectsOption(a) {
   return {
     tooltip: { trigger: 'item', formatter: (p) => `${esc(p.name)}<br/><b>${p.value}</b> enrolments (${p.percent}%)` },
@@ -299,6 +307,7 @@ export function growthOption(a) {
   };
 }
 
+// feedback tickets by where they stand now
 export function feedbackOption(a) {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },

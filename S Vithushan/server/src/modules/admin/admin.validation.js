@@ -1,12 +1,16 @@
+// admin form rules - users, tutor keys, announcements, reminders, re-registration and the roll-over
 const { body, param, query } = require('express-validator');
 const { PASSWORD_RULE_MESSAGE, isStrongPassword } = require('../../../../../shared/server/src/utils/passwordPolicy');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { TARGET_AUDIENCES, ANNOUNCEMENT_PRIORITIES, REMINDER_TYPES } = require('./admin.constants');
 
+// user id in the address must be a number
 const userIdParamRules = [param('userId').isInt({ min: 1 }).withMessage('Invalid user id.')];
 
+// key id in the address must be a number
 const keyIdParamRules = [param('keyId').isInt({ min: 1 }).withMessage('Invalid key id.')];
 
+// generate key rules - an optional name or email and an optional ID number
 const generateTutorKeyRules = [
   body('intendedFor')
     .optional({ checkFalsy: true })
@@ -20,6 +24,7 @@ const generateTutorKeyRules = [
     .withMessage('ID number is too long.'),
 ];
 
+// key id and which document: cv or certificate-0, certificate-1 ...
 const keyDocumentParamRules = [
   param('keyId').isInt({ min: 1 }).withMessage('Invalid key id.'),
   param('type')
@@ -27,11 +32,13 @@ const keyDocumentParamRules = [
     .withMessage('Invalid document type.'),
 ];
 
+// suspend rules - the user id and the name typed to confirm
 const suspendUserRules = [
   param('userId').isInt({ min: 1 }).withMessage('Invalid user id.'),
   body('confirmName').trim().notEmpty().withMessage('Please type the name in capital letters to confirm.'),
 ];
 
+// add user rules - name, email, strong password and role (tutor or admin)
 const createUserRules = [
   body('fullName').trim().isLength({ min: 2, max: 150 }).withMessage('Full name must be 2-150 characters.'),
   body('email').trim().isEmail().withMessage('Please enter a valid email address.').normalizeEmail(),
@@ -39,16 +46,19 @@ const createUserRules = [
   body('role').isIn(['TUTOR', 'ADMIN']).withMessage('Admin can only directly create Tutor or Admin accounts.'),
 ];
 
+// user list filters - search, role and status
 const listUsersQueryRules = [
   query('search').optional({ checkFalsy: true }).trim().isLength({ max: 150 }),
   query('role').optional({ checkFalsy: true }).isIn(['STUDENT_PARENT', 'TUTOR', 'ADMIN']),
   query('status').optional({ checkFalsy: true }).isIn(['ACTIVE', 'SUSPENDED', 'DELETED']),
 ];
 
+// announcement id in the address must be a number
 const announcementIdParamRules = [
   param('announcementId').isInt({ min: 1 }).withMessage('Invalid announcement id.'),
 ];
 
+// announcement form rules - title, body, priority, audience and an optional grade
 const createAnnouncementRules = [
   body('title').trim().isLength({ min: 3, max: 200 }).withMessage('Title must be 3-200 characters.'),
   body('body').trim().isLength({ min: 3, max: 4000 }).withMessage('Message body is required.'),
@@ -60,8 +70,10 @@ const createAnnouncementRules = [
     .withMessage('Please choose a valid grade.'),
 ];
 
+// edit announcement rules - the id plus the announcement form
 const updateAnnouncementRules = [...announcementIdParamRules, ...createAnnouncementRules];
 
+// send reminders rules - the reminder type and optionally chosen students
 const sendRemindersRules = [
   body('type').isIn(REMINDER_TYPES).withMessage('Invalid reminder type.'),
   body('studentIds')
@@ -71,10 +83,12 @@ const sendRemindersRules = [
   body('studentIds.*').optional().isInt({ min: 1 }).withMessage('Invalid student id.'),
 ];
 
+// reminder candidates filter - the reminder type
 const reminderCandidatesQueryRules = [
   query('type').isIn(REMINDER_TYPES).withMessage('Invalid reminder type.'),
 ];
 
+// tutor message rules - audience, optional class, subject and message
 const tutorMessageRules = [
   body('audience').isIn(['STUDENTS', 'ADMIN', 'BOTH']).withMessage('Please choose who this goes to.'),
   body('classId').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Invalid class id.'),
@@ -82,6 +96,7 @@ const tutorMessageRules = [
   body('message').trim().isLength({ min: 3, max: 350 }).withMessage('Please write your message (3-350 characters).'),
 ];
 
+// re-registration key id in the address must be a number
 const reregistrationKeyIdParamRules = [
   param('keyId').isInt({ min: 1 }).withMessage('Invalid key id.'),
 ];
@@ -106,6 +121,7 @@ const generateReregistrationKeysRules = [
     .withMessage('Please choose a valid year.'),
 ];
 
+// revenue period - daily, monthly, yearly or fiveYears
 const revenueQueryRules = [
   query('period')
     .optional({ checkFalsy: true })
@@ -113,6 +129,7 @@ const revenueQueryRules = [
     .withMessage('Choose daily, monthly, yearly or last 5 years.'),
 ];
 
+// schedule reminder rules - audience, optional class, title, message and the date and time
 const scheduleReminderRules = [
   body('audience').isIn(['SELF', 'CLASS', 'ALL']).withMessage('Choose who gets this reminder.'),
   body('classId').if(body('audience').equals('CLASS')).isInt({ min: 1 }).withMessage('Choose a class.'),
@@ -127,8 +144,10 @@ const scheduleReminderRules = [
     .withMessage('Pick a date and a time.'),
 ];
 
+// reminder id in the address must be a number
 const reminderIdParamRules = [param('reminderId').isInt({ min: 1 }).withMessage('Invalid reminder id.')];
 
+// key list filter - an optional year
 const reregistrationKeyQueryRules = [
   query('academicYear')
     .optional({ checkFalsy: true })
@@ -136,6 +155,7 @@ const reregistrationKeyQueryRules = [
     .withMessage('Please choose a valid year.'),
 ];
 
+// the key a student types - 8 to 24 letters, numbers and dashes
 const redeemReregistrationKeyRules = [
   body('keyCode')
     .trim()
@@ -149,12 +169,14 @@ const redeemReregistrationKeyRules = [
     .withMessage('A key only contains letters, numbers and dashes.'),
 ];
 
+// roll-over preview - the year
 const rolloverQueryRules = [
   query('academicYear')
     .isInt({ min: 2000, max: 2100 })
     .withMessage('Please choose a valid year.'),
 ];
 
+// run roll-over rules - the year, and RUN typed to confirm
 const runRolloverRules = [
   body('academicYear')
     .isInt({ min: 2000, max: 2100 })

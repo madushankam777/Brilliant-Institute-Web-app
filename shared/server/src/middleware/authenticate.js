@@ -6,13 +6,16 @@ const { passwordVersion, isTokenRevoked } = require('../utils/sessionToken');
 const { SESSION_COOKIE_NAME, USER_STATUS } = require('../config/roles');
 const { pool } = require('../config/db');
 
+// login check - every protected route runs this first, then req.user is the logged-in person
 async function authenticate(req, res, next) {
+  // read the session token from the cookie
   const token = req.cookies ? req.cookies[SESSION_COOKIE_NAME] : undefined;
 
   if (!token) {
     return next(ApiError.unauthorized('Please log in to continue.'));
   }
 
+  // check the token signature and expiry
   let payload;
   try {
     // Explicitly pin the algorithm - never let the token's own header pick it.
@@ -26,6 +29,7 @@ async function authenticate(req, res, next) {
     return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
   }
 
+  // load the account from the database
   let account;
   try {
     const [rows] = await pool.execute(

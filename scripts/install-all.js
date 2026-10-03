@@ -2,6 +2,7 @@
 const { execSync } = require('child_process');
 const path = require('path');
 
+// project folder
 const ROOT = path.resolve(__dirname, '..');
 // the API loads route files from each person's module, so each module's packages are needed too
 const FOLDERS = [
@@ -15,6 +16,7 @@ const FOLDERS = [
   'client',
 ];
 
+// install each folder's packages in turn
 for (const folder of FOLDERS) {
   console.log(`\n[install] ${folder}`);
   // the website build needs its dev tools (vite); the servers do not

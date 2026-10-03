@@ -36,6 +36,7 @@ function PlaceholderRegisterPage() {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // check the form before sending it
   function validate() {
     const errors = {};
     if (form.fullName.trim().length < 2) {
@@ -68,6 +69,7 @@ function PlaceholderRegisterPage() {
     }
   }
 
+  // the page - role choice, then the form
   return (
     <AuthLayout
       quote={{
@@ -101,6 +103,7 @@ function PlaceholderRegisterPage() {
 
       {error && <Alert type="error" message={error} />}
 
+      {/* register form - name, email, phone, grade or key, password and terms */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="fullName"

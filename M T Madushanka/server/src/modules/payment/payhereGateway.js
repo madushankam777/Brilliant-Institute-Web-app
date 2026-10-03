@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 
+// where the browser sends the payer - PayHere's sandbox (testing) or live checkout
 const CHECKOUT_URLS = {
   sandbox: 'https://sandbox.payhere.lk/pay/checkout',
   live: 'https://www.payhere.lk/pay/checkout',
@@ -30,6 +31,7 @@ function md5Upper(value) {
   return crypto.createHash('md5').update(String(value)).digest('hex').toUpperCase();
 }
 
+// are the PayHere settings complete?
 function isConfigured() {
   return config.payhere.isConfigured;
 }
@@ -39,15 +41,18 @@ function formatAmount(amount) {
   return Number(amount).toFixed(2);
 }
 
+// order id sent to PayHere, e.g. BI-15 for payment 15
 function orderIdForPayment(paymentId) {
   return `BI-${paymentId}`;
 }
 
+// get our payment id back from a PayHere order id
 function paymentIdFromOrderId(orderId) {
   const match = /^BI-(\d+)$/.exec(String(orderId || ''));
   return match ? Number(match[1]) : null;
 }
 
+// the address PayHere calls when a payment finishes
 function notifyUrl() {
   return (
     config.payhere.notifyUrlOverride ||
@@ -65,6 +70,7 @@ function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
   const formattedAmount = formatAmount(amount);
   const currency = config.payhere.currency;
 
+  // checkout signature = md5(merchant id + order id + amount + currency + md5(secret))
   const hash = md5Upper(
     config.payhere.merchantId +
       orderId +
@@ -73,6 +79,7 @@ function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
       md5Upper(config.payhere.merchantSecret)
   );
 
+  // PayHere needs a first and a last name
   const nameParts = String(student.fullName || '').trim().split(/\s+/);
   const firstName = nameParts[0] || 'Student';
   const lastName = nameParts.slice(1).join(' ') || '-';
@@ -113,6 +120,7 @@ function verifyNotification(body = {}) {
     md5sig: signature,
   } = body;
 
+  // the signature PayHere should have sent (same idea, plus the status code)
   const expected = md5Upper(
     String(merchantId) +
       String(orderId) +

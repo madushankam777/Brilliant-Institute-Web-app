@@ -14,6 +14,7 @@ function sslOptions() {
   return options;
 }
 
+// connection pool - every database query in the API goes through this
 const pool = mysql.createPool({
   host: config.db.host,
   port: config.db.port,
@@ -28,6 +29,7 @@ const pool = mysql.createPool({
   dateStrings: true,
 });
 
+// start-up check - can we reach the database?
 async function verifyDatabaseConnection() {
   const connection = await pool.getConnection();
   try {

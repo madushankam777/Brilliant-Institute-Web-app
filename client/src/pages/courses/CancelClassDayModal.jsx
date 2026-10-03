@@ -14,6 +14,7 @@ import {
   todayKey,
 } from '../../../../shared/client/src/utils/schedule';
 
+// cancel a date pop-up - cancel one lesson (students are told) or restore a cancelled date
 function CancelClassDayModal({ classItem, onClose, onSaved }) {
   const today = todayKey();
   const [allEvents, reloadEvents] = useClassEvents(today, addDaysToKey(today, 365));
@@ -24,15 +25,20 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
 
+  // the dates already cancelled for this class
   const cancelled = allEvents.filter((event) => event.classId === classItem.id && event.type === 'CANCELLED');
+  // is this date already cancelled
   const isCancelled = (dateKey) => cancelled.some((event) => event.date === dateKey);
+  // a day this class still runs (not past, not a holiday)
   const isClassDay = (dateKey) => dateKey >= today && classRunsOn(classItem, dateKey) && !holidays[dateKey];
 
+  // why the chosen date cannot be cancelled
   let dateProblem = '';
   if (date && holidays[date]) dateProblem = `Public holiday - ${holidays[date]}. There is no class that day anyway.`;
   else if (date && !classRunsOn(classItem, date)) dateProblem = `This class runs on ${classItem.dayOfWeek}s. Pick a ${classItem.dayOfWeek}.`;
   else if (date && isCancelled(date)) dateProblem = 'Already cancelled on this day.';
 
+  // cancel date btn - cancel the chosen date and tell the students
   async function handleCancel(event) {
     event.preventDefault();
     if (!date) {
@@ -51,6 +57,7 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
     }
   }
 
+  // restore btn - bring a cancelled date back
   async function handleRestore(eventId) {
     setBusyId(eventId);
     setError('');
@@ -64,6 +71,7 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
     }
   }
 
+  // the pop-up - calendar, the chosen day, the reason, cancelled dates and buttons
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cancel-day-title">
       <div className="modal-dialog modal-wide">
@@ -77,7 +85,9 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
         <Alert type="error" message={error} />
 
         <form onSubmit={handleCancel} noValidate>
+          {/* calendar and the chosen day */}
           <div className="schedule-picker">
+            {/* calendar - a dot marks the days this class runs */}
             <MonthCalendar
               selectedDate={date}
               onSelectDate={(dateKey) => {
@@ -91,6 +101,7 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
             />
 
             <div>
+              {/* the chosen day and any problem with it */}
               <div className="day-agenda">
                 {date ? (
                   <>
@@ -112,6 +123,7 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
                 )}
               </div>
 
+              {/* reason shown to the students */}
               <div className="form-field" style={{ marginTop: '16px' }}>
                 <label htmlFor="cancel-note">Reason for students (optional)</label>
                 <input
@@ -123,6 +135,7 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
                 />
               </div>
 
+              {/* dates already cancelled, each with a restore btn */}
               {cancelled.length > 0 && (
                 <div className="cancelled-days">
                   <h3>Already cancelled</h3>
@@ -147,6 +160,7 @@ function CancelClassDayModal({ classItem, onClose, onSaved }) {
             </div>
           </div>
 
+          {/* close and cancel this date buttons */}
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busyId === 'new'}>
               Close

@@ -1,3 +1,4 @@
+// report link - the Report btn shown on the admin pages
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 

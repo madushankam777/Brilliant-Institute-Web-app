@@ -1,7 +1,9 @@
+// website build and dev server settings (Vite) - security headers, the /api proxy and shared packages
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// make shared/ files use this app's copy of react, axios and the router (only one copy)
 const sharedPackageAliases = ['react', 'react-dom', 'react/jsx-runtime', 'react-router-dom', 'axios'].reduce(
   (aliases, pkg) => {
     aliases[pkg] = path.resolve(__dirname, 'node_modules', pkg);
@@ -10,6 +12,7 @@ const sharedPackageAliases = ['react', 'react-dom', 'react/jsx-runtime', 'react-
   {}
 );
 
+// headers sent with every page - same rules as server/src/app.js
 const SECURITY_HEADERS = {
   // security headers
   'Content-Security-Policy': [
@@ -35,13 +38,16 @@ const SECURITY_HEADERS = {
 // dev server gets every header except the CSP
 const { 'Content-Security-Policy': _strictCsp, ...DEV_HEADERS } = SECURITY_HEADERS;
 
+// the Vite settings
 export default defineConfig({
+  // React support
   plugins: [react()],
   resolve: {
     alias: sharedPackageAliases,
   },
   // static files from shared/client/public
   publicDir: path.resolve(__dirname, '../shared/client/public'),
+  // dev server - npm run dev, port 5173
   server: {
     port: 5173,
     strictPort: true,

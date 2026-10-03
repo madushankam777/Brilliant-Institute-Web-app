@@ -3,11 +3,16 @@ const parts = require('../reportParts');
 
 const { num, kpi, table, columnChart, section, rows } = parts;
 
+// the account roles
 const ROLES = ['STUDENT_PARENT', 'TUTOR', 'ADMIN'];
+// the account statuses
 const STATUSES = ['ACTIVE', 'SUSPENDED', 'LEFT', 'DELETED'];
 
+// user accounts report - accounts by role and status, new sign-ups, locked accounts and tutor keys
 async function build(params, { period }) {
+  // accounts per role and status
   const counts = await rows(`SELECT role, status, COUNT(*) AS total FROM users GROUP BY role, status`);
+  // one row per role with a count for each status
   const matrix = ROLES.map((role) => {
     const row = { role: parts.label(role) };
     let total = 0;
@@ -19,8 +24,10 @@ async function build(params, { period }) {
     row.total = total;
     return row;
   });
+  // the row for one role
   const countOf = (role) => matrix.find((item) => item.role === parts.label(role));
 
+  // the account directory, filtered by role and status when they are chosen
   const where = ["status <> 'DELETED'"];
   const values = [];
   if (params.role) {
@@ -37,21 +44,25 @@ async function build(params, { period }) {
      ORDER BY role, full_name`,
     values
   );
+  // accounts created in the period
   const newUsers = await rows(
     `SELECT created_at, full_name, role, email, grade
      FROM users WHERE created_at >= ? AND created_at < ?
      ORDER BY created_at ASC`,
     [period.start, period.end]
   );
+  // accounts with failed logins or a lock
   const security = await rows(
     `SELECT full_name, role, email, failed_login_attempts, locked_until, last_login_at
      FROM users
      WHERE status <> 'DELETED' AND (failed_login_attempts > 0 OR locked_until > NOW())
      ORDER BY failed_login_attempts DESC`
   );
+  // active accounts that never logged in
   const neverLoggedIn = await rows(
     `SELECT COUNT(*) AS total FROM users WHERE status = 'ACTIVE' AND last_login_at IS NULL`
   );
+  // tutor keys made in the period
   const keys = await rows(
     `SELECT k.created_at, k.key_code, k.intended_for, k.status, k.used_at, u.full_name AS used_by
      FROM tutor_enrollment_keys k LEFT JOIN users u ON u.id = k.used_by
@@ -66,10 +77,12 @@ async function build(params, { period }) {
     value: newUsers.filter((item) => item.created_at.slice(0, 7) === key).length,
   }));
 
+  // accounts in use (not deleted)
   const accounts = matrix.reduce((sum, item) => sum + item.total - item.DELETED, 0);
   const suspended = matrix.reduce((sum, item) => sum + item.SUSPENDED, 0);
   const locked = security.filter((item) => item.locked_until).length;
 
+  // the key findings
   const highlights = [
     `${accounts} accounts in use: ${countOf('STUDENT_PARENT').total - countOf('STUDENT_PARENT').DELETED} students, ` +
       `${countOf('TUTOR').total - countOf('TUTOR').DELETED} tutors and ${countOf('ADMIN').total - countOf('ADMIN').DELETED} admins.`,
@@ -81,6 +94,7 @@ async function build(params, { period }) {
 
   const filterText = [params.role ? parts.label(params.role) : 'All roles', params.status ? parts.label(params.status) : 'All except deleted'].join(', ');
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'User Accounts Report',
     subtitle: 'Accounts by role and status, new registrations and account security',

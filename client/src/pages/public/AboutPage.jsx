@@ -10,6 +10,7 @@ import Footer from '../../../../shared/client/src/components/layout/Footer';
 // image from shared/client/public
 const ABOUT_IMAGE = '/about-us.webp';
 
+// the mission points
 const MISSION = [
   'Teach clear, syllabus-focused lessons with tutors who know their students.',
   'Keep a steady weekly routine, with timetables everyone can see.',
@@ -17,6 +18,7 @@ const MISSION = [
   'Make joining, paying and asking for help simple and secure.',
 ];
 
+// why families choose us - four cards
 const VALUES = [
   {
     icon: 'target',
@@ -40,12 +42,14 @@ const VALUES = [
   },
 ];
 
+// the three steps to join
 const STEPS = [
   { title: 'Create an account', text: 'Register online as a student or parent in under a minute.' },
   { title: 'Choose your classes', text: 'Browse classes by subject, grade and day, then enrol.' },
   { title: 'Learn and track progress', text: 'Check in to class, see your attendance and pay fees online.' },
 ];
 
+// questions parents and students ask, with answers
 const FAQS = [
   {
     q: 'How do I join a class?',
@@ -81,18 +85,22 @@ const FAQS = [
   },
 ];
 
+// about page - what the institute does, why families choose it, tutors, steps to join and questions
 function AboutPage() {
   const { isLoggedIn } = useAuth();
   const [tutors, setTutors] = useState([]);
 
+  // load the tutors shown on the page
   useEffect(() => {
     fetchPublicTutors()
       .then(setTutors)
       .catch(() => setTutors([]));
   }, []);
 
+  // the page - hero, vision and mission, values, tutors, steps, questions and a contact box
   return (
     <>
+      {/* hero */}
       <section className="container hero">
         <div className="hero-copy">
           <span className="eyebrow">About Us</span>
@@ -148,6 +156,7 @@ function AboutPage() {
         </div>
       </section>
 
+      {/* why families choose us */}
       <section className="section section-bg-soft">
         <div className="container">
           <div className="section-heading">
@@ -198,6 +207,7 @@ function AboutPage() {
         </section>
       )}
 
+      {/* three easy steps */}
       <section className="section section-bg-soft">
         <div className="container">
           <div className="section-heading">
@@ -237,6 +247,7 @@ function AboutPage() {
         </div>
       </section>
 
+      {/* contact box */}
       <section className="container">
         <div className="about-cta">
           <div>

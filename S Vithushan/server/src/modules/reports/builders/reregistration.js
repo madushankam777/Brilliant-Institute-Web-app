@@ -7,15 +7,19 @@ const { kpi, table, bars, section, rows, percent } = parts;
 // best key status wins when a student has more than one key
 const RANK = { USED: 4, UNUSED: 3, EXPIRED: 2, REVOKED: 1 };
 
+// re-registration report - who has confirmed their place for the next academic year
 async function build(params) {
+  // the academic year (next year unless one is chosen)
   const year = params.academicYear || new Date().getFullYear() + 1;
   const finalGrade = GRADES[GRADES.length - 1];
 
+  // every active student
   const students = await rows(
     `SELECT id, full_name, student_code, grade, phone, reregistered_for_year
      FROM users WHERE role = 'STUDENT_PARENT' AND status = 'ACTIVE'
      ORDER BY grade, full_name`
   );
+  // the keys issued for this year
   const keys = await rows(
     `SELECT k.student_id, k.key_code, k.from_grade, k.to_grade, k.status, k.created_at, k.used_at, k.expires_at,
             u.full_name, u.student_code, (k.status = 'UNUSED' AND k.expires_at IS NOT NULL AND k.expires_at < NOW()) AS is_expired
@@ -24,11 +28,13 @@ async function build(params) {
      ORDER BY k.created_at ASC`,
     [year]
   );
+  // the last 10 roll-overs
   const history = await rows(
     `SELECT academic_year, promoted_count, graduated_count, removed_count, ran_at
      FROM yearly_rollover_log ORDER BY academic_year DESC LIMIT 10`
   );
 
+  // each student's best key status - used, unused, expired or revoked
   const keyStatus = new Map();
   keys.forEach((key) => {
     const status = Number(key.is_expired) ? 'EXPIRED' : key.status;
@@ -36,8 +42,11 @@ async function build(params) {
     if (!current || RANK[status] > RANK[current]) keyStatus.set(key.student_id, status);
   });
 
+  // returning students (those in the last grade finish and do not re-register)
   const eligible = students.filter((item) => item.grade !== finalGrade);
+  // students who confirmed their place
   const done = eligible.filter((item) => item.reregistered_for_year === year || keyStatus.get(item.id) === 'USED');
+  // students who have not, with the state of their key
   const notDone = eligible
     .filter((item) => !done.includes(item))
     .map((item) => ({ ...item, keyState: keyStatus.has(item.id) ? keyLabel(keyStatus.get(item.id)) : 'No key issued' }));
@@ -46,12 +55,14 @@ async function build(params) {
   const finishing = students.filter((item) => item.grade === finalGrade).length;
   const rate = percent(done.length, eligible.length);
 
+  // per grade - students, confirmed, waiting and the rate
   const gradeRows = GRADES.filter((grade) => grade !== finalGrade).map((grade) => {
     const inGrade = eligible.filter((item) => item.grade === grade);
     const confirmed = done.filter((item) => item.grade === grade).length;
     return { grade, students: inGrade.length, confirmed, waiting: inGrade.length - confirmed, rate: percent(confirmed, inGrade.length) };
   }).filter((item) => item.students > 0);
 
+  // the key findings
   const highlights = [
     `${done.length} of ${eligible.length} returning students (${rate ?? 0}%) have confirmed their place for ${year}.`,
   ];
@@ -60,6 +71,7 @@ async function build(params) {
   if (finishing > 0) highlights.push(`${finishing} ${finalGrade} student(s) finish this year and do not need to re-register.`);
   if (notDone.length > 0) highlights.push(`Students who do not re-register are closed out at the January roll-over.`);
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'Re-registration Report',
     subtitle: `Places confirmed for the ${year} academic year`,
@@ -134,6 +146,7 @@ async function build(params) {
   };
 }
 
+// words for a key's state
 function keyLabel(status) {
   if (status === 'UNUSED') return 'Key issued, not used yet';
   if (status === 'EXPIRED') return 'Key expired';

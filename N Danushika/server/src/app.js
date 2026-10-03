@@ -1,3 +1,4 @@
+// this module's own small API (auth only) - the combined site uses server/src/app.js
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -12,6 +13,7 @@ const { notFoundHandler, errorHandler } = require('../../../shared/server/src/mi
 
 const authRoutes = require('./modules/auth/auth.routes');
 
+// create the web server
 const app = express();
 
 // We run behind a proxy in production
@@ -56,8 +58,10 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'API is running.' });
 });
 
+// login, register and profile routes
 app.use('/api/auth', authRoutes);
 
+// unknown address gives a 404, any other error gives a JSON error reply
 app.use(notFoundHandler);
 app.use(errorHandler);
 

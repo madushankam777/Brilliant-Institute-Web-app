@@ -165,6 +165,7 @@ async function getPayouts(period, tutorId = null) {
   return list.map((item) => ({ ...item, amount: num(item.amount), account: accountText(item) }));
 }
 
+// bank name with the last 4 digits of the account
 function accountText(payout) {
   if (!payout.bank_name && !payout.bank_account_last4) return '-';
   return `${payout.bank_name || 'Account'}${payout.bank_account_last4 ? ` ••••${payout.bank_account_last4}` : ''}`;

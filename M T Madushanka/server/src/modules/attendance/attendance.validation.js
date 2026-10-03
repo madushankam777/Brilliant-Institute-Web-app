@@ -2,12 +2,15 @@
 const { param, body, query } = require('express-validator');
 const { VALID_ATTENDANCE_STATUSES } = require('./attendance.constants');
 
+// class id in the address must be a number
 const classIdParamRules = [param('classId').isInt({ min: 1 }).withMessage('Invalid class id.')];
 
+// session id in the address must be a number
 const sessionIdParamRules = [
   param('sessionId').isInt({ min: 1 }).withMessage('Invalid session id.'),
 ];
 
+// save attendance rules - a list of marks, each with a student, a status and optional remarks
 const markAttendanceRules = [
   param('sessionId').isInt({ min: 1 }).withMessage('Invalid session id.'),
   body('records').isArray({ min: 1 }).withMessage('At least one attendance entry is required.'),
@@ -21,6 +24,7 @@ const markAttendanceRules = [
     .withMessage('Remarks must be 255 characters or fewer.'),
 ];
 
+// history filter - an optional class id
 const historyQueryRules = [
   query('classId').optional().isInt({ min: 1 }).withMessage('Invalid class id.'),
 ];

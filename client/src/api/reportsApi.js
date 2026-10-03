@@ -1,3 +1,4 @@
+// report API calls - list, build and download reports, and the analytics data
 import httpClient from '../../../shared/client/src/api/httpClient';
 
 // reports page - which reports exist
@@ -12,6 +13,7 @@ export async function fetchReportOptions() {
   return response.data.data.options;
 }
 
+// recent reports
 export async function fetchReportHistory() {
   const response = await httpClient.get('/admin/reports/history');
   return response.data.data.history;

@@ -1,3 +1,4 @@
+// auth routes - register, login, logout, profile, password change and reset (all under /api/auth)
 const express = require('express');
 const authenticate = require('../../../../../shared/server/src/middleware/authenticate');
 const { authLimiter, resetRequestLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
@@ -16,6 +17,7 @@ const {
 const router = express.Router();
 
 // Public endpoints (no login required).
+// register btn - make a student or tutor account
 router.post(
   '/register',
   authLimiter,
@@ -24,6 +26,7 @@ router.post(
   controller.register
 );
 
+// login btn - check email and password, then start the session
 router.post(
   '/login',
   authLimiter,
@@ -32,8 +35,10 @@ router.post(
   controller.login
 );
 
+// logout btn - end the session
 router.post('/logout', controller.logout);
 
+// forgot password btn - email a 6-digit reset code
 router.post(
   '/forgot-password',
   resetRequestLimiter,
@@ -42,6 +47,7 @@ router.post(
   controller.forgotPassword
 );
 
+// reset password - set a new password using the emailed code (or an admin reset link)
 router.post(
   '/reset-password',
   authLimiter,
@@ -51,8 +57,11 @@ router.post(
 );
 
 // Endpoints below this line require the user to be logged in.
+// session check - is the user still logged in?
 router.get('/session', authenticate, controller.getSession);
+// my profile - read my own details
 router.get('/profile', authenticate, controller.getProfile);
+// profile save btn - update name, phone and bio
 router.put(
   '/profile',
   authenticate,
@@ -60,17 +69,20 @@ router.put(
   validateRequest,
   controller.updateProfile
 );
+// profile picture upload - JPG, PNG or WEBP up to 3 MB
 router.post(
   '/profile/picture',
   authenticate,
   profilePictureUpload,
   controller.uploadProfilePicture
 );
+// profile picture remove btn
 router.delete(
   '/profile/picture',
   authenticate,
   controller.removeProfilePicture
 );
+// change password btn - needs the current password
 router.put(
   '/password',
   authenticate,

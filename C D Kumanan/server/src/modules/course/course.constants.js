@@ -4,11 +4,13 @@ const CLASS_STATUS = Object.freeze({
   CANCELLED: 'CANCELLED',
 });
 
+// enrolment states
 const ENROLLMENT_STATUS = Object.freeze({
   ACTIVE: 'ACTIVE',
   DROPPED: 'DROPPED',
 });
 
+// subject areas offered in the class filter
 const SUBJECT_AREAS = Object.freeze([
   'Mathematics',
   'Science',
@@ -19,6 +21,7 @@ const SUBJECT_AREAS = Object.freeze([
   'Other',
 ]);
 
+// days a class can run on
 const DAYS_OF_WEEK = Object.freeze([
   'Monday',
   'Tuesday',

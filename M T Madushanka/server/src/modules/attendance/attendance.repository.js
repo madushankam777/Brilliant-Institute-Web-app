@@ -1,11 +1,14 @@
+// attendance database queries - classes, sessions, attendance marks and check-in keys
 const { pool } = require('../../../../../shared/server/src/config/db');
 
+// a class with its tutor's name and photo - reused by the class lists
 const CLASS_WITH_TUTOR_SELECT = `
   SELECT c.*, t.full_name AS tutor_name, t.profile_picture_path AS tutor_profile_picture
   FROM classes c
   JOIN users t ON t.id = c.tutor_id
 `;
 
+// one class by id
 async function findClassById(classId) {
   const [rows] = await pool.execute(`SELECT * FROM classes WHERE id = ? LIMIT 1`, [classId]);
   return rows[0] || null;
@@ -28,6 +31,7 @@ async function listAllClassesWithTutor() {
   return rows;
 }
 
+// one session with its class and tutor, plus its current key
 async function findSessionWithClass(sessionId) {
   const [rows] = await pool.execute(
     `SELECT cs.id, cs.class_id, cs.session_date, cs.start_time, cs.end_time,
@@ -63,6 +67,7 @@ async function findSessionByActiveCheckinCode(code) {
   return rows[0] || null;
 }
 
+// all sessions of a class, newest first
 async function listSessionsForClass(classId) {
   const [rows] = await pool.execute(
     `SELECT id, class_id, session_date, start_time, end_time
@@ -88,6 +93,7 @@ async function listActiveStudentsForClass(classId) {
   return rows;
 }
 
+// the session of a class on a given date, if any
 async function findSessionByClassAndDate(classId, sessionDate) {
   const [rows] = await pool.execute(
     `SELECT id, class_id, session_date, start_time, end_time
@@ -97,6 +103,7 @@ async function findSessionByClassAndDate(classId, sessionDate) {
   return rows[0] || null;
 }
 
+// create a session (one class day)
 async function createSession({ classId, sessionDate, startTime, endTime }) {
   const [result] = await pool.execute(
     `INSERT INTO class_sessions (class_id, session_date, start_time, end_time, created_at)
@@ -106,6 +113,7 @@ async function createSession({ classId, sessionDate, startTime, endTime }) {
   return result.insertId;
 }
 
+// all marks of one session
 async function listAttendanceForSession(sessionId) {
   const [rows] = await pool.execute(
     `SELECT id, session_id, student_id, status, remarks, marked_by, marked_at, updated_at
@@ -116,6 +124,7 @@ async function listAttendanceForSession(sessionId) {
   return rows;
 }
 
+// one student's mark in one session
 async function findAttendanceRecord(sessionId, studentId) {
   const [rows] = await pool.execute(
     `SELECT * FROM attendance_records WHERE session_id = ? AND student_id = ? LIMIT 1`,
@@ -124,6 +133,7 @@ async function findAttendanceRecord(sessionId, studentId) {
   return rows[0] || null;
 }
 
+// add a mark
 async function createAttendanceRecord({ sessionId, studentId, status, remarks, markedBy }) {
   await pool.execute(
     `INSERT INTO attendance_records
@@ -133,6 +143,7 @@ async function createAttendanceRecord({ sessionId, studentId, status, remarks, m
   );
 }
 
+// correct a mark
 async function updateAttendanceRecord(id, { status, remarks, markedBy }) {
   await pool.execute(
     `UPDATE attendance_records
@@ -142,6 +153,7 @@ async function updateAttendanceRecord(id, { status, remarks, markedBy }) {
   );
 }
 
+// a student's marks, newest first - optionally for one class
 async function listAttendanceHistoryForStudent(studentId, classId) {
   const params = [studentId];
   let classFilter = '';
@@ -163,6 +175,7 @@ async function listAttendanceHistoryForStudent(studentId, classId) {
   return rows;
 }
 
+// is the student actively enrolled in the class?
 async function isStudentEnrolledInClass(studentId, classId) {
   const [rows] = await pool.execute(
     `SELECT id FROM enrollments WHERE student_id = ? AND class_id = ? AND status = 'ACTIVE' LIMIT 1`,
@@ -171,6 +184,7 @@ async function isStudentEnrolledInClass(studentId, classId) {
   return rows.length > 0;
 }
 
+// per class: sessions marked and how many were attended (present or late)
 async function getAttendanceSummaryByClass(studentId) {
   const [rows] = await pool.execute(
     `SELECT cs.class_id, c.subject,

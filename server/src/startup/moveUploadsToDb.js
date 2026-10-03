@@ -6,8 +6,10 @@ const { pool } = require('../../../shared/server/src/config/db');
 const { hasTable } = require('../../../shared/server/src/utils/schemaFeatures');
 const { UPLOADS_ROOT_DIR, resolveUploadPath } = require('../../../shared/server/src/utils/resolveUploadPath');
 
+// file type by file extension
 const MIME_BY_EXTENSION = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.pdf': 'application/pdf' };
 
+// JSON text to an object, with a fallback
 function parseJson(value, fallback) {
   if (value === null || value === undefined) return fallback;
   return typeof value === 'string' ? JSON.parse(value) : value;
@@ -29,6 +31,7 @@ async function moveFile(oldPath, kind, userId) {
   return `/api/files/${publicId}`;
 }
 
+// run the move - profile pictures, bank slips, tutor CVs and certificates
 async function moveUploadsToDb() {
   if (!fs.existsSync(UPLOADS_ROOT_DIR)) return;
   if (!(await hasTable('uploaded_files'))) return;

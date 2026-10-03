@@ -9,9 +9,12 @@ const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandle
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const service = require('./contact.service');
 
+// what a Contact Us message can be about
 const TOPICS = ['ADMISSIONS', 'CLASSES', 'FEES', 'TECHNICAL', 'OTHER'];
+// message states - NEW until an admin marks it HANDLED
 const STATUSES = ['NEW', 'HANDLED'];
 
+// Contact Us form rules - name, email, optional phone, topic and message, plus a hidden field bots fill in
 const sendRules = [
   body('fullName').trim().isLength({ min: 2, max: 120 }).withMessage('Please enter your name.'),
   body('email').trim().isEmail().isLength({ max: 190 }).withMessage('Please enter a valid email address.'),
@@ -28,6 +31,7 @@ const sendRules = [
 
 const router = express.Router();
 
+// send btn - the public Contact Us form (limited to 5 messages an hour per visitor)
 router.post(
   '/',
   contactLimiter,
@@ -43,6 +47,7 @@ router.post(
   })
 );
 
+// admin inbox - the messages, optionally by status
 router.get(
   '/',
   authenticate,
@@ -55,6 +60,7 @@ router.get(
   })
 );
 
+// handled btn - an admin marks a message handled or opens it again
 router.patch(
   '/:messageId/status',
   authenticate,

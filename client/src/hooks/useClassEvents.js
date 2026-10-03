@@ -1,3 +1,4 @@
+// class changes hook - cancelled days and extra classes for a date range
 import { useCallback, useEffect, useState } from 'react';
 import { fetchClassEvents } from '../api/courseApi';
 import { addDaysToKey, startOfWeek, todayKey } from '../../../shared/client/src/utils/schedule';
@@ -7,6 +8,7 @@ function useClassEvents(fromDate, toDate) {
   const [events, setEvents] = useState([]);
   const [version, setVersion] = useState(0);
 
+  // load the changes whenever the dates change (or reload is called)
   useEffect(() => {
     let isCurrent = true;
     fetchClassEvents(fromDate, toDate)
@@ -21,6 +23,7 @@ function useClassEvents(fromDate, toDate) {
     };
   }, [fromDate, toDate, version]);
 
+  // ask for the changes again
   const reload = useCallback(() => setVersion((value) => value + 1), []);
   return [events, reload];
 }

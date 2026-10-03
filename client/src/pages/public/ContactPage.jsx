@@ -9,6 +9,7 @@ import Footer from '../../../../shared/client/src/components/layout/Footer';
 import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import { INSTITUTE, MAP_EMBED_URL, MAP_LINK_URL } from '../../../../shared/client/src/constants/institute';
 
+// what a message can be about
 const TOPICS = [
   { value: 'ADMISSIONS', label: 'Joining the institute' },
   { value: 'CLASSES', label: 'Classes and timetables' },
@@ -17,11 +18,15 @@ const TOPICS = [
   { value: 'OTHER', label: 'Something else' },
 ];
 
+// a message can be up to 2000 characters
 const MESSAGE_MAX = 2000;
+// a simple email check
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// contact page - address, phone, email, a map and the message form
 function ContactPage() {
   const { user, isLoggedIn } = useAuth();
+  // a blank form - name and email are filled in for a logged-in user
   const emptyForm = {
     fullName: user ? user.fullName : '',
     email: user ? user.email : '',
@@ -35,11 +40,13 @@ function ContactPage() {
   const [sentMessage, setSentMessage] = useState('');
   const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
 
+  // change one field and clear its error
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
     clearFieldError(field);
   }
 
+  // send btn - validate, send the message, then clear the form
   async function handleSubmit(event) {
     event.preventDefault();
     const ok = validate({
@@ -69,8 +76,10 @@ function ContactPage() {
     }
   }
 
+  // the page - hero, contact details with a map, and the message form
   return (
     <>
+      {/* hero */}
       <section className="container contact-hero">
         <span className="eyebrow">Contact Us</span>
         <h1>We&apos;d love to hear from you</h1>
@@ -80,6 +89,7 @@ function ContactPage() {
         </p>
       </section>
 
+      {/* contact details and map */}
       <section className="container contact-layout">
         <div className="contact-details">
           <a href={INSTITUTE.phoneHref} className="contact-card">
@@ -123,6 +133,7 @@ function ContactPage() {
           </a>
         </div>
 
+        {/* message form */}
         <div className="card contact-form-card">
           <h2>Send us a message</h2>
           {isLoggedIn && user.role !== 'ADMIN' && (
@@ -132,6 +143,7 @@ function ContactPage() {
             </p>
           )}
 
+          {/* the thank-you message once it is sent, otherwise the form */}
           {sentMessage ? (
             <div className="contact-sent" role="status">
               <Icon name="checkCircle" size={36} />

@@ -29,6 +29,7 @@ const authDeviceLimiter = rateLimit({
   },
 });
 
+// login, register and reset use both limits above
 const authLimiter = [authDeviceLimiter, authAttemptLimiter];
 
 // forgot password - every request counts, so nobody can flood an inbox
@@ -55,6 +56,7 @@ function perUserKey(req) {
   return req.user ? `user-${req.user.id}` : req.ip;
 }
 
+// every request - a general cap per device
 const apiLimiter = rateLimit({
   windowMs: config.rateLimit.apiWindowMinutes * 60 * 1000,
   max: config.rateLimit.apiMaxRequests,

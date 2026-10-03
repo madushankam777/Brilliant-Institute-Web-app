@@ -1,5 +1,6 @@
 // shortLabel is what fits in the phone tab bar; the sidebar shows the full label
 export function getNavItems(role) {
+  // the admin's side menu
   if (role === 'ADMIN') {
     return [
       { to: '/admin/dashboard', label: 'Dashboard', icon: 'home', end: true },
@@ -19,6 +20,7 @@ export function getNavItems(role) {
       { to: '/profile', label: 'My Profile', icon: 'user' },
     ];
   }
+  // the tutor's side menu
   if (role === 'TUTOR') {
     return [
       { to: '/', label: 'Dashboard', icon: 'home', end: true },
@@ -32,6 +34,7 @@ export function getNavItems(role) {
       { to: '/profile', label: 'My Profile', icon: 'user' },
     ];
   }
+  // the student's side menu (the default)
   return [
     { to: '/', label: 'Dashboard', icon: 'home', end: true },
     { to: '/courses/classes', label: 'Browse Classes', shortLabel: 'Browse', icon: 'search' },

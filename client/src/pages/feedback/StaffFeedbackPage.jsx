@@ -9,6 +9,7 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import { useAuth } from '../../context/AuthContext';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the status tabs
 const FILTERS = [
   { key: 'ALL', label: 'All' },
   { key: 'PENDING', label: 'Pending' },
@@ -16,32 +17,38 @@ const FILTERS = [
   { key: 'RESOLVED', label: 'Resolved' },
 ];
 
+// badge colour for Resolved, In Progress or Pending
 function statusBadgeClass(status) {
   if (status === 'RESOLVED') return 'badge badge-success';
   if (status === 'IN_PROGRESS') return 'badge badge-warning';
   return 'badge badge-neutral';
 }
 
+// who a ticket was sent to, as text
 function recipientLabel(ticket) {
   if (ticket.recipientType === 'ADMIN') return 'Admin';
   if (ticket.recipientType === 'TUTOR') return ticket.recipientTutorName || 'Tutor';
   return `Admin & ${ticket.recipientTutorName || 'Tutor'}`;
 }
 
+// a date and time as, for example, 12 Oct 2026, 3:30 PM
 function formatTime(isoDate) {
   return new Date(isoDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+// my messages - a tutor or admin reads the tickets sent to them, replies like a chat and resolves them
 function StaffFeedbackPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
+  // the status tab, the tickets and the page state
   const [filter, setFilter] = useState('ALL');
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [selectedId, setSelectedId] = useState(null);
 
+  // the reply box and its state
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -56,6 +63,7 @@ function StaffFeedbackPage() {
     }
   }
 
+  // load the tickets for the chosen tab
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -70,12 +78,15 @@ function StaffFeedbackPage() {
     }
   }, [filter]);
 
+  // reload when the tab changes
   useEffect(() => {
     load();
   }, [load]);
 
+  // the ticket open on the right
   const selectedTicket = tickets.find((ticket) => ticket.id === selectedId) || null;
 
+  // send reply btn - add my reply to the conversation
   async function handleReply(event) {
     event.preventDefault();
     if (!selectedTicket || !replyText.trim()) return;
@@ -92,6 +103,7 @@ function StaffFeedbackPage() {
     }
   }
 
+  // mark as resolved btn - close the conversation
   async function handleResolve() {
     if (!selectedTicket) return;
     setActionError('');
@@ -106,6 +118,7 @@ function StaffFeedbackPage() {
     }
   }
 
+  // the page - title, status tabs, the ticket list and the open conversation
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -117,6 +130,7 @@ function StaffFeedbackPage() {
           {user.role === 'ADMIN' && <ReportLink type="feedback" label="Feedback report" />}
         </div>
 
+        {/* status tabs - All, Pending, In Progress, Resolved */}
         <div className="choice-group" style={{ marginBottom: '18px' }}>
           {FILTERS.map((item) => (
             <button
@@ -136,12 +150,14 @@ function StaffFeedbackPage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* a spinner, an empty message, or the ticket list and the conversation */}
         {isLoading ? (
           <LoadingSpinner label="Loading tickets..." />
         ) : tickets.length === 0 ? (
           <p className="muted">No messages addressed to you in this view.</p>
         ) : (
           <div className="checkout-grid">
+            {/* ticket list - one card per ticket */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {tickets.map((ticket) => (
                 <button
@@ -167,6 +183,7 @@ function StaffFeedbackPage() {
               ))}
             </div>
 
+            {/* the open conversation */}
             <div className="card" ref={detailRef} style={{ scrollMarginTop: '84px' }}>
               {!selectedTicket ? (
                 <p className="muted">Select a ticket to view its details.</p>
@@ -176,6 +193,7 @@ function StaffFeedbackPage() {
                     <h2 style={{ margin: 0 }}>
                       {selectedTicket.submittedByName} &mdash; {selectedTicket.category}
                     </h2>
+                    {/* mark as resolved btn - only while the ticket is open */}
                     {selectedTicket.status !== 'RESOLVED' && (
                       <button type="button" className="btn btn-secondary btn-sm" disabled={isResolving} onClick={handleResolve}>
                         {isResolving ? 'Resolving...' : 'Mark as Resolved'}
@@ -188,6 +206,7 @@ function StaffFeedbackPage() {
 
                   <Alert type="error" message={actionError} />
 
+                  {/* the messages - the first message, then the replies */}
                   <div className="chat-thread">
                     <div className="chat-bubble-row">
                       <Avatar name={selectedTicket.submittedByName} size={28} />
@@ -214,6 +233,7 @@ function StaffFeedbackPage() {
                     })}
                   </div>
 
+                  {/* a resolved ticket is closed to replies; otherwise the reply form */}
                   {selectedTicket.status === 'RESOLVED' ? (
                     <div style={{ marginTop: '14px' }}>
                       <Alert

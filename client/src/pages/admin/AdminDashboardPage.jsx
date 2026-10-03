@@ -12,12 +12,15 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import RevenueCard from './RevenueCard';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// a number as LKR money (no cents)
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(amount);
 }
 
+// a date and time as, for example, 12 Oct 2026, 3:30 PM
 function formatDateTime(value) {
   if (!value) return '-';
   return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
@@ -29,6 +32,7 @@ function formatDateTime(value) {
   });
 }
 
+// the words shown for each audit log action
 const ACTIVITY_LABELS = {
   USER_REGISTERED: 'New user registered',
   LOGIN_SUCCESS: 'Login',
@@ -56,16 +60,19 @@ const ACTIVITY_LABELS = {
   REPORT_DOWNLOADED: 'Report downloaded (PDF)',
 };
 
+// the words for one activity, or its action name made readable
 function activityLabel(entry) {
   return ACTIVITY_LABELS[entry.action] || entry.action.replace(/_/g, ' ').toLowerCase();
 }
 
+// badge colour for each payment status
 const PAYMENT_STATUS_BADGE = {
   SUCCESSFUL: 'badge-success',
   PENDING: 'badge-warning',
   FAILED: 'badge-danger',
 };
 
+// the words shown for each payment method
 const PAYMENT_METHOD_LABEL = {
   CARD: 'Card',
   EZ_CASH: 'eZ Cash',
@@ -76,15 +83,19 @@ const PAYMENT_METHOD_LABEL = {
   BANK_DEPOSIT: 'Bank deposit slip',
 };
 
+// operations dashboard - stat cards, revenue, recent payments and the live audit activity
 function AdminDashboardPage() {
+  // the dashboard numbers and the page state
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // the recent payments and their state
   const [recentPayments, setRecentPayments] = useState([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const [paymentsError, setPaymentsError] = useState('');
 
+  // load the dashboard numbers
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -97,10 +108,12 @@ function AdminDashboardPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // load the recent payments
   useEffect(() => {
     let isMounted = true;
     fetchRecentPayments()
@@ -118,6 +131,7 @@ function AdminDashboardPage() {
     };
   }, []);
 
+  // the page - shortcut buttons, stat cards, revenue, recent payments and live activity
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -126,6 +140,7 @@ function AdminDashboardPage() {
             <h1>Operations Dashboard</h1>
             <p className="muted">Brilliant Institute at a glance.</p>
           </div>
+          {/* shortcuts - analytics, summary report, add user, new class and create announcement */}
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <Link to="/admin/analytics" className="btn btn-secondary">
               <Icon name="spark" size={16} /> Analytics
@@ -145,10 +160,12 @@ function AdminDashboardPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* a spinner, or the dashboard */}
         {isLoading || !stats ? (
           <LoadingSpinner label="Loading dashboard..." />
         ) : (
           <>
+            {/* stat cards - users, classes, revenue this month and open complaints */}
             <div className="stat-grid">
               <StatCard icon="users" label="Total Users" value={stats.totalUsers} to="/admin/users" />
               <StatCard icon="book" label="Active Classes" value={stats.activeClasses} to="/courses/manage" />
@@ -168,8 +185,10 @@ function AdminDashboardPage() {
               />
             </div>
 
+            {/* revenue chart and breakdown */}
             <RevenueCard />
 
+            {/* recent payments - with a link to verify bank slips */}
             <div className="card">
               <div className="flex-between">
                 <h2 style={{ margin: 0 }}>Recent Payments</h2>
@@ -219,6 +238,7 @@ function AdminDashboardPage() {
               )}
             </div>
 
+            {/* live audit activity - who did what and when */}
             <div className="card">
               <h2>Live Audit Activity</h2>
               {stats.recentActivity.length === 0 ? (

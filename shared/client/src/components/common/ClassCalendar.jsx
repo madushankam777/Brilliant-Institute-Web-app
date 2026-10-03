@@ -1,8 +1,11 @@
+// month calendar on the Calendar page - each day shows its classes, holidays, cancelled and extra classes
 import Icon from './Icon';
 import { formatTime, monthCells, occurrencesOn, parseDateKey, todayKey } from '../../utils/schedule';
 
+// the weekday headings, Monday first
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// the spoken label for a day, for screen readers
 function dayLabel(dateKey, holiday, classCount, hasCancelled, hasExtra) {
   const parts = [parseDateKey(dateKey).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })];
   if (holiday) parts.push(`public holiday: ${holiday}`);
@@ -12,6 +15,7 @@ function dayLabel(dateKey, holiday, classCount, hasCancelled, hasExtra) {
   return parts.join(', ');
 }
 
+// css class for each kind of class chip
 const CHIP_CLASS = {
   regular: 'class-calendar-chip',
   cancelled: 'class-calendar-chip is-cancelled',
@@ -25,19 +29,23 @@ function ClassCalendar({ year, month, onMonthChange, classes, events = [], holid
   const cells = monthCells(year, month);
   while (cells.length % 7 !== 0) cells.push(null);
 
+  // previous / next month btns
   function shiftMonth(step) {
     const date = new Date(year, month + step, 1);
     onMonthChange(date.getFullYear(), date.getMonth());
   }
 
+  // today btn - show this month and select today
   function goToToday() {
     const now = new Date();
     onMonthChange(now.getFullYear(), now.getMonth());
     onSelectDate(today);
   }
 
+  // the calendar - header, weekday names, one button per day, and the legend
   return (
     <div className="class-calendar">
+      {/* month name with the previous and next btns, and the Today btn */}
       <div className="class-calendar-header">
         <div className="class-calendar-title-row">
           <button type="button" className="month-calendar-nav" onClick={() => shiftMonth(-1)} aria-label="Previous month">
@@ -55,6 +63,7 @@ function ClassCalendar({ year, month, onMonthChange, classes, events = [], holid
         </button>
       </div>
 
+      {/* the days */}
       <div className="class-calendar-grid">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label} className="class-calendar-weekday">
@@ -107,6 +116,7 @@ function ClassCalendar({ year, month, onMonthChange, classes, events = [], holid
         })}
       </div>
 
+      {/* legend - what the dots and colours mean */}
       <div className="class-calendar-legend">
         <span>
           <span className="class-calendar-dot is-cancelled" /> Class cancelled

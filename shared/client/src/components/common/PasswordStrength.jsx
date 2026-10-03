@@ -1,3 +1,4 @@
+// score a password 0 to 3 - length, mixed case, a number, and a symbol with 10+ characters
 function scorePassword(password) {
   if (!password) return 0;
   let score = 0;
@@ -8,9 +9,12 @@ function scorePassword(password) {
   return Math.min(score, 3);
 }
 
+// the words shown for each score
 const LABELS = ['Too weak', 'Weak password', 'Good password', 'Strong password'];
+// the colour for each score
 const TONES = ['weak', 'weak', 'medium', 'strong'];
 
+// password strength meter - three bars and a word under the password box
 function PasswordStrength({ password }) {
   if (!password) return null;
   const score = scorePassword(password);

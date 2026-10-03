@@ -3,10 +3,13 @@ const { body, param, query } = require('express-validator');
 const { SUBJECT_AREAS, DAYS_OF_WEEK } = require('./course.constants');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 
+// a time as HH:MM (or HH:MM:SS)
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 
+// class id in the address must be a number
 const classIdParamRules = [param('classId').isInt({ min: 1 }).withMessage('Invalid class id.')];
 
+// enrolment id in the address must be a number
 const enrollmentIdParamRules = [
   param('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
 ];
@@ -17,10 +20,13 @@ const deleteEnrollmentRecordRules = [
   body('confirmText').equals('DELETE').withMessage('Please type DELETE in capital letters to confirm.'),
 ];
 
+// tutor id in the address must be a number
 const tutorIdParamRules = [param('tutorId').isInt({ min: 1 }).withMessage('Invalid tutor id.')];
 
+// user id in the address must be a number
 const timetableUserIdRules = [param('userId').isInt({ min: 1 }).withMessage('Invalid user id.')];
 
+// a date written as YYYY-MM-DD
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 // a date range of at most about a year
@@ -37,6 +43,7 @@ const holidayQueryRules = [
     .withMessage('The end date must be after the start date and within about a year of it.'),
 ];
 
+// class search filters - all optional
 const browseQueryRules = [
   query('search').optional({ checkFalsy: true }).trim().isLength({ max: 150 }),
   query('subjectArea').optional({ checkFalsy: true }).isIn(SUBJECT_AREAS),
@@ -44,6 +51,7 @@ const browseQueryRules = [
   query('dayOfWeek').optional({ checkFalsy: true }).isIn(DAYS_OF_WEEK),
 ];
 
+// class form rules - title, subject area, level, venue, day, times, capacity and fee
 const classBodyRules = [
   body('subject').trim().isLength({ min: 3, max: 150 }).withMessage('Class title must be 3-150 characters.'),
   body('subjectArea').isIn(SUBJECT_AREAS).withMessage('Please choose a valid subject area.'),
@@ -68,6 +76,7 @@ const classBodyRules = [
   body('tutorId').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Invalid tutor id.'),
 ];
 
+// create class rules - the class form plus an optional first class date
 const createClassRules = [
   ...classBodyRules,
   body('startDate')
@@ -78,19 +87,24 @@ const createClassRules = [
     .isISO8601({ strict: true })
     .withMessage('Pick the first class date on the calendar.'),
 ];
+// edit class rules - the class id plus the class form
 const updateClassRules = [...classIdParamRules, ...classBodyRules];
 
+// the date of a cancelled day or an extra class
 const eventDateRule = body('date')
   .matches(DATE_REGEX)
   .withMessage('Pick a date on the calendar.')
   .bail()
   .isISO8601({ strict: true })
   .withMessage('Pick a date on the calendar.');
+// an optional note (up to 255 characters)
 const eventNoteRule = body('note').optional({ checkFalsy: true }).trim().isLength({ max: 255 })
   .withMessage('Keep the note under 255 characters.');
 
+// cancel day rules - class id, date and an optional note
 const cancelDayRules = [...classIdParamRules, eventDateRule, eventNoteRule];
 
+// extra class rules - class id, date, start and end time, optional venue and note
 const extraClassRules = [
   ...classIdParamRules,
   eventDateRule,
@@ -104,6 +118,7 @@ const extraClassRules = [
   eventNoteRule,
 ];
 
+// event id in the address must be a number
 const eventIdParamRules = [param('eventId').isInt({ min: 1 }).withMessage('Invalid id.')];
 
 module.exports = {

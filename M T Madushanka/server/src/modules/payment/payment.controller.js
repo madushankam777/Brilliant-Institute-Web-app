@@ -3,11 +3,13 @@ const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandle
 const { saveUpload, deleteUpload, sendUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const service = require('./payment.service');
 
+// GET /api/payments/balance - what I still owe on each class
 const getMyBalances = asyncHandler(async (req, res) => {
   const balances = await service.getMyBalances(req.user);
   res.status(200).json({ success: true, data: { balances } });
 });
 
+// POST /api/payments - pay through the payment simulator (201 done, 202 if the gateway timed out)
 const makePayment = asyncHandler(async (req, res) => {
   const { enrollmentId, amount, paymentMethod, paymentDetails } = req.body;
   const result = await service.makePayment(req.user, {
@@ -35,6 +37,7 @@ const makePayment = asyncHandler(async (req, res) => {
   });
 });
 
+// PATCH /:paymentId/retry - try a pending payment again
 const retryPendingPayment = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const result = await service.retryPendingPayment(req.user, paymentId);
@@ -54,6 +57,7 @@ const retryPendingPayment = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /history - my payments
 const getMyPaymentHistory = asyncHandler(async (req, res) => {
   const payments = await service.getMyPaymentHistory(req.user);
   res.status(200).json({ success: true, data: { payments } });
@@ -114,6 +118,7 @@ const editBankTransferPayment = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /admin/pending-bank-transfers - transfers waiting for approval
 const listPendingBankTransfers = asyncHandler(async (req, res) => {
   const payments = await service.listPendingBankTransfers();
   res.status(200).json({ success: true, data: { payments } });
@@ -125,18 +130,21 @@ const listRecentPayments = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { payments } });
 });
 
+// PATCH /admin/:paymentId/approve - approve a bank transfer
 const approveBankTransferPayment = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const payment = await service.approveBankTransferPayment(req.user, paymentId, { amount: req.body.amount });
   res.status(200).json({ success: true, message: 'Bank transfer approved.', data: { payment } });
 });
 
+// PATCH /admin/:paymentId/reject - reject a bank transfer
 const rejectBankTransferPayment = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const payment = await service.rejectBankTransferPayment(req.user, paymentId);
   res.status(200).json({ success: true, message: 'Bank transfer rejected.', data: { payment } });
 });
 
+// GET /:paymentId/receipt-image - send the receipt image (its owner or an admin only)
 const getReceiptImage = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const publicPath = await service.getReceiptImagePath(req.user, paymentId);
@@ -149,6 +157,7 @@ const getPaymentSettings = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { settings } });
 });
 
+// PUT /admin/settings - save the payment settings
 const updatePaymentSettings = asyncHandler(async (req, res) => {
   const { bankName, bankAccountName, bankAccountNumber, bankBranch, bankSwift, ezCashNumber, mcashNumber, enabledMethods, confirmText } =
     req.body;
@@ -166,6 +175,7 @@ const updatePaymentSettings = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Payment settings saved.', data: { settings } });
 });
 
+// GET /admin/tutors - active tutors for the Pay Tutors page
 const listActiveTutors = asyncHandler(async (req, res) => {
   const tutors = await service.listActiveTutors();
   res.status(200).json({ success: true, data: { tutors } });
@@ -177,6 +187,7 @@ const getMyBankDetails = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { bankDetails } });
 });
 
+// PUT /me/bank-details - a tutor saves their own bank details
 const updateMyBankDetails = asyncHandler(async (req, res) => {
   const { bankName, accountHolder, accountNumber, branch } = req.body;
   const bankDetails = await service.updateMyBankDetails(req.user, {
@@ -192,6 +203,7 @@ const updateMyBankDetails = asyncHandler(async (req, res) => {
   });
 });
 
+// POST /admin/tutor-payouts - pay a tutor and notify them
 const payTutor = asyncHandler(async (req, res) => {
   const { tutorId, amount, note, periodLabel, method, bankReference, transferDate } = req.body;
   const payout = await service.payTutor(req.user, {
@@ -215,15 +227,18 @@ const payTutor = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /admin/payouts/options - which payout methods this site supports
 const getPayoutOptions = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { options: await service.getPayoutOptions() } });
 });
 
+// GET /admin/tutors/:tutorId/payout-account - the full account number (audit-logged)
 const getTutorPayoutAccount = asyncHandler(async (req, res) => {
   const account = await service.getTutorPayoutAccount(req.user, Number(req.params.tutorId));
   res.status(200).json({ success: true, data: { account } });
 });
 
+// GET /admin/payouts/batch - payouts waiting for the next bank file
 const getPayoutBatch = asyncHandler(async (req, res) => {
   const batch = await service.getPayoutBatch();
   res.status(200).json({ success: true, data: { batch } });
@@ -239,6 +254,7 @@ const exportPayoutFile = asyncHandler(async (req, res) => {
   res.status(200).send(file.csv);
 });
 
+// PATCH /admin/payouts/:payoutId/settled - the bank confirmed this payout
 const confirmPayoutSettled = asyncHandler(async (req, res) => {
   const result = await service.confirmPayoutSettled(req.user, Number(req.params.payoutId), {
     providerReference: req.body.providerReference,
@@ -247,6 +263,7 @@ const confirmPayoutSettled = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Payout marked as paid. The tutor has been notified.', data: { result } });
 });
 
+// PATCH /admin/payouts/:payoutId/failed - the payout did not go through
 const markPayoutFailed = asyncHandler(async (req, res) => {
   const result = await service.markPayoutFailed(
     req.user,
@@ -267,6 +284,7 @@ const updateTutorBankDetailsAsAdmin = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /admin/tutor-payouts - every payout and the totals per tutor
 const listTutorPayouts = asyncHandler(async (req, res) => {
   const data = await service.listTutorPayouts();
   res.status(200).json({ success: true, data });
@@ -293,6 +311,7 @@ const handlePayHereNotification = asyncHandler(async (req, res) => {
   res.status(200).send('OK');
 });
 
+// GET /:paymentId/status - the return page checks the payment after PayHere
 const getMyPaymentStatus = asyncHandler(async (req, res) => {
   const payment = await service.getMyPaymentStatus(req.user, Number(req.params.paymentId));
   res.status(200).json({ success: true, data: { payment } });

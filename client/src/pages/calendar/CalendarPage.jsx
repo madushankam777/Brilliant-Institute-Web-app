@@ -25,12 +25,14 @@ import {
   todayKey,
 } from '../../../../shared/client/src/utils/schedule';
 
+// the intro text for each role
 const INTRO = {
   STUDENT_PARENT: 'Your classes for the month. Classes are not held on public holidays.',
   TUTOR: 'The classes you teach this month. Click a date to also see the other classes at the institute that day.',
   ADMIN: 'Every class on the platform, month by month, with public holidays marked.',
 };
 
+// the first and last day of a month, as 2026-10-01 style dates
 function monthRange(year, month) {
   const mm = String(month + 1).padStart(2, '0');
   const lastDay = String(new Date(year, month + 1, 0).getDate()).padStart(2, '0');
@@ -53,37 +55,44 @@ function googleCalendarLink(classItem, dateKey) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+// css class for a class card - cancelled or holiday, extra, or normal
 function dayClassName(item, holiday) {
   if (holiday || item.kind === 'cancelled') return 'day-class is-cancelled';
   if (item.kind === 'extra') return 'day-class is-extra';
   return 'day-class';
 }
 
+// a date as, for example, Mon, 12 Oct
 function shortDate(dateKey) {
   return parseDateKey(dateKey).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+// calendar - the month's classes, public holidays, cancelled and extra classes
 function CalendarPage() {
   const { user } = useAuth();
   const isAdmin = user.role === 'ADMIN';
   const isTutor = user.role === 'TUTOR';
   const isStaff = isAdmin || isTutor;
 
+  // the classes and the page state
   const [classes, setClasses] = useState([]);
   // tutor only - every other tutor's classes, to see who uses which hall
   const [otherClasses, setOtherClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // the month shown, the chosen day and the confirm / busy state
   const [view, setView] = useState(() => ({ year: new Date().getFullYear(), month: new Date().getMonth() }));
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [confirmKey, setConfirmKey] = useState(null);
   const [busyKey, setBusyKey] = useState(null);
   const [notice, setNotice] = useState('');
 
+  // holidays and class changes for the month shown
   const range = monthRange(view.year, view.month);
   const holidays = useHolidays(range.from, range.to);
   const [events, reloadEvents] = useClassEvents(range.from, range.to);
 
+  // load my classes (an admin loads every class)
   useEffect(() => {
     let isCurrent = true;
     const request = isAdmin ? fetchMyTaughtClasses() : fetchMyTimetable().then((data) => data.classes);
@@ -102,6 +111,7 @@ function CalendarPage() {
     };
   }, [isAdmin]);
 
+  // tutor only - load every other tutor's classes
   useEffect(() => {
     if (!isTutor) return undefined;
     let isCurrent = true;
@@ -143,6 +153,7 @@ function CalendarPage() {
     }
   }
 
+  // month arrows - show another month and pick today or its 1st
   function changeMonth(year, month) {
     setView({ year, month });
     const now = new Date();
@@ -150,12 +161,15 @@ function CalendarPage() {
     selectDate(isThisMonth ? todayKey() : monthRange(year, month).from);
   }
 
+  // the chosen day - its holiday, its classes and whether it can still be changed
   const holiday = holidays[selectedDate];
   const dayClasses = occurrencesOn(classes, events, selectedDate);
   const otherDayClasses = occurrencesOn(otherClasses, events, selectedDate);
   const canChange = isStaff && selectedDate >= todayKey();
+  // the holidays of the month shown, in date order
   const monthHolidays = Object.entries(holidays).sort(([a], [b]) => a.localeCompare(b));
 
+  // the page - title, the month calendar and the side cards for the chosen day
   return (
     <PortalShell navItems={getNavItems(user.role)}>
       <div className="page">
@@ -164,6 +178,7 @@ function CalendarPage() {
             <h1>Calendar</h1>
             <p className="muted">{INTRO[user.role]}</p>
           </div>
+          {/* add extra class btn - tutors and admins only */}
           {isStaff && (
             <Link to="/courses/manage" className="btn btn-secondary">
               <Icon name="plus" size={16} /> Add extra class
@@ -171,13 +186,16 @@ function CalendarPage() {
           )}
         </div>
 
+        {/* error and success messages */}
         <Alert type="error" message={error} />
         <Alert type="success" message={notice} />
 
+        {/* a spinner, or the calendar and the side cards */}
         {isLoading ? (
           <LoadingSpinner label="Loading calendar..." />
         ) : (
           <div className="calendar-layout">
+            {/* the month calendar */}
             <div className="card">
               <ClassCalendar
                 year={view.year}
@@ -192,9 +210,11 @@ function CalendarPage() {
             </div>
 
             <div>
+              {/* the chosen day - holiday banner and its classes */}
               <div className="card">
                 <h2>{formatLongDate(selectedDate)}</h2>
 
+                {/* public holiday banner */}
                 {holiday && (
                   <div className="holiday-banner" role="status">
                     <Icon name="calendarDays" size={18} />
@@ -209,6 +229,7 @@ function CalendarPage() {
                   </div>
                 )}
 
+                {/* no classes, or one row per class with its badges and buttons */}
                 {dayClasses.length === 0 ? (
                   <p className="muted" style={{ margin: 0 }}>
                     No classes on this day.
@@ -244,6 +265,7 @@ function CalendarPage() {
                         </span>
                       )}
 
+                      {/* cancel this day, restore it, or remove an extra class (asks Confirm / Keep first) */}
                       {!holiday && canChange && (
                         <div className="day-class-actions">
                           {confirmKey === item.key ? (
@@ -277,6 +299,7 @@ function CalendarPage() {
                         </div>
                       )}
 
+                      {/* add to Google Calendar link - students and tutors */}
                       {!holiday && !isAdmin && item.kind === 'regular' && (
                           <a
                             href={googleCalendarLink(item, selectedDate)}
@@ -322,6 +345,7 @@ function CalendarPage() {
                 </div>
               )}
 
+              {/* holidays this month - click one to open that day */}
               <div className="card">
                 <h2>Holidays this month</h2>
                 {monthHolidays.length === 0 ? (

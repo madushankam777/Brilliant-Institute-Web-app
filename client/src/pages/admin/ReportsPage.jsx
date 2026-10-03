@@ -19,26 +19,33 @@ import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import ReportView from './ReportView';
 import { PRESETS, presetRange } from './reportPeriods';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
+// the report groups in the list
 const GROUPS = ['Overview', 'People', 'Teaching', 'Finance', 'Support', 'Administration'];
+// the filters a report can use
 const FILTER_KEYS = ['studentId', 'tutorId', 'classId', 'userId', 'grade', 'role', 'status', 'academicYear', 'detail'];
 
 // reports that can be split into one PDF per person
 const PEOPLE_REPORTS = { tutors: 'tutorId', students: 'studentId' };
 
+// each person in full, or a summary only
 const DETAIL_OPTIONS = [
   { value: 'full', label: 'Each person in full' },
   { value: 'summary', label: 'Summary only' },
 ];
 
+// the words for each role
 const ROLE_NAMES = { ADMIN: 'Admin', TUTOR: 'Tutor', STUDENT_PARENT: 'Student' };
 
+// role filter choices
 const ROLE_OPTIONS = [
   { value: 'STUDENT_PARENT', label: 'Students' },
   { value: 'TUTOR', label: 'Tutors' },
   { value: 'ADMIN', label: 'Admins' },
 ];
 
+// status filter choices
 const STATUS_OPTIONS = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'SUSPENDED', label: 'Suspended' },
@@ -46,6 +53,7 @@ const STATUS_OPTIONS = [
   { value: 'DELETED', label: 'Deleted' },
 ];
 
+// a date and time as, for example, 12 Oct 2026, 3:30 PM
 function formatWhen(value) {
   if (!value) return '-';
   return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
@@ -57,8 +65,10 @@ function formatWhen(value) {
   });
 }
 
+// reports - pick a report, set the period and filters, view it, then download a PDF, Excel or ZIP
 function ReportsPage() {
   const [searchParams] = useSearchParams();
+  // the report list, the form choices and the recent reports
   const [catalog, setCatalog] = useState([]);
   const [options, setOptions] = useState(null);
   const [history, setHistory] = useState([]);
@@ -66,11 +76,13 @@ function ReportsPage() {
   const [loadError, setLoadError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  // the chosen report, its period and its filters
   const [type, setType] = useState('');
   const [preset, setPreset] = useState('last30');
   const [range, setRange] = useState(presetRange('last30'));
   const [filters, setFilters] = useState({});
 
+  // the generated report and the button / message state
   const [report, setReport] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -81,9 +93,11 @@ function ReportsPage() {
   const reportRef = useRef(null);
   const autoRunDone = useRef(false);
 
+  // the chosen report, and whether it uses a period
   const selected = catalog.find((item) => item.type === type) || null;
   const usesPeriod = Boolean(selected && selected.params.includes('period'));
 
+  // load my recent reports
   const loadHistory = useCallback(async () => {
     try {
       setHistory(await fetchReportHistory());
@@ -149,6 +163,7 @@ function ReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
+  // the period and filters sent to the server for the chosen report
   function buildParams(source = null) {
     if (source) return source;
     const params = {};
@@ -261,25 +276,30 @@ function ReportsPage() {
     runReport(null, query, item.type);
   }
 
+  // period list - pick a ready-made period
   function changePreset(value) {
     setPreset(value);
     if (value !== 'custom') setRange(presetRange(value));
   }
 
+  // a date typed - switch to custom dates
   function changeDate(key, value) {
     setPreset('custom');
     setRange((previous) => ({ ...previous, [key]: value }));
   }
 
+  // change one filter
   function changeFilter(key, value) {
     setFilters((previous) => ({ ...previous, [key]: value }));
   }
 
+  // true while any button is working
   const busy = isGenerating || isDownloading || isZipping || isExporting;
   // "all tutors" / "all students" - can be split into one file each
   const personKey = selected ? PEOPLE_REPORTS[selected.type] : null;
   const canSplit = Boolean(personKey && !filters[personKey]);
 
+  // the page - title, the report list, the filters, the preview and the recent reports
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page page-reports">
@@ -293,10 +313,12 @@ function ReportsPage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* a spinner, or the report list and the report area */}
         {isLoading ? (
           <LoadingSpinner label="Loading reports..." />
         ) : (
           <div className="reports-layout">
+            {/* report list - grouped, one button per report */}
             <aside className="card reports-catalog" aria-label="Reports">
               {GROUPS.map((group) => {
                 const items = catalog.filter((item) => item.group === group);
@@ -321,9 +343,12 @@ function ReportsPage() {
               })}
             </aside>
 
+            {/* the report area - the filters, the preview and the recent reports */}
             <div className="reports-main">
+              {/* filters card - the chosen report, its period and filters, and the buttons */}
               {selected && (
                 <div className="card report-form-card">
+                  {/* report picker for a phone */}
                   <div className="form-field reports-mobile-pick">
                     <label htmlFor="report-type">Report</label>
                     <select id="report-type" value={type} onChange={(e) => chooseReport(catalog.find((item) => item.type === e.target.value))}>
@@ -341,6 +366,7 @@ function ReportsPage() {
                     </select>
                   </div>
 
+                  {/* the chosen report's name and description */}
                   <div className="report-form-head">
                     <span className="report-form-icon">
                       <Icon name={selected.icon} size={22} />
@@ -354,8 +380,10 @@ function ReportsPage() {
                   <Alert type="error" message={formError} />
                   <Alert type="success" message={notice} />
 
+                  {/* filters form */}
                   <form onSubmit={runReport} noValidate>
                     <div className="report-filters">
+                      {/* period and dates */}
                       {usesPeriod && (
                         <>
                           <div className="form-field">
@@ -397,6 +425,7 @@ function ReportsPage() {
                         </>
                       )}
 
+                      {/* tutor filter */}
                       {selected.params.includes('tutorId') && (
                         <FilterSelect
                           id="tutorId"
@@ -408,6 +437,7 @@ function ReportsPage() {
                           options={(options?.tutors || []).map((item) => ({ value: item.id, label: item.name }))}
                         />
                       )}
+                      {/* student filter */}
                       {selected.params.includes('studentId') && (
                         <FilterSelect
                           id="studentId"
@@ -422,6 +452,7 @@ function ReportsPage() {
                           }))}
                         />
                       )}
+                      {/* person filter */}
                       {selected.params.includes('userId') && (
                         <FilterSelect
                           id="userId"
@@ -436,6 +467,7 @@ function ReportsPage() {
                           }))}
                         />
                       )}
+                      {/* detail filter - each person in full, or a summary */}
                       {selected.params.includes('detail') && canSplit && (
                         <FilterSelect
                           id="detail"
@@ -446,6 +478,7 @@ function ReportsPage() {
                           options={DETAIL_OPTIONS}
                         />
                       )}
+                      {/* grade filter */}
                       {selected.params.includes('grade') && !filters.studentId && (
                         <FilterSelect
                           id="grade"
@@ -457,6 +490,7 @@ function ReportsPage() {
                           options={(options?.grades || []).map((grade) => ({ value: grade, label: grade }))}
                         />
                       )}
+                      {/* class filter */}
                       {selected.params.includes('classId') && (
                         <FilterSelect
                           id="classId"
@@ -471,9 +505,11 @@ function ReportsPage() {
                           }))}
                         />
                       )}
+                      {/* role filter */}
                       {selected.params.includes('role') && (
                         <FilterSelect id="role" label="Role" value={filters.role} error={fieldErrors.role} onChange={changeFilter} allLabel="All roles" options={ROLE_OPTIONS} />
                       )}
+                      {/* status filter */}
                       {selected.params.includes('status') && (
                         <FilterSelect
                           id="status"
@@ -485,6 +521,7 @@ function ReportsPage() {
                           options={STATUS_OPTIONS}
                         />
                       )}
+                      {/* academic year filter */}
                       {selected.params.includes('academicYear') && (
                         <FilterSelect
                           id="academicYear"
@@ -497,6 +534,7 @@ function ReportsPage() {
                       )}
                     </div>
 
+                    {/* generate, PDF, Excel and ZIP btns */}
                     <div className="report-actions">
                       <button type="submit" className="btn btn-primary" disabled={busy}>
                         <Icon name="barChart" size={16} /> {isGenerating ? 'Generating...' : 'Generate report'}
@@ -517,6 +555,7 @@ function ReportsPage() {
                 </div>
               )}
 
+              {/* the report preview */}
               <div ref={reportRef}>
                 {isGenerating && <LoadingSpinner label="Building your report..." />}
                 {!isGenerating && report && (
@@ -535,6 +574,7 @@ function ReportsPage() {
                 )}
               </div>
 
+              {/* recent reports - Open, ZIP, Excel or PDF runs one again */}
               <div className="card">
                 <div className="flex-between">
                   <h2 style={{ margin: 0 }}>Recent reports</h2>
@@ -542,6 +582,7 @@ function ReportsPage() {
                     <Icon name="refresh" size={15} /> Refresh
                   </button>
                 </div>
+                {/* an empty message, or the recent reports table */}
                 {history.length === 0 ? (
                   <p className="muted" style={{ marginTop: '12px' }}>No reports have been generated yet.</p>
                 ) : (
@@ -604,6 +645,7 @@ function ReportsPage() {
                     </table>
                   </div>
                 )}
+                {/* show all / show fewer btn */}
                 {history.length > 8 && (
                   <button type="button" className="btn btn-link" onClick={() => setShowAllHistory((value) => !value)}>
                     {showAllHistory ? 'Show fewer' : `Show all ${history.length}`}

@@ -19,16 +19,20 @@ const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
 
+// milliseconds in one day
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// a number as two digits, e.g. 7 gives 07
 function pad2(value) {
   return String(value).padStart(2, '0');
 }
 
+// round money to 2 decimal places
 function roundMoney(value) {
   return Math.round(value * 100) / 100;
 }
 
+// add user btn - an admin creates an account (the password is saved hashed)
 async function createUser(adminUser, { fullName, email, password, role }) {
   const existing = await repository.findUserByEmail(email);
   if (existing) {
@@ -52,11 +56,15 @@ async function createUser(adminUser, { fullName, email, password, role }) {
 
 // make a tutor enrollment key code
 function generateKeyCode() {
+  // 12 random hex characters (6 random bytes)
   const raw = crypto.randomBytes(6).toString('hex').toUpperCase();
+  // the key looks like TUT-9F3A-1C7B-D204
   return `TUT-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
 }
 
+// generate key btn - make a new one-time tutor key, with the tutor's CV and certificates, and save it
 async function generateTutorKey(adminUser, { intendedFor, idNumber, cvPath, certificatePaths }) {
+  // the new random key code
   const keyCode = generateKeyCode();
   const keyId = await repository.createTutorKey({
     keyCode,
@@ -79,6 +87,7 @@ async function generateTutorKey(adminUser, { intendedFor, idNumber, cvPath, cert
   return toSafeTutorKey(created, { includeCode: true });
 }
 
+// where a key's CV or certificate is stored (for the admin to download)
 async function getTutorKeyDocumentPath(keyId, type, index) {
   const key = await repository.findTutorKeyById(keyId);
   if (!key) {
@@ -101,11 +110,13 @@ async function getTutorKeyDocumentPath(keyId, type, index) {
   return certificatePath;
 }
 
+// all tutor keys - the codes are never shown again
 async function listTutorKeys() {
   const rows = await repository.listTutorKeys();
   return rows.map((row) => toSafeTutorKey(row, { includeCode: false }));
 }
 
+// revoke btn - cancel a key that has not been used yet
 async function revokeTutorKey(adminUser, keyId) {
   const key = await repository.findTutorKeyById(keyId);
   if (!key) {
@@ -144,6 +155,7 @@ async function deleteTutorKey(adminUser, keyId) {
   });
 }
 
+// admin dashboard - the counts, the revenue trend and the recent activity
 async function getDashboardStats() {
   const [counts, revenueTrend, recentActivity] = await Promise.all([
     repository.getCoreCounts(),
@@ -197,6 +209,7 @@ async function getRevenueReport(period) {
   const today = await repository.getDatabaseToday();
   const [year, month] = today.split('-').map(Number);
 
+  // pick the time buckets for the period: 30 days, 12 months, this year by month, or 5 years
   let bucket = 'month';
   const keys = [];
   let headlineKeys = [];
@@ -217,10 +230,12 @@ async function getRevenueReport(period) {
     headlineKeys = keys;
   }
 
+  // add up the payments in each bucket
   const [fromDate, toDate] = bucketRange(bucket, keys[0], keys[keys.length - 1]);
   const rows = await repository.sumRevenueByBucket(bucket, fromDate, toDate);
   const rowsByKey = new Map(rows.map((row) => [row.bucket, row]));
 
+  // one bar per bucket - 0 when nothing was paid
   const points = keys.map((key) => {
     const row = rowsByKey.get(key);
     return {
@@ -229,6 +244,7 @@ async function getRevenueReport(period) {
       paymentCount: row ? Number(row.payment_count) : 0,
     };
   });
+  // the buckets that make up the big total on top
   const headline = points.filter((point) => headlineKeys.includes(point.key));
 
   return {
@@ -241,6 +257,7 @@ async function getRevenueReport(period) {
   };
 }
 
+// user list with the admin's filters
 async function listUsers(filters) {
   const rows = await repository.listUsers(filters);
   return rows.map(toSafeUserForAdmin);
@@ -262,6 +279,7 @@ async function getUserProfile(userId) {
   return { ...safeUser, enrollmentKey: key ? toSafeTutorKey(key, { includeCode: false }) : null };
 }
 
+// an admin may act on anyone, a tutor only on students enrolled in their own classes
 async function assertCanActOnUser(actingUser, targetUser) {
   if (actingUser.role === ROLES.ADMIN) {
     return;
@@ -279,6 +297,7 @@ async function assertCanActOnUser(actingUser, targetUser) {
   throw ApiError.forbidden();
 }
 
+// suspend btn - the person's name must be typed to confirm, and never your own account
 async function suspendUser(actingUser, userId, confirmName) {
   if (userId === actingUser.id) {
     throw ApiError.badRequest('You cannot suspend your own account.');
@@ -313,6 +332,7 @@ async function suspendUser(actingUser, userId, confirmName) {
   return toSafeUserForAdmin(updated);
 }
 
+// activate btn - reopen a suspended account (a tutor can only undo a suspension made by a tutor)
 async function activateUser(actingUser, userId) {
   const targetUser = await repository.findUserById(userId);
   if (!targetUser || targetUser.status === USER_STATUS.DELETED) {
@@ -379,6 +399,7 @@ async function createPasswordResetLink(adminUser, userId) {
     throw ApiError.badRequest('Reactivate this account before resetting its password.');
   }
 
+  // make the one-time reset token
   const token = await authService.createResetToken(userId);
   await recordAuditEvent({
     actorId: adminUser.id,
@@ -392,6 +413,7 @@ async function createPasswordResetLink(adminUser, userId) {
   };
 }
 
+// a tutor's students and the classes they take
 async function listMyStudents(tutorUser) {
   const rows = await repository.listStudentsForTutor(tutorUser.id);
   return rows.map((row) => ({
@@ -400,6 +422,7 @@ async function listMyStudents(tutorUser) {
   }));
 }
 
+// the grade must be one of the allowed grades
 function assertValidTargetGrade(targetGrade) {
   if (targetGrade && !GRADES.includes(targetGrade)) {
     throw ApiError.badRequest('Please choose a valid grade.');
@@ -411,17 +434,23 @@ function assertValidTargetGrade(targetGrade) {
 // not is closed out. Admin issues one-time keys (for chosen students, a whole
 // class or a whole grade) and the student types theirs in to confirm.
 
+// a re-registration key works for 120 days
 const REREGISTRATION_KEY_VALID_DAYS = 120;
 
+// make a random re-registration key
 function generateReregistrationKeyCode() {
+  // 12 random hex characters (6 random bytes)
   const raw = crypto.randomBytes(6).toString('hex').toUpperCase();
+  // the key looks like REG-9F3A-1C7B-D204
   return `REG-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
 }
 
+// the academic year is the calendar year
 function currentAcademicYear() {
   return new Date().getFullYear();
 }
 
+// keys can only be issued for this year or next year
 function resolveAcademicYear(academicYear) {
   const thisYear = currentAcademicYear();
   const year = Number(academicYear) || thisYear + 1;
@@ -469,11 +498,14 @@ async function findStudentsForKeys({ mode, studentIds, classId, grade }) {
   return repository.listActiveStudentsByIds(ids);
 }
 
+// issue keys btn - one re-registration key per student, for a class, a grade or picked students
 async function generateReregistrationKeys(adminUser, { mode, studentIds, classId, grade, toGrade, academicYear }) {
+  // needs the re-registration database update
   if (!(await schema.hasReregistration())) throw schema.migrationRequired();
   assertValidTargetGrade(toGrade);
   const year = resolveAcademicYear(academicYear);
 
+  // who gets a key
   const students = await findStudentsForKeys({ mode, studentIds, classId, grade });
   if (students.length === 0) {
     const emptyMessages = {
@@ -484,6 +516,7 @@ async function generateReregistrationKeys(adminUser, { mode, studentIds, classId
     throw ApiError.badRequest(emptyMessages[mode]);
   }
 
+  // students who already have a key this year are skipped
   const alreadyHasKey = new Set(
     await repository.findStudentIdsWithKey(students.map((student) => student.id), year)
   );
@@ -491,6 +524,7 @@ async function generateReregistrationKeys(adminUser, { mode, studentIds, classId
   const toIssue = [];
   const skipped = [];
 
+  // per student - skip (already has a key, or finished the last grade) or make a key for the next grade
   students.forEach((student) => {
     // default is one grade up; admin can pick a grade for repeaters
     const moveTo = toGrade || nextGrade(student.grade);
@@ -553,6 +587,7 @@ async function generateReregistrationKeys(adminUser, { mode, studentIds, classId
     });
   }
 
+  // audit log - keys issued
   if (issued.length > 0) {
     await recordAuditEvent({
       actorId: adminUser.id,
@@ -587,6 +622,7 @@ function toSafeReregistrationKey(row) {
   };
 }
 
+// the keys issued for a year (the code is never shown again)
 async function listReregistrationKeys(academicYear) {
   // before the migration there simply are no keys yet
   if (!(await schema.hasReregistration())) return [];
@@ -595,6 +631,7 @@ async function listReregistrationKeys(academicYear) {
   return rows.map(toSafeReregistrationKey);
 }
 
+// revoke btn - cancel a key that has not been used
 async function revokeReregistrationKey(adminUser, keyId) {
   if (!(await schema.hasReregistration())) throw schema.migrationRequired();
   const key = await repository.findReregistrationKeyById(keyId);
@@ -636,7 +673,9 @@ async function redeemReregistrationKey(studentUser, keyCode) {
   if (!(await schema.hasReregistration())) {
     throw ApiError.badRequest('Re-registration is not open yet. Please check with the office.');
   }
+  // the student types the key - spaces and letter case are ignored
   const normalised = String(keyCode || '').trim().toUpperCase();
+  // the key must belong to this student, be unused and not have expired
   const key = await repository.findRedeemableKeyForStudent(normalised, studentUser.id);
   if (!key) {
     throw ApiError.badRequest(
@@ -658,6 +697,7 @@ async function redeemReregistrationKey(studentUser, keyCode) {
     await repository.setStudentReregistered(studentUser.id, key.academic_year);
   }
 
+  // audit log and a notification for the student
   await recordAuditEvent({
     actorId: studentUser.id,
     action: 'REREGISTRATION_COMPLETED',
@@ -704,6 +744,7 @@ async function getMyReregistrationStatus(studentUser) {
   };
 }
 
+// publish btn - post an announcement for everyone, students or tutors (optionally one grade)
 async function createAnnouncement(adminUser, { title, body, priority, targetAudience, targetGrade }) {
   assertValidTargetGrade(targetGrade);
   const announcementId = await repository.createAnnouncement({
@@ -727,6 +768,7 @@ async function createAnnouncement(adminUser, { title, body, priority, targetAudi
   return toSafeAnnouncement(created);
 }
 
+// edit btn - change an announcement (students then see an Updated badge)
 async function updateAnnouncement(adminUser, announcementId, { title, body, priority, targetAudience, targetGrade }) {
   assertValidTargetGrade(targetGrade);
   const existing = await repository.findAnnouncementById(announcementId);
@@ -755,6 +797,7 @@ async function updateAnnouncement(adminUser, announcementId, { title, body, prio
   return toSafeAnnouncement(updated);
 }
 
+// delete btn - archive the announcement
 async function deleteAnnouncement(adminUser, announcementId) {
   const existing = await repository.findAnnouncementById(announcementId);
   if (!existing || existing.status === 'ARCHIVED') {
@@ -772,6 +815,7 @@ async function deleteAnnouncement(adminUser, announcementId) {
   });
 }
 
+// every announcement, for the admin
 async function listAllAnnouncements() {
   const rows = await repository.listAllAnnouncements();
   return rows.map(toSafeAnnouncement);
@@ -784,6 +828,7 @@ async function listAnnouncementsForUser(user) {
   return rows.map(toSafeAnnouncement);
 }
 
+// the students a reminder applies to - overdue fees or low attendance
 async function findReminderRows(type) {
   return type === 'FEE_DUE'
     ? repository.findStudentsWithOverdueFees()
@@ -817,7 +862,9 @@ async function getReminderCandidates(type) {
 
 // send reminders btn - to selected students, or everyone that matches
 async function sendReminders(adminUser, { type, studentIds }) {
+  // everyone who matches this reminder type
   const allRows = await findReminderRows(type);
+  // only the chosen students, or everyone that matches
   const recipients =
     Array.isArray(studentIds) && studentIds.length > 0
       ? allRows.filter((row) => studentIds.includes(row.student_id))
@@ -830,6 +877,7 @@ async function sendReminders(adminUser, { type, studentIds }) {
         ? `Reminder: your fee balance of LKR ${Number(recipient.balance).toFixed(2)} for ${recipient.subject} is outstanding.`
         : `Reminder: your attendance for ${recipient.subject} has fallen below ${config.business.lowAttendanceThresholdPercent}%. Please contact your tutor.`;
 
+    // send it through the gateway (a mock that only prints to the log) and save it for the student's bell
     const result = await gateway.sendNotification({ channel: 'EMAIL', message });
     if (result.delivered) {
       await repository.logNotification({
@@ -861,10 +909,12 @@ async function listMyClassesForMessaging(tutorUser) {
 
 // Tutor -> their own students and/or Admin
 async function sendTutorMessage(tutorUser, { audience, classId, subject, message }) {
+  // collect who will get the message
   const recipientIds = new Set();
 
   if (audience === 'STUDENTS' || audience === 'BOTH') {
     if (classId) {
+      // a tutor can only message students of their own classes
       const ownsClass = (await repository.listClassesForTutor(tutorUser.id)).some(
         (row) => row.id === Number(classId)
       );
@@ -929,6 +979,7 @@ function parseLocalDateTime(value) {
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
+// a Date as YYYY-MM-DD HH:MM:SS for MySQL
 function toMysqlDateTime(date) {
   return (
     `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ` +
@@ -938,6 +989,7 @@ function toMysqlDateTime(date) {
 
 // audience: SELF, CLASS or ALL
 async function scheduleReminder(tutorUser, { audience, classId, title, message, remindAt }) {
+  // the reminder time must be in the future and within a year
   const sendAt = parseLocalDateTime(remindAt);
   if (Number.isNaN(sendAt.getTime()) || sendAt.getTime() <= Date.now()) {
     throw ApiError.badRequest('Pick a date and time in the future.');
@@ -946,11 +998,13 @@ async function scheduleReminder(tutorUser, { audience, classId, title, message, 
     throw ApiError.badRequest('Reminders can be set up to one year ahead.');
   }
 
+  // who gets it - the tutor themself, one class, or all their students
   let recipientIds = [tutorUser.id];
   let classSubject = null;
   if (audience !== 'SELF') {
     if (audience === 'CLASS') {
       const myClasses = await repository.listClassesForTutor(tutorUser.id);
+      // a tutor can only remind their own classes
       const chosen = myClasses.find((row) => row.id === Number(classId));
       if (!chosen) {
         throw ApiError.forbidden('You can only remind students in your own classes.');
@@ -965,12 +1019,14 @@ async function scheduleReminder(tutorUser, { audience, classId, title, message, 
     }
   }
 
+  // build the text shown in the bell
   const sender = await repository.findUserById(tutorUser.id);
   const text = [title.trim(), (message || '').trim()].filter(Boolean).join(' - ');
   const signature = audience === 'SELF' ? '' : ` (${classSubject ? `${classSubject}, ` : ''}from ${sender.full_name})`;
   const fullMessage = `${REMINDER_PREFIX}${text}${signature}`.slice(0, 500);
   const sendAtSql = toMysqlDateTime(sendAt);
 
+  // the same reminder at the same time is refused
   const duplicates = await repository.countUpcomingReminder({
     tutorId: tutorUser.id,
     message: fullMessage,
@@ -980,6 +1036,7 @@ async function scheduleReminder(tutorUser, { audience, classId, title, message, 
     throw ApiError.conflict('You already have this reminder set for that time.');
   }
 
+  // save one notification per person, to appear at the chosen time
   await repository.createScheduledNotifications(recipientIds, {
     type: 'CLASS_REMINDER',
     message: fullMessage,
@@ -997,6 +1054,7 @@ async function scheduleReminder(tutorUser, { audience, classId, title, message, 
   return { recipientCount: recipientIds.length, sendAt: sendAtSql };
 }
 
+// a tutor's reminders - SCHEDULED until their time, then SENT
 async function listMyReminders(tutorUser) {
   const rows = await repository.listRemindersByTutor(tutorUser.id, REMINDER_PREFIX);
   return rows.map((row) => ({
@@ -1009,6 +1067,7 @@ async function listMyReminders(tutorUser) {
   }));
 }
 
+// cancel btn - only a reminder that has not been sent yet
 async function cancelReminder(tutorUser, reminderId) {
   const row = await repository.findReminderRow(reminderId, tutorUser.id);
   if (!row || !String(row.message).startsWith(REMINDER_PREFIX)) {

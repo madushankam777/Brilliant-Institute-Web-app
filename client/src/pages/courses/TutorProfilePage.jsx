@@ -11,10 +11,12 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import { useAuth } from '../../context/AuthContext';
 import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// tutor profile - bio and the classes this tutor teaches
 function TutorProfilePage() {
   const { tutorId } = useParams();
   const { user } = useAuth();
@@ -25,6 +27,7 @@ function TutorProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // load the tutor and their classes
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -39,10 +42,12 @@ function TutorProfilePage() {
     }
   }, [tutorId]);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // a spinner while loading
   if (isLoading) {
     return (
       <PortalShell navItems={NAV_ITEMS}>
@@ -53,6 +58,7 @@ function TutorProfilePage() {
     );
   }
 
+  // the tutor could not be loaded
   if (loadError || !tutor) {
     return (
       <PortalShell navItems={NAV_ITEMS}>
@@ -66,15 +72,18 @@ function TutorProfilePage() {
     );
   }
 
+  // the page - breadcrumb, the tutor card and their classes
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
+        {/* breadcrumb */}
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link to="/courses/classes">Browse Classes</Link>
           <span className="breadcrumb-sep">/</span>
           <span className="breadcrumb-current">{tutor.fullName}</span>
         </nav>
 
+        {/* tutor details */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: tutor.bio ? '18px' : 0 }}>
             <Avatar name={tutor.fullName} pictureUrl={tutor.profilePictureUrl} size={64} />
@@ -86,6 +95,7 @@ function TutorProfilePage() {
           {tutor.bio && <p style={{ marginBottom: 0 }}>{tutor.bio}</p>}
         </div>
 
+        {/* classes taught */}
         <div className="card">
           <h2>Classes Taught</h2>
           {classes.length === 0 ? (

@@ -1,3 +1,4 @@
+// auth validation - input rules for register, login, profile, password change and reset
 const { body } = require('express-validator');
 const { PASSWORD_RULE_MESSAGE, isStrongPassword } = require('../../../../../shared/server/src/utils/passwordPolicy');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
@@ -10,6 +11,7 @@ const NAME_MESSAGE = 'Full name can only contain letters, spaces, apostrophes, p
 const PHONE_REGEX = /^[0-9+\-\s()]+$/;
 const PHONE_MESSAGE = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
 
+// register form rules - name, email, phone, strong password, terms, role, tutor key or grade
 const registerValidationRules = [
   body('fullName')
     .trim()
@@ -50,11 +52,13 @@ const registerValidationRules = [
     .withMessage('Please select your grade.'),
 ];
 
+// login form rules - email and password
 const loginValidationRules = [
   body('email').trim().isEmail().withMessage('Please enter a valid email address.').normalizeEmail(),
   body('password').notEmpty().withMessage('Password is required.'),
 ];
 
+// profile form rules - name, phone and bio
 const updateProfileValidationRules = [
   body('fullName')
     .trim()
@@ -76,6 +80,7 @@ const updateProfileValidationRules = [
     .withMessage('Bio must be 1000 characters or fewer.'),
 ];
 
+// change password rules - current password and a strong new one
 const changePasswordValidationRules = [
   body('currentPassword').notEmpty().withMessage('Current password is required.'),
   body('newPassword')
@@ -83,10 +88,12 @@ const changePasswordValidationRules = [
     .withMessage(PASSWORD_RULE_MESSAGE),
 ];
 
+// forgot password rules - a valid email
 const forgotPasswordValidationRules = [
   body('email').trim().isEmail().withMessage('Please enter a valid email address.').normalizeEmail(),
 ];
 
+// reset password rules - email and 6-digit code (or a reset link token) and a strong new password
 const resetPasswordValidationRules = [
   // either the admin's reset link token, or the email + 6-digit code
   body('token').optional({ checkFalsy: true }).trim().isLength({ min: 32, max: 128 }).withMessage('This reset link is not valid.'),

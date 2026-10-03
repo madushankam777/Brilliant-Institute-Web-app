@@ -4,15 +4,19 @@ const data = require('../reportData');
 
 const { num, percent, change, kpi, table, bars, columnChart, facts, section, signatures, rows, one, money } = parts;
 
+// fees and payments report - money in, money owed, tutor payouts and every transaction
 async function build(params, { period }) {
+  // fees collected in this period and in the one before it
   const collected = await data.getCollectedTotal(period);
   const previous = await data.getCollectedTotal(period.previous);
+  // failed and refunded payments in the period
   const failed = await one(
     `SELECT SUM(status = 'FAILED') AS failed, SUM(status = 'REFUNDED') AS refunded,
             COALESCE(SUM(CASE WHEN status = 'REFUNDED' THEN amount END), 0) AS refunded_amount
      FROM payments WHERE COALESCE(paid_at, created_at) >= ? AND COALESCE(paid_at, created_at) < ?`,
     [period.start, period.end]
   );
+  // bank transfer slips waiting for verification
   const pending = await rows(
     `SELECT p.created_at, u.full_name, u.student_code, c.subject, p.amount,
             JSON_UNQUOTE(JSON_EXTRACT(p.payment_details, '$.bankReference')) AS reference
@@ -23,7 +27,9 @@ async function build(params, { period }) {
      WHERE p.status = 'PENDING' AND p.payment_method = 'BANK_TRANSFER'
      ORDER BY p.created_at ASC`
   );
+  // total value of the waiting slips
   const pendingTotal = pending.reduce((sum, item) => sum + num(item.amount), 0);
+  // every unpaid balance right now
   const outstanding = await rows(
     `SELECT u.full_name, u.student_code, u.phone, c.subject, e.balance
      FROM enrollments e
@@ -32,10 +38,14 @@ async function build(params, { period }) {
      WHERE e.status = 'ACTIVE' AND e.balance > 0
      ORDER BY e.balance DESC, u.full_name`
   );
+  // total unpaid
   const owedTotal = outstanding.reduce((sum, item) => sum + num(item.balance), 0);
+  // money paid to tutors in the period
   const payouts = await data.getPayouts(period);
+  // total paid to tutors
   const paidOut = payouts.filter(data.isPaid).reduce((sum, item) => sum + item.amount, 0);
 
+  // fees by payment method
   const methods = await rows(
     `SELECT payment_method, COUNT(*) AS payments, SUM(amount) AS total
      FROM payments WHERE status = 'SUCCESSFUL' AND paid_at >= ? AND paid_at < ?
@@ -45,6 +55,7 @@ async function build(params, { period }) {
 
   // daily bars for short periods, monthly for longer ones
   const daily = period.days <= 62;
+  // fees collected per day or per month, for the chart
   const trendRows = await rows(
     `SELECT DATE_FORMAT(paid_at, '${daily ? '%Y-%m-%d' : '%Y-%m'}') AS bucket, SUM(amount) AS total
      FROM payments WHERE status = 'SUCCESSFUL' AND paid_at >= ? AND paid_at < ?
@@ -61,9 +72,11 @@ async function build(params, { period }) {
     parts.monthKeys(period.from, period.to).forEach((key) => trend.push({ label: parts.monthLabel(key), value: trendMap.get(key) || 0 }));
   }
 
+  // fees per class - collected in the period and still owed
   const classes = await data.getClasses();
   const collections = await data.getCollectionsByClass(period);
   const owedByClass = await data.getOutstandingByClass();
+  // classes with payments or an unpaid balance, biggest first
   const classRows = classes
     .map((item) => ({
       subject: item.subject,
@@ -75,6 +88,7 @@ async function build(params, { period }) {
     .filter((item) => item.payments > 0 || item.owed > 0)
     .sort((a, b) => b.collected - a.collected);
 
+  // every payment in the period (the transaction register)
   const register = await rows(
     `SELECT COALESCE(p.paid_at, p.created_at) AS date, r.receipt_number, u.full_name, u.student_code, c.subject,
             p.payment_method, p.status, p.amount
@@ -88,7 +102,9 @@ async function build(params, { period }) {
     [period.start, period.end]
   );
 
+  // change against the previous period
   const growth = change(collected.total, previous.total);
+  // the key findings
   const highlights = [];
   highlights.push(
     growth === null
@@ -102,6 +118,7 @@ async function build(params, { period }) {
   if (outstanding.length > 0) highlights.push(`LKR ${money(owedTotal)} is owed across ${outstanding.length} enrolment(s).`);
   highlights.push(`After LKR ${money(paidOut)} paid to tutors, the net amount for the period is LKR ${money(collected.total - paidOut)}.`);
 
+  // the report - title, key figures, key findings and sections
   return {
     title: 'Fees & Payments Report',
     subtitle: 'Fees collected, money owed, tutor payouts and the full transaction register',

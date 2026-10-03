@@ -9,12 +9,14 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the status tabs
 const FILTERS = [
   { key: 'NEW', label: 'New' },
   { key: 'HANDLED', label: 'Handled' },
   { key: '', label: 'All' },
 ];
 
+// the words shown for each topic
 const TOPIC_LABELS = {
   ADMISSIONS: 'Joining',
   CLASSES: 'Classes',
@@ -23,6 +25,7 @@ const TOPIC_LABELS = {
   OTHER: 'Other',
 };
 
+// a date and time as, for example, 12 Oct 2026, 3:30 PM
 function formatDateTime(value) {
   return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
     day: 'numeric',
@@ -33,8 +36,10 @@ function formatDateTime(value) {
   });
 }
 
+// enquiries - messages from the public Contact Us page; the admin marks them handled
 function EnquiriesPage() {
   const { user } = useAuth();
+  // the tab, the messages and the page state
   const [filter, setFilter] = useState('NEW');
   const [messages, setMessages] = useState([]);
   const [newCount, setNewCount] = useState(0);
@@ -42,6 +47,7 @@ function EnquiriesPage() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
 
+  // load the messages for the chosen tab
   const load = useCallback(async () => {
     setError('');
     try {
@@ -56,11 +62,13 @@ function EnquiriesPage() {
     }
   }, [filter]);
 
+  // reload when the tab changes
   useEffect(() => {
     setIsLoading(true);
     load();
   }, [load]);
 
+  // mark handled / reopen btn - change a message's status
   async function changeStatus(message, status) {
     setBusyId(message.id);
     setError('');
@@ -74,6 +82,7 @@ function EnquiriesPage() {
     }
   }
 
+  // the page - title, status tabs and one card per message
   return (
     <PortalShell navItems={getNavItems(user.role)}>
       <div className="page">
@@ -88,6 +97,7 @@ function EnquiriesPage() {
           <ReportLink type="enquiries" label="Enquiries report" />
         </div>
 
+        {/* status tabs - New, Handled, All */}
         <div className="choice-group" style={{ marginBottom: '18px' }}>
           {FILTERS.map((item) => (
             <button
@@ -105,6 +115,7 @@ function EnquiriesPage() {
 
         <Alert type="error" message={error} />
 
+        {/* a spinner, an empty message, or one card per message */}
         {isLoading ? (
           <LoadingSpinner label="Loading messages..." />
         ) : messages.length === 0 ? (
@@ -134,6 +145,7 @@ function EnquiriesPage() {
 
               <p className="enquiry-message">{message.message}</p>
 
+              {/* contact links, and the Mark handled / Reopen btn */}
               <div className="enquiry-footer">
                 <div className="enquiry-contacts">
                   <a href={`mailto:${message.email}?subject=${encodeURIComponent('Re: your message to Brilliant Institute')}`}>
@@ -145,6 +157,7 @@ function EnquiriesPage() {
                     </a>
                   )}
                 </div>
+                {/* mark handled btn for a new message; handled by and a reopen btn after that */}
                 {message.status === 'NEW' ? (
                   <button
                     type="button"

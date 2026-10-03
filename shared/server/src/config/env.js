@@ -1,3 +1,4 @@
+// settings - loads server/.env, checks the required values and exports one config object
 require('dotenv').config();
 
 // Every variable in this list MUST be present in the environment
@@ -10,6 +11,7 @@ const REQUIRED_VARS = [
   'CLIENT_ORIGIN',
 ];
 
+// which required variables are missing or empty
 function getMissingVars() {
   return REQUIRED_VARS.filter((name) => {
     const value = process.env[name];
@@ -17,6 +19,7 @@ function getMissingVars() {
   });
 }
 
+// stop the server at start-up if a required variable is missing or the secret is weak
 function assertRequiredEnvVars() {
   const missing = getMissingVars();
   if (missing.length > 0) {
@@ -40,13 +43,16 @@ function assertRequiredEnvVars() {
   }
 }
 
+// run the check now
 assertRequiredEnvVars();
 
+// number from text, with a fallback
 function toInt(value, fallback) {
   const parsed = parseInt(value, 10);
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+// TRUST_PROXY can be false, true (this machine only), a hop count or an address list
 function parseTrustProxy(value) {
   if (!value || value === 'false') return false;
   if (value === 'true') return 'loopback';
@@ -54,6 +60,7 @@ function parseTrustProxy(value) {
   return value;
 }
 
+// the one config object the rest of the API reads
 const config = {
   env: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
@@ -69,6 +76,7 @@ const config = {
   // cloud hosting - the API server also serves the built website (client/dist)
   serveClient: process.env.SERVE_CLIENT === 'true',
 
+  // database login
   db: {
     host: process.env.DB_HOST,
     port: toInt(process.env.DB_PORT, 3306),
@@ -82,6 +90,7 @@ const config = {
     sslCa: process.env.DB_SSL_CA || '',
   },
 
+  // login and session rules
   auth: {
     // Secure cookie - set COOKIE_SECURE=true on https
     cookieSecure:
@@ -95,6 +104,7 @@ const config = {
     accountLockoutMinutes: toInt(process.env.ACCOUNT_LOCKOUT_MINUTES, 15),
   },
 
+  // how many requests are allowed in a time window
   rateLimit: {
     authWindowMinutes: toInt(process.env.AUTH_RATE_LIMIT_WINDOW_MINUTES, 15),
     authMaxAttempts: toInt(process.env.AUTH_RATE_LIMIT_MAX_ATTEMPTS, 8),
@@ -102,6 +112,7 @@ const config = {
     apiMaxRequests: toInt(process.env.API_RATE_LIMIT_MAX_REQUESTS, 1500),
   },
 
+  // school rules
   business: {
     lowAttendanceThresholdPercent: toInt(
       process.env.LOW_ATTENDANCE_THRESHOLD_PERCENT,
@@ -137,6 +148,7 @@ const config = {
     calendarId: process.env.HOLIDAY_CALENDAR_ID || 'en.lk#holiday@group.v.calendar.google.com',
   },
 
+  // payment gateway placeholder (live card payments use the payhere settings below)
   paymentGateway: {
     providerName: process.env.PAYMENT_GATEWAY_PROVIDER_NAME || 'mock-gateway',
     apiKey: process.env.PAYMENT_GATEWAY_API_KEY || '',
@@ -166,6 +178,7 @@ const config = {
   },
 };
 
+// PayHere is ready only when the merchant id, secret and public address are all set
 config.payhere.isConfigured = Boolean(
   config.payhere.merchantId && config.payhere.merchantSecret && config.payhere.publicBaseUrl
 );

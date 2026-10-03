@@ -97,10 +97,12 @@ const AREAS = {
   REREGISTRATION_COMPLETED: 'Re-registration',
 };
 
+// the friendly name of an action, or the action itself if it has none
 function actionName(action) {
   return ACTIONS[action] || label(action);
 }
 
+// which part of the site an action belongs to
 function areaOf(action) {
   if (AREAS[action]) return AREAS[action];
   if (action.startsWith('CLASS_') || action.startsWith('EXTRA_CLASS')) return 'Classes';
@@ -110,6 +112,7 @@ function areaOf(action) {
   return 'Other';
 }
 
+// details are saved as JSON text - turn them back into an object
 function parseDetails(details) {
   if (!details) return {};
   if (typeof details === 'object') return details;

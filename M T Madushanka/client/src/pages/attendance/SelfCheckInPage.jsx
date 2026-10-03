@@ -7,6 +7,7 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// check-in page - the student types the 6-digit key the tutor shows in class
 function SelfCheckInPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
@@ -65,6 +66,7 @@ function SelfCheckInPage() {
             </button>
           </form>
 
+          {/* back to the dashboard link */}
           <p className="auth-footer-note">
             <Link to="/">Back to Dashboard</Link>
           </p>

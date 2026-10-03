@@ -1,3 +1,4 @@
+// Contact Us API calls - the public form, the About page tutors and the admin inbox
 import httpClient from '../../../shared/client/src/api/httpClient';
 
 // public Contact Us form
@@ -18,6 +19,7 @@ export async function fetchContactMessages(status) {
   return response.data.data;
 }
 
+// admin - mark a message handled, or open it again
 export async function setContactMessageStatus(messageId, status) {
   const response = await httpClient.patch(`/contact/${messageId}/status`, { status });
   return response.data;

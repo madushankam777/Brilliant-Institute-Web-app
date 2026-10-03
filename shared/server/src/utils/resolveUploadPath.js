@@ -2,6 +2,7 @@
 const path = require('path');
 const ApiError = require('./ApiError');
 
+// the old uploads folder (shared/server/uploads)
 const UPLOADS_ROOT_DIR = path.join(__dirname, '..', '..', 'uploads');
 
 // stored /uploads path to an absolute path - never outside uploads

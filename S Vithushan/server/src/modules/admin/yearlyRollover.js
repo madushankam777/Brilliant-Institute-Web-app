@@ -5,8 +5,10 @@ const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const repository = require('./admin.repository');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
+// milliseconds in one day
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// sort students into promote (re-registered), graduate (last grade) and remove (did not re-register)
 function classify(students, academicYear) {
   const promote = [];
   const graduate = [];
@@ -173,10 +175,12 @@ async function runIfDue() {
 
 // check at start-up and once a day
 function startRolloverScheduler() {
+  // run the roll-over if it is due, and log a failure instead of crashing
   const check = () => {
     runIfDue().catch((error) => console.error('[rollover] check failed:', error.message));
   };
 
+  // first check 30 seconds after start, then once a day
   setTimeout(check, 30 * 1000).unref();
   const timer = setInterval(check, DAY_MS);
   timer.unref();

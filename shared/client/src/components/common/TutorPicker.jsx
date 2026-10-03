@@ -1,3 +1,4 @@
+// pick one tutor from a searchable list
 import { useState } from 'react';
 import Avatar from './Avatar';
 
@@ -5,6 +6,7 @@ import Avatar from './Avatar';
 function TutorPicker({ tutors, value, onChange, emptyMessage = 'No tutors found.' }) {
   const [search, setSearch] = useState('');
 
+  // tutors matching the search box
   const filtered = tutors.filter((tutor) =>
     tutor.fullName.toLowerCase().includes(search.trim().toLowerCase())
   );

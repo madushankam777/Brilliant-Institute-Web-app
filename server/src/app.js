@@ -1,3 +1,4 @@
+// the combined API - security rules, every module's routes and, when hosted, the website itself
 const express = require('express');
 const path = require('path');
 const helmet = require('helmet');
@@ -26,8 +27,10 @@ const adminRoutes = require('../../S Vithushan/server/src/modules/admin/admin.ro
 const reportRoutes = require('../../S Vithushan/server/src/modules/reports/reports.routes');
 const analyticsRoutes = require('../../S Vithushan/server/src/modules/reports/analytics.routes');
 
+// create the web server
 const app = express();
 
+// behind a proxy or tunnel, trust it for the real visitor address
 app.set('trust proxy', config.trustProxy);
 
 // security headers - same rules as the website preview (client/vite.config.js)
@@ -53,6 +56,7 @@ app.use(
   })
 );
 
+// CORS - only our own website may call the API (with cookies)
 app.use(
   cors({
     // CLIENT_ORIGIN can list more than one allowed origin
@@ -76,6 +80,7 @@ app.use(
 // smaller downloads - pages, scripts and JSON are sent zipped (PDF and Excel files already are)
 app.use(compression());
 
+// read JSON request bodies (max 100 KB) and cookies
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 
@@ -89,11 +94,14 @@ app.use(
   express.static(path.join(UPLOADS_ROOT_DIR, 'profile-pictures'), { dotfiles: 'deny', index: false })
 );
 
+// log every request
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
 
 // built website - cloud hosting runs the site and the API on one address (SERVE_CLIENT=true)
 if (config.serveClient) {
+  // the built website folder
   const CLIENT_DIST = path.resolve(__dirname, '../../client/dist');
+  // serve the built website files
   app.use(
     express.static(CLIENT_DIST, {
       index: false,
@@ -121,6 +129,7 @@ app.post(
   paymentController.handlePayHereNotification
 );
 
+// rate limit and CSRF check for every request below this line
 app.use(apiLimiter);
 app.use(csrfGuard);
 
@@ -132,10 +141,12 @@ app.get(
   })
 );
 
+// health check - is the API up? (returns no data)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'API is running.' });
 });
 
+// feature routes - one line per module, the person who built it is named at the end
 app.use('/api/auth', authRoutes); // Registration & Login (N Danushika)
 app.use('/api/attendance', attendanceRoutes); // Attendance (M T Madushanka)
 app.use('/api/payments', paymentRoutes); // Payments (M T Madushanka)
@@ -146,6 +157,7 @@ app.use('/api/admin/reports', reportRoutes); // Reports + PDF / Excel downloads 
 app.use('/api/admin/analytics', analyticsRoutes); // Analytics dashboard data (S Vithushan)
 app.use('/api', adminRoutes); // Admin, Notifications & Announcements (S Vithushan) - /api/admin/* + /api/announcements
 
+// unknown address gives a 404, any other error gives a JSON error reply
 app.use(notFoundHandler);
 app.use(errorHandler);
 

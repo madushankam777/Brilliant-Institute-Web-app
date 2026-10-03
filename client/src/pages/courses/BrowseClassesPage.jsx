@@ -12,13 +12,17 @@ import { GRADES } from '../../../../shared/client/src/constants/grades';
 import { useAuth } from '../../context/AuthContext';
 import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 
+// subject areas for the filter
 const SUBJECT_AREAS = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Other'];
+// days for the filter
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// browse classes - search and filter the active classes, then open one
 function BrowseClassesPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
@@ -26,13 +30,16 @@ function BrowseClassesPage() {
   // the top bar's search box hands the term over as ?search=
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  // the other filters - subject area, grade and day
   const [subjectArea, setSubjectArea] = useState('');
   const [level, setLevel] = useState(searchParams.get('search') ? '' : user.grade || '');
   const [dayOfWeek, setDayOfWeek] = useState('');
+  // the results
   const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // load the classes that match the filters
   const loadClasses = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -46,11 +53,13 @@ function BrowseClassesPage() {
     }
   }, [search, subjectArea, level, dayOfWeek]);
 
+  // reload when a filter changes (typing waits 250 ms)
   useEffect(() => {
     const timeoutId = setTimeout(loadClasses, 250); // debounce free-text search
     return () => clearTimeout(timeoutId);
   }, [loadClasses]);
 
+  // the page - the filter card and one card per class
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -59,6 +68,7 @@ function BrowseClassesPage() {
           <p className="muted">Explore high-quality tuition programs designed to build confidence and deliver performance.</p>
         </div>
 
+        {/* filters - search, subject area, grade and day */}
         <div className="card">
           <div className="form-field has-icon" style={{ marginBottom: '16px' }}>
             <div className="input-shell">
@@ -142,6 +152,7 @@ function BrowseClassesPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* the results - a message while loading, else one card per class */}
         {isLoading ? (
           <LoadingSpinner label="Loading classes..." />
         ) : classes.length === 0 ? (

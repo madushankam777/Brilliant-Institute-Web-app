@@ -11,7 +11,9 @@ const CATEGORIES = [
   'Other',
 ];
 
+// feedback report - tickets received and resolved, open ones by priority, and time to resolve
 async function build(params, { period }) {
+  // tickets received in the period
   const tickets = await rows(
     `SELECT f.ticket_number, f.created_at, f.category, f.subject, f.priority, f.status, f.resolved_at, f.recipient_type,
             u.full_name AS submitted_by, t.full_name AS tutor_name
@@ -22,6 +24,7 @@ async function build(params, { period }) {
      ORDER BY f.created_at ASC`,
     [period.start, period.end]
   );
+  // tickets still open (any date), most urgent first
   const open = await rows(
     `SELECT f.ticket_number, f.created_at, f.category, f.subject, f.priority, f.status, u.full_name AS submitted_by,
             DATEDIFF(NOW(), f.created_at) AS age_days
@@ -29,6 +32,7 @@ async function build(params, { period }) {
      WHERE f.status <> 'RESOLVED'
      ORDER BY FIELD(f.priority, 'HIGH', 'MEDIUM', 'LOW'), f.created_at ASC`
   );
+  // tickets resolved in the period and their average time
   const resolved = await one(
     `SELECT COUNT(*) AS total, AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) / 60 AS hours
      FROM feedback_complaints WHERE resolved_at >= ? AND resolved_at < ?`,
@@ -37,6 +41,7 @@ async function build(params, { period }) {
 
   // standard categories plus any others found in the tickets
   const names = [...new Set([...CATEGORIES, ...tickets.map((item) => item.category)])];
+  // per category - received, resolved, open and high priority
   const categoryRows = names.map((category) => {
     const list = tickets.filter((item) => item.category === category);
     return {
@@ -53,14 +58,17 @@ async function build(params, { period }) {
   const resolutionRate = percent(resolvedInPeriod, tickets.length);
   const hours = resolved.hours === null ? null : num(resolved.hours);
 
+  // the key findings
   const highlights = [`${tickets.length} ticket(s) were received and ${num(resolved.total)} were resolved during the period.`];
   const busiest = [...categoryRows].sort((a, b) => b.received - a.received)[0];
   if (busiest && busiest.received > 0) highlights.push(`Most tickets were about "${busiest.category}" (${busiest.received}).`);
   if (hours !== null) highlights.push(`Tickets took ${parts.formatHours(hours)} on average to resolve.`);
   if (open.length > 0) highlights.push(`${open.length} ticket(s) are still open${highOpen > 0 ? `, ${highOpen} of them high priority` : ''}.`);
+  // age in days of the oldest open ticket
   const oldest = open.reduce((max, item) => Math.max(max, num(item.age_days)), 0);
   if (oldest > 7) highlights.push(`The oldest open ticket has been waiting ${oldest} days.`);
 
+  // the report - title, key figures, key findings and sections
   return {
     title: 'Feedback & Complaints Report',
     subtitle: 'Tickets from students and parents, how fast they were solved and what is still open',

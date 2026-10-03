@@ -12,8 +12,11 @@ import EChart from './EChart';
 import { PRESETS, presetRange } from './reportPeriods';
 import * as charts from './analyticsCharts';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
+// icons for the six number cards
 const KPI_ICONS = ['users', 'wallet', 'bank', 'card', 'checkCircle', 'chat'];
+// the word for one point on a chart
 const PERIOD_WORD = { day: 'day', week: 'week', month: 'month' };
 
 // true when every number in the lists is zero
@@ -41,8 +44,10 @@ function ChartCard({ title, hint, report, wide, empty, children }) {
   );
 }
 
+// analytics - interactive charts for fees, attendance, classes, tutors and site use
 function AnalyticsPage() {
   const navigate = useNavigate();
+  // the period choice, its dates and the page state
   const [preset, setPreset] = useState('last90');
   const [range, setRange] = useState(presetRange('last90'));
   const [data, setData] = useState(null);
@@ -50,6 +55,7 @@ function AnalyticsPage() {
   const [error, setError] = useState('');
   const [busyFile, setBusyFile] = useState('');
 
+  // load the numbers for a period
   const load = useCallback(async (period) => {
     setIsLoading(true);
     setError('');
@@ -62,10 +68,12 @@ function AnalyticsPage() {
     }
   }, []);
 
+  // load the last 90 days when the page opens
   useEffect(() => {
     load(presetRange('last90'));
   }, [load]);
 
+  // period list - pick a ready-made period, or custom dates
   function changePreset(value) {
     setPreset(value);
     if (value !== 'custom') {
@@ -128,9 +136,11 @@ function AnalyticsPage() {
     };
   }, [data]);
 
+  // the unit of one chart point, and the tutors with no attendance marked
   const step = data ? PERIOD_WORD[data.period.granularity] : 'week';
   const hiddenTutors = data ? data.tutors.filter((item) => item.attendance === null).length : 0;
 
+  // the page - title and downloads, the period filter, number cards and the charts
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page page-analytics">
@@ -142,6 +152,7 @@ function AnalyticsPage() {
               tutor or class to open its full report.
             </p>
           </div>
+          {/* summary PDF and Excel btns */}
           <div className="analytics-downloads">
             <button type="button" className="btn btn-secondary" disabled={Boolean(busyFile)} onClick={() => download('pdf')}>
               <Icon name="download" size={16} /> {busyFile === 'pdf' ? 'Preparing...' : 'Summary PDF'}
@@ -152,6 +163,7 @@ function AnalyticsPage() {
           </div>
         </div>
 
+        {/* period filter - a ready-made period or custom dates */}
         <form className="card analytics-filters" onSubmit={applyDates}>
           <div className="form-field">
             <label htmlFor="analytics-preset">Period</label>
@@ -196,13 +208,16 @@ function AnalyticsPage() {
 
         <Alert type="error" message={error} />
 
+        {/* a spinner on the first load */}
         {!data && isLoading && <LoadingSpinner label="Loading analytics..." />}
 
+        {/* the number cards and the charts */}
         {data && options && (
           <div className={isLoading ? 'analytics-body is-loading' : 'analytics-body'}>
             <p className="muted analytics-period">
               {data.period.label} · one point per {step}
             </p>
+            {/* number cards */}
             <div className="stat-grid stat-grid-3">
               {data.kpis.map((item, index) => (
                 <StatCard
@@ -217,7 +232,9 @@ function AnalyticsPage() {
               ))}
             </div>
 
+            {/* the charts - each card links to its full report */}
             <div className="analytics-grid">
+              {/* fees collected and tutor payouts */}
               <ChartCard
                 wide
                 title="Fees collected and tutor payouts"
@@ -228,6 +245,7 @@ function AnalyticsPage() {
                 <EChart option={options.money} height={340} label="Fees collected and tutor payouts" />
               </ChartCard>
 
+              {/* payment methods - click to open the finance report */}
               <ChartCard
                 title="Payment methods"
                 empty={data.methods.length === 0 && 'No fees were collected in this period.'}
@@ -237,6 +255,7 @@ function AnalyticsPage() {
                 <EChart option={options.methods} height={320} label="Payment methods" onClick={() => navigate(reportLink('finance'))} />
               </ChartCard>
 
+              {/* students by grade - click a grade to open the students report */}
               <ChartCard
                 title="Students by grade"
                 empty={data.students.grades.length === 0 && 'There are no active students yet.'}
@@ -251,6 +270,7 @@ function AnalyticsPage() {
                 />
               </ChartCard>
 
+              {/* attendance marks and the attendance rate */}
               <ChartCard
                 wide
                 title="Attendance"
@@ -261,6 +281,7 @@ function AnalyticsPage() {
                 <EChart option={options.attendance} height={340} label="Attendance" />
               </ChartCard>
 
+              {/* attendance by class and week - click a class to open its report */}
               <ChartCard
                 wide
                 title="Attendance by class"
@@ -279,6 +300,7 @@ function AnalyticsPage() {
                 />
               </ChartCard>
 
+              {/* tutor performance - attendance against fees collected */}
               <ChartCard
                 title="Tutor performance"
                 empty={hiddenTutors === data.tutors.length && 'No attendance has been marked for any tutor in this period.'}
@@ -293,6 +315,7 @@ function AnalyticsPage() {
                 />
               </ChartCard>
 
+              {/* fees and payouts by tutor */}
               <ChartCard
                 title="Fees and payouts by tutor"
                 empty={allZero(data.tutors.map((t) => t.collected), data.tutors.map((t) => t.paid)) && 'No fees or payouts in this period.'}
@@ -307,6 +330,7 @@ function AnalyticsPage() {
                 />
               </ChartCard>
 
+              {/* seats taken in each class */}
               <ChartCard wide title="Class seats"
                 empty={data.classes.length === 0 && 'There are no active classes.'}
                 hint="Seats taken in every active class. Click a class to open its report."
@@ -320,6 +344,7 @@ function AnalyticsPage() {
                 />
               </ChartCard>
 
+              {/* enrolments by subject area */}
               <ChartCard
                 title="Enrolments by subject"
                 empty={data.students.subjects.length === 0 && 'There are no active enrolments.'}
@@ -328,6 +353,7 @@ function AnalyticsPage() {
                 <EChart option={options.subjects} height={320} label="Enrolments by subject" />
               </ChartCard>
 
+              {/* new students and new enrolments */}
               <ChartCard
                 title="Growth"
                 empty={allZero(data.students.newStudents, data.students.newEnrolments) && 'No new students or enrolments in this period.'}
@@ -337,6 +363,7 @@ function AnalyticsPage() {
                 <EChart option={options.growth} height={320} label="Growth" />
               </ChartCard>
 
+              {/* feedback and complaints */}
               <ChartCard
                 title="Feedback and complaints"
                 empty={allZero(data.feedback.pending, data.feedback.inProgress, data.feedback.resolved) && 'No feedback was received in this period.'}
@@ -346,6 +373,7 @@ function AnalyticsPage() {
                 <EChart option={options.feedback} height={320} label="Feedback and complaints" />
               </ChartCard>
 
+              {/* site use - sign-ins by role */}
               <ChartCard
                 title="Site use"
                 empty={allZero(data.usage.students, data.usage.tutors, data.usage.admins) && 'No sign-ins in this period.'}

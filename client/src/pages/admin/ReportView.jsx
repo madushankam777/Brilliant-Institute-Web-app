@@ -18,6 +18,7 @@ function KpiTiles({ items }) {
   );
 }
 
+// a table block - columns, rows, totals and a note
 function ReportTable({ block }) {
   return (
     <div className="report-block">
@@ -121,6 +122,7 @@ function ReportColumns({ block }) {
   );
 }
 
+// a facts block - label and value pairs
 function ReportFacts({ block }) {
   return (
     <div className="report-block">
@@ -137,6 +139,7 @@ function ReportFacts({ block }) {
   );
 }
 
+// signature lines for the people who sign the report
 function ReportSignatures({ block }) {
   return (
     <div className="report-signatures">
@@ -151,6 +154,7 @@ function ReportSignatures({ block }) {
   );
 }
 
+// pick the right block for its type
 function ReportBlock({ block }) {
   if (block.type === 'table') return <ReportTable block={block} />;
   if (block.type === 'bars') return <ReportBars block={block} />;
@@ -163,6 +167,7 @@ function ReportBlock({ block }) {
   return null;
 }
 
+// the report as a page - letterhead, title, details, key figures, findings, sections and footer
 function ReportView({ report }) {
   const details = [
     ['Report number', report.reportNumber],
@@ -174,6 +179,7 @@ function ReportView({ report }) {
 
   return (
     <article className="report-paper">
+      {/* letterhead - logo, institute name and the report title */}
       <header className="report-letterhead">
         <img src={logoImg} alt="" className="report-logo" />
         <div className="report-brand">
@@ -186,9 +192,11 @@ function ReportView({ report }) {
         </div>
       </header>
 
+      {/* title and subtitle */}
       <h2 className="report-title">{report.title}</h2>
       {report.subtitle && <p className="report-subtitle">{report.subtitle}</p>}
 
+      {/* report number, date, period, prepared by and the filters used */}
       <dl className="report-details">
         {details.map(([label, value]) => (
           <div key={label} className="report-detail">
@@ -198,8 +206,10 @@ function ReportView({ report }) {
         ))}
       </dl>
 
+      {/* key figures */}
       <KpiTiles items={report.summary} />
 
+      {/* key findings */}
       {report.highlights.length > 0 && (
         <div className="report-findings">
           <span className="report-findings-title">Key findings</span>
@@ -211,6 +221,7 @@ function ReportView({ report }) {
         </div>
       )}
 
+      {/* the numbered sections, each with its blocks */}
       {report.sections.map((section, index) => (
         <section key={`${section.title}-${index}`} className="report-section">
           <h3 className="report-section-title">
@@ -224,6 +235,7 @@ function ReportView({ report }) {
         </section>
       ))}
 
+      {/* footer - end of report and the confidential note */}
       <footer className="report-footer">
         <span>End of report</span>
         <small>

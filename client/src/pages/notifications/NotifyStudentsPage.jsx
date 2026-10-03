@@ -9,28 +9,34 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// who a notice can go to
 const AUDIENCES = [
   { value: 'STUDENTS', label: 'My students', hint: 'Everyone actively enrolled in your classes.' },
   { value: 'ADMIN', label: 'Admin', hint: 'The institute office only.' },
   { value: 'BOTH', label: 'Students + Admin', hint: 'Both of the above.' },
 ];
 
+// a blank notice form
 const EMPTY_FORM = { audience: 'STUDENTS', classId: '', subject: '', message: '' };
 
+// notify students - a tutor sends a notice to their students, the admin, or both
 function NotifyStudentsPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
+  // my classes and the page state
   const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // the notice form and its state
   const [form, setForm] = useState(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
 
+  // load the classes I can send to
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -43,14 +49,17 @@ function NotifyStudentsPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // change one form field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // send notification btn - check the form, then send the notice
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -87,6 +96,7 @@ function NotifyStudentsPage() {
     }
   }
 
+  // the page - title and the notice form
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -105,6 +115,7 @@ function NotifyStudentsPage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* a spinner, or the notice form */}
         {isLoading ? (
           <LoadingSpinner label="Loading your classes..." />
         ) : (
@@ -113,6 +124,7 @@ function NotifyStudentsPage() {
             <Alert type="error" message={formError} />
 
             <form onSubmit={handleSubmit} noValidate>
+              {/* who the notice goes to */}
               <div className="form-field">
                 <label>Send to</label>
                 <div className="choice-group" role="radiogroup">
@@ -137,6 +149,7 @@ function NotifyStudentsPage() {
                 </p>
               </div>
 
+              {/* class choice - not needed when the notice only goes to the admin */}
               {form.audience !== 'ADMIN' && (
                 <div className="form-field">
                   <label htmlFor="notify-class">Class (optional)</label>
@@ -160,6 +173,7 @@ function NotifyStudentsPage() {
                 </div>
               )}
 
+              {/* subject */}
               <div className="form-field">
                 <label htmlFor="notify-subject">Subject</label>
                 <input
@@ -172,6 +186,7 @@ function NotifyStudentsPage() {
                 {fieldErrors.subject && <p className="field-error">{fieldErrors.subject}</p>}
               </div>
 
+              {/* message - up to 350 characters */}
               <div className="form-field">
                 <label htmlFor="notify-message">Message</label>
                 <textarea
@@ -186,6 +201,7 @@ function NotifyStudentsPage() {
                 {fieldErrors.message && <p className="field-error">{fieldErrors.message}</p>}
               </div>
 
+              {/* send btn */}
               <button type="submit" className="btn btn-primary" disabled={isSending}>
                 {isSending ? 'Sending...' : 'Send notification'}
               </button>

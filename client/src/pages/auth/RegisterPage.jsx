@@ -1,3 +1,4 @@
+// register page - the sign-up form for students and tutors
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerAccount } from '../../api/authApi';
@@ -7,14 +8,17 @@ import PasswordStrength from '../../../../shared/client/src/components/common/Pa
 import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
 
+// what a strong password needs
 const PASSWORD_RULE_MESSAGE =
   'Password must be at least 8 characters long and include an uppercase letter, ' +
   'a lowercase letter, and a number.';
 
+// 8-72 characters with upper case, lower case and a number
 function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
+// an empty form - student is the default role
 const initialFormState = {
   fullName: '',
   email: '',
@@ -27,6 +31,7 @@ const initialFormState = {
   grade: '',
 };
 
+// register page - students choose a grade, tutors need an enrollment key
 function RegisterPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState(initialFormState);
@@ -34,10 +39,12 @@ function RegisterPage() {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // change one form field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // check the form before sending it
   function validate() {
     const errors = {};
     if (form.fullName.trim().length < 2) {
@@ -64,6 +71,7 @@ function RegisterPage() {
     return errors;
   }
 
+  // register btn - validate, create the account, then go to the login page
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -92,6 +100,7 @@ function RegisterPage() {
     }
   }
 
+  // the page - role choice, then the form
   return (
     <AuthLayout
       quote={{
@@ -125,6 +134,7 @@ function RegisterPage() {
 
       <Alert type="error" message={formError} />
 
+      {/* register form - name, email, phone, grade or key, password and terms */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="fullName"

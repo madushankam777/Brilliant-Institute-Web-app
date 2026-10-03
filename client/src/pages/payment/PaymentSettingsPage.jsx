@@ -10,6 +10,7 @@ import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
 // payment methods the admin can switch on or off
@@ -20,6 +21,7 @@ const METHOD_OPTIONS = [
   { value: 'MCASH', label: 'mCash', help: 'Mobitel mCash mobile wallet.' },
 ];
 
+// a blank settings form
 const EMPTY_FORM = {
   bankName: '',
   bankAccountName: '',
@@ -30,7 +32,9 @@ const EMPTY_FORM = {
   mcashNumber: '',
 };
 
+// payment settings - the bank and wallet details students see at checkout, and which methods are on
 function PaymentSettingsPage() {
+  // the settings form and the page state
   const [form, setForm] = useState(EMPTY_FORM);
   const [enabledMethods, setEnabledMethods] = useState(['BANK_TRANSFER']);
   // turning a method off - admin must type REMOVE
@@ -43,6 +47,7 @@ function PaymentSettingsPage() {
   const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
   const [saveMessage, setSaveMessage] = useState('');
 
+  // load the saved settings when the page opens
   useEffect(() => {
     let isMounted = true;
     fetchPaymentSettings()
@@ -70,6 +75,7 @@ function PaymentSettingsPage() {
     };
   }, []);
 
+  // change one field and clear its error
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
     clearFieldError(field);
@@ -79,6 +85,7 @@ function PaymentSettingsPage() {
   const ACCOUNT_PATTERN = /^[0-9 -]{4,34}$/;
   const WALLET_PATTERN = /^(?:\+94|0)7\d{8}$/;
 
+  // check the bank and wallet fields before saving
   function validateSettings() {
     return validate({
       bankName: form.bankName.length > 100 && 'Bank name must be 100 characters or fewer.',
@@ -100,6 +107,7 @@ function PaymentSettingsPage() {
     });
   }
 
+  // switch a method on, or ask to confirm before turning it off
   function toggleMethod(value) {
     setSaveMessage('');
     if (enabledMethods.includes(value)) {
@@ -117,6 +125,7 @@ function PaymentSettingsPage() {
     setPendingRemove(null);
   }
 
+  // save payment settings btn - check the fields, then save
   async function handleSubmit(event) {
     event.preventDefault();
     setSaveMessage('');
@@ -134,6 +143,7 @@ function PaymentSettingsPage() {
     }
   }
 
+  // the page - title, the settings form and the turn off pop-up
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -150,6 +160,7 @@ function PaymentSettingsPage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* a spinner, or the settings form */}
         {isLoading ? (
           <LoadingSpinner label="Loading payment settings..." />
         ) : (
@@ -181,10 +192,12 @@ function PaymentSettingsPage() {
                   );
                 })}
               </div>
+              {/* warning - with every method off students can only pay at the office */}
               {enabledMethods.length === 0 && (
                 <p className="field-error">With every method off, students can only pay at the office.</p>
               )}
 
+              {/* bank transfer details - the account students send money to */}
               <h2 style={{ fontSize: '0.95rem', marginTop: '24px' }}>Bank transfer</h2>
               <FormField
                 id="bankName"
@@ -229,6 +242,7 @@ function PaymentSettingsPage() {
                 />
               </div>
 
+              {/* mobile wallet numbers - eZ Cash and mCash */}
               <h2 style={{ fontSize: '0.95rem', marginTop: '24px' }}>Mobile wallets</h2>
               <p className="field-help" style={{ marginTop: '-8px' }}>
                 Shown to students so they know which number to send their eZ Cash / mCash payment to.
@@ -255,6 +269,7 @@ function PaymentSettingsPage() {
                 />
               </div>
 
+              {/* save btn */}
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
                 {isSaving ? 'Saving...' : 'Save payment settings'}
               </button>
@@ -263,6 +278,7 @@ function PaymentSettingsPage() {
         )}
       </div>
 
+      {/* turn off pop-up - REMOVE must be typed to confirm */}
       {pendingRemove && (
         <div className="modal-overlay" onClick={() => setPendingRemove(null)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">

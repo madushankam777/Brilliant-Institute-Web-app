@@ -3,6 +3,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const config = require('../../shared/server/src/config/env');
 const { sendMail, checkMailer } = require('../../shared/server/src/utils/mailer');
 
+// check the email set-up, then send one test email (to the given address, or the institute address)
 async function main() {
   const to = process.argv[2] || config.institute.email;
   const ready = await checkMailer();
@@ -19,6 +20,7 @@ async function main() {
   console.log(`Test email sent to ${to}`);
 }
 
+// run it - show the error if sending fails
 main().catch((error) => {
   console.error('Could not send the test email:', error.message);
   process.exitCode = 1;

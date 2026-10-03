@@ -3,6 +3,7 @@ const { pool } = require('../../../../../shared/server/src/config/db');
 
 // --- Dashboard -----------------------------------------------------------
 
+// dashboard counts - users, active classes, open complaints and this month's revenue
 async function getCoreCounts() {
   const [[userRow]] = await pool.execute(
     `SELECT COUNT(*) AS total FROM users WHERE status != 'DELETED'`
@@ -25,6 +26,7 @@ async function getCoreCounts() {
   };
 }
 
+// revenue per month for the last 6 months
 async function getRevenueTrend() {
   const [rows] = await pool.execute(
     `SELECT DATE_FORMAT(paid_at, '%Y-%m') AS month, SUM(amount) AS total
@@ -38,6 +40,7 @@ async function getRevenueTrend() {
 
 // --- Revenue report ---
 
+// today's date according to the database
 async function getDatabaseToday() {
   const [[row]] = await pool.query('SELECT CURDATE() AS today');
   return row.today;
@@ -46,6 +49,7 @@ async function getDatabaseToday() {
 // Formats come from this fixed list, never from the request.
 const REVENUE_BUCKET_FORMATS = { day: '%Y-%m-%d', month: '%Y-%m', year: '%Y' };
 
+// successful payments added up per day, month or year between two dates
 async function sumRevenueByBucket(bucket, fromDate, toDate) {
   const format = REVENUE_BUCKET_FORMATS[bucket];
   const [rows] = await pool.execute(
@@ -58,6 +62,7 @@ async function sumRevenueByBucket(bucket, fromDate, toDate) {
   return rows;
 }
 
+// the latest audit log entries with who did them
 async function listRecentActivity(limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 10;
   const [rows] = await pool.query(
@@ -73,6 +78,7 @@ async function listRecentActivity(limit) {
 
 // --- Users -----------------------------------------------------------------
 
+// user list - search by name, email or ST code, filter by role and status (latest 200)
 async function listUsers({ search, role, status }) {
   const clauses = [`status != 'DELETED'`];
   const params = [];
@@ -97,6 +103,7 @@ async function listUsers({ search, role, status }) {
   return rows;
 }
 
+// add a user account
 async function createUser({ fullName, email, passwordHash, role }) {
   const [result] = await pool.execute(
     `INSERT INTO users (full_name, email, password_hash, role, status, created_at)
@@ -106,16 +113,19 @@ async function createUser({ fullName, email, passwordHash, role }) {
   return result.insertId;
 }
 
+// find a user id by email
 async function findUserByEmail(email) {
   const [rows] = await pool.execute(`SELECT id FROM users WHERE email = ? LIMIT 1`, [email]);
   return rows[0] || null;
 }
 
+// one user by id
 async function findUserById(userId) {
   const [rows] = await pool.execute(`SELECT * FROM users WHERE id = ? LIMIT 1`, [userId]);
   return rows[0] || null;
 }
 
+// set an account ACTIVE or SUSPENDED
 async function updateUserStatus(userId, status) {
   await pool.execute(`UPDATE users SET status = ?, updated_at = NOW() WHERE id = ?`, [
     status,
@@ -130,6 +140,7 @@ async function softDeleteUser(userId) {
   ]);
 }
 
+// is this student enrolled in one of this tutor's classes?
 async function isStudentEnrolledWithTutor(studentId, tutorId) {
   const [rows] = await pool.execute(
     `SELECT 1 FROM enrollments e
@@ -141,6 +152,7 @@ async function isStudentEnrolledWithTutor(studentId, tutorId) {
   return rows.length > 0;
 }
 
+// a tutor's active students with the classes they take
 async function listStudentsForTutor(tutorId) {
   const [rows] = await pool.execute(
     `SELECT u.*,
@@ -158,6 +170,7 @@ async function listStudentsForTutor(tutorId) {
 
 // --- Tutor enrollment keys ---------------------------------------------------
 
+// save a new tutor key as UNUSED
 async function createTutorKey({ keyCode, intendedFor, idNumber, cvPath, certificatePaths, createdBy }) {
   const [result] = await pool.execute(
     `INSERT INTO tutor_enrollment_keys
@@ -175,6 +188,7 @@ async function createTutorKey({ keyCode, intendedFor, idNumber, cvPath, certific
   return result.insertId;
 }
 
+// all tutor keys with who made them and who used them
 async function listTutorKeys() {
   const [rows] = await pool.execute(
     `SELECT k.*, creator.full_name AS created_by_name, user.full_name AS used_by_name
@@ -186,6 +200,7 @@ async function listTutorKeys() {
   return rows;
 }
 
+// one tutor key by id
 async function findTutorKeyById(keyId) {
   const [rows] = await pool.execute(`SELECT * FROM tutor_enrollment_keys WHERE id = ? LIMIT 1`, [
     keyId,
@@ -202,6 +217,7 @@ async function findTutorKeyByUserId(userId) {
   return rows[0] || null;
 }
 
+// mark a key REVOKED
 async function revokeTutorKey(keyId) {
   await pool.execute(`UPDATE tutor_enrollment_keys SET status = 'REVOKED' WHERE id = ?`, [keyId]);
 }
@@ -211,6 +227,7 @@ async function deleteTutorKey(keyId) {
   await pool.execute(`DELETE FROM tutor_enrollment_keys WHERE id = ?`, [keyId]);
 }
 
+// ids of the active admins
 async function listAdminIds() {
   const [rows] = await pool.execute(
     `SELECT id FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'`
@@ -237,6 +254,7 @@ async function listStudentIdsForTutor(tutorId, classId) {
   return rows.map((row) => row.student_id);
 }
 
+// a tutor's active classes
 async function listClassesForTutor(tutorId) {
   const [rows] = await pool.execute(
     `SELECT id, subject, level FROM classes WHERE tutor_id = ? AND status = 'ACTIVE' ORDER BY subject ASC`,
@@ -247,6 +265,7 @@ async function listClassesForTutor(tutorId) {
 
 // --- Student re-registration (yearly grade roll-over) -----------------------
 
+// run work as one database transaction - all of it is saved, or none of it
 async function withTransaction(work) {
   const connection = await pool.getConnection();
   try {
@@ -262,10 +281,12 @@ async function withTransaction(work) {
   }
 }
 
+// a ?, ?, ? list for an IN (...) query
 function placeholdersFor(values) {
   return values.map(() => '?').join(', ');
 }
 
+// save a re-registration key as UNUSED - the code, the student, the grades and the year
 async function createReregistrationKey(
   { keyCode, studentId, fromGrade, toGrade, academicYear, expiresAt, createdBy },
   executor = pool
@@ -294,6 +315,7 @@ async function listStudentsForReregistration() {
   return rows;
 }
 
+// active classes with how many students each has
 async function listClassesWithStudentCounts() {
   const [rows] = await pool.execute(
     `SELECT c.id, c.subject, c.level, t.full_name AS tutor_name, COUNT(u.id) AS student_count
@@ -308,6 +330,7 @@ async function listClassesWithStudentCounts() {
   return rows;
 }
 
+// ids of the active students in a class
 async function listActiveStudentIdsInClass(classId) {
   const [rows] = await pool.execute(
     `SELECT DISTINCT u.id
@@ -319,6 +342,7 @@ async function listActiveStudentIdsInClass(classId) {
   return rows.map((row) => row.id);
 }
 
+// ids of the active students in a grade
 async function listActiveStudentIdsInGrade(grade) {
   const [rows] = await pool.execute(
     `SELECT id FROM users WHERE grade = ? AND status = 'ACTIVE' AND role = 'STUDENT_PARENT'`,
@@ -327,6 +351,7 @@ async function listActiveStudentIdsInGrade(grade) {
   return rows.map((row) => row.id);
 }
 
+// the active students from a list of ids
 async function listActiveStudentsByIds(studentIds) {
   if (studentIds.length === 0) return [];
   const [rows] = await pool.execute(
@@ -349,6 +374,7 @@ async function findStudentIdsWithKey(studentIds, academicYear) {
   return rows.map((row) => row.student_id);
 }
 
+// one re-registration key by id
 async function findReregistrationKeyById(keyId) {
   const [rows] = await pool.execute(
     `SELECT * FROM student_reregistration_keys WHERE id = ? LIMIT 1`,
@@ -369,6 +395,7 @@ async function findRedeemableKeyForStudent(keyCode, studentId) {
   return rows[0] || null;
 }
 
+// mark a key USED - this works only once
 async function markReregistrationKeyUsed(keyId) {
   const [result] = await pool.execute(
     `UPDATE student_reregistration_keys SET status = 'USED', used_at = NOW()
@@ -378,6 +405,7 @@ async function markReregistrationKeyUsed(keyId) {
   return result.affectedRows > 0;
 }
 
+// mark a key REVOKED (only if it is unused)
 async function revokeReregistrationKey(keyId) {
   const [result] = await pool.execute(
     `UPDATE student_reregistration_keys SET status = 'REVOKED' WHERE id = ? AND status = 'UNUSED'`,
@@ -386,6 +414,7 @@ async function revokeReregistrationKey(keyId) {
   return result.affectedRows > 0;
 }
 
+// re-registration keys with the student and their classes, optionally for one year (latest 300)
 async function listReregistrationKeys(academicYear) {
   const params = [];
   let clause = '';
@@ -411,6 +440,7 @@ async function listReregistrationKeys(academicYear) {
   return rows;
 }
 
+// remember that the student confirmed their place for a year
 async function setStudentReregistered(studentId, academicYear) {
   await pool.execute(
     `UPDATE users SET reregistered_for_year = ?, updated_at = NOW()
@@ -419,6 +449,7 @@ async function setStudentReregistered(studentId, academicYear) {
   );
 }
 
+// move the student to a grade and remember the year
 async function setStudentGrade(studentId, grade, academicYear) {
   await pool.execute(
     `UPDATE users SET grade = ?, reregistered_for_year = ?, updated_at = NOW()
@@ -438,6 +469,7 @@ async function listStudentsForRollover(academicYear) {
   return rows.map((row) => ({ ...row, hasReregistered: row.reregistered_for_year === academicYear }));
 }
 
+// mark a student LEFT
 async function markStudentLeft(studentId) {
   await pool.execute(
     `UPDATE users SET status = 'LEFT', left_at = NOW(), updated_at = NOW() WHERE id = ?`,
@@ -454,6 +486,7 @@ async function closeEnrollmentsForStudent(studentId) {
   return result.affectedRows;
 }
 
+// has the roll-over for this year already run?
 async function findRolloverLog(academicYear) {
   const [rows] = await pool.execute(
     `SELECT * FROM yearly_rollover_log WHERE academic_year = ? LIMIT 1`,
@@ -462,6 +495,7 @@ async function findRolloverLog(academicYear) {
   return rows[0] || null;
 }
 
+// save the roll-over counts for the year
 async function recordRolloverLog({ academicYear, promotedCount, removedCount, graduatedCount }) {
   await pool.execute(
     `INSERT INTO yearly_rollover_log (academic_year, promoted_count, removed_count, graduated_count, ran_at)
@@ -476,6 +510,7 @@ async function recordRolloverLog({ academicYear, promotedCount, removedCount, gr
 
 // --- Announcements -----------------------------------------------------------
 
+// save a PUBLISHED announcement
 async function createAnnouncement({ title, body, priority, targetAudience, targetGrade, publishedBy }) {
   const [result] = await pool.execute(
     `INSERT INTO announcements
@@ -486,6 +521,7 @@ async function createAnnouncement({ title, body, priority, targetAudience, targe
   return result.insertId;
 }
 
+// one announcement with who published and last edited it
 async function findAnnouncementById(announcementId) {
   const [rows] = await pool.execute(
     `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name
@@ -499,6 +535,7 @@ async function findAnnouncementById(announcementId) {
   return rows[0] || null;
 }
 
+// edit an announcement and raise its version (not once it is archived)
 async function updateAnnouncement(
   announcementId,
   { title, body, priority, targetAudience, targetGrade, updatedBy }
@@ -512,6 +549,7 @@ async function updateAnnouncement(
   );
 }
 
+// hide an announcement (ARCHIVED)
 async function archiveAnnouncement(announcementId, updatedBy) {
   await pool.execute(
     `UPDATE announcements SET status = 'ARCHIVED', updated_by = ?, updated_at = NOW() WHERE id = ?`,
@@ -519,6 +557,7 @@ async function archiveAnnouncement(announcementId, updatedBy) {
   );
 }
 
+// every announcement that is not archived
 async function listAllAnnouncements() {
   const [rows] = await pool.execute(
     `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name
@@ -531,6 +570,7 @@ async function listAllAnnouncements() {
   return rows;
 }
 
+// announcements for one role and grade - for everyone or that role, and for no grade or that grade (latest 50)
 async function listAnnouncementsForAudience(role, grade) {
   const [rows] = await pool.execute(
     `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name
@@ -548,6 +588,7 @@ async function listAnnouncementsForAudience(role, grade) {
 
 // --- Reminders / Notifications -----------------------------------------------
 
+// students with an unpaid balance on an active class
 async function findStudentsWithOverdueFees() {
   const [rows] = await pool.execute(
     `SELECT DISTINCT e.student_id, u.full_name, u.email, e.balance, c.subject
@@ -559,6 +600,7 @@ async function findStudentsWithOverdueFees() {
   return rows;
 }
 
+// students whose attendance in a class is under the limit
 async function findStudentsWithLowAttendance(thresholdPercent) {
   const [rows] = await pool.execute(
     `SELECT ar.student_id, u.full_name, u.email, c.subject,
@@ -575,6 +617,7 @@ async function findStudentsWithLowAttendance(thresholdPercent) {
   return rows;
 }
 
+// save a notification for one person
 async function logNotification({ recipientId, channel, type, message, sentBy }) {
   await pool.execute(
     `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
@@ -601,6 +644,7 @@ async function listNotificationsForUser(userId, limit) {
 // One reminder = one notification_log row per recipient, all sharing the same
 // message and send time. Rows with a future sent_at stay hidden until then.
 
+// save one notification per person, with a future time
 async function createScheduledNotifications(recipientIds, { type, message, sentBy, sendAt }) {
   if (recipientIds.length === 0) return;
   const rowsSql = recipientIds.map(() => `(?, 'EMAIL', ?, ?, ?, ?)`).join(', ');
@@ -613,6 +657,7 @@ async function createScheduledNotifications(recipientIds, { type, message, sentB
   );
 }
 
+// a tutor's reminders from the last 14 days on - one reminder is one row
 async function listRemindersByTutor(tutorId, messagePrefix) {
   const [rows] = await pool.execute(
     `SELECT MIN(id) AS id, message, sent_at, COUNT(*) AS recipient_count,
@@ -628,6 +673,7 @@ async function listRemindersByTutor(tutorId, messagePrefix) {
   return rows;
 }
 
+// one reminder row of this tutor, and whether it is still upcoming
 async function findReminderRow(reminderId, tutorId) {
   const [rows] = await pool.execute(
     `SELECT id, message, sent_at, sent_at > NOW() AS is_upcoming
@@ -639,6 +685,7 @@ async function findReminderRow(reminderId, tutorId) {
   return rows[0] || null;
 }
 
+// how many identical reminders exist at that time
 async function countUpcomingReminder({ tutorId, message, sendAt }) {
   const [rows] = await pool.execute(
     `SELECT COUNT(*) AS total FROM notification_log

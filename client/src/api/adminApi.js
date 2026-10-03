@@ -1,5 +1,7 @@
+// admin API calls - dashboard, users, tutor keys, announcements, reminders and re-registration
 import httpClient from '../../../shared/client/src/api/httpClient';
 
+// admin dashboard - counts, revenue trend and recent activity
 export async function fetchDashboardStats() {
   const response = await httpClient.get('/admin/dashboard');
   return response.data.data.stats;
@@ -11,6 +13,7 @@ export async function fetchRevenueReport(period) {
   return response.data.data.report;
 }
 
+// user list with search, role and status filters
 export async function fetchUsers(filters = {}) {
   const params = {};
   if (filters.search) params.search = filters.search;
@@ -20,11 +23,13 @@ export async function fetchUsers(filters = {}) {
   return response.data.data.users;
 }
 
+// add user btn - create a tutor or admin account
 export async function createUser(payload) {
   const response = await httpClient.post('/admin/users', payload);
   return response.data.data.user;
 }
 
+// one user's profile
 export async function fetchUserProfile(userId) {
   const response = await httpClient.get(`/admin/users/${userId}`);
   return response.data.data.user;
@@ -36,6 +41,7 @@ export async function suspendUser(userId, confirmName) {
   return response.data.data.user;
 }
 
+// activate btn - reopen a suspended account
 export async function activateUser(userId) {
   const response = await httpClient.patch(`/admin/users/${userId}/activate`);
   return response.data.data.user;
@@ -46,11 +52,13 @@ export async function deleteUser(userId) {
   await httpClient.delete(`/admin/users/${userId}`);
 }
 
+// a tutor's students
 export async function fetchMyStudents() {
   const response = await httpClient.get('/students/mine');
   return response.data.data.students;
 }
 
+// generate key btn - make a tutor key and upload the tutor's CV and certificates
 export async function generateTutorKey({ intendedFor, idNumber, cvFile, certificateFiles }) {
   const formData = new FormData();
   if (intendedFor) formData.append('intendedFor', intendedFor);
@@ -64,11 +72,13 @@ export async function generateTutorKey({ intendedFor, idNumber, cvFile, certific
   return response.data.data.key;
 }
 
+// all tutor keys
 export async function fetchTutorKeys() {
   const response = await httpClient.get('/admin/tutor-keys');
   return response.data.data.keys;
 }
 
+// revoke btn - cancel an unused key
 export async function revokeTutorKey(keyId) {
   await httpClient.patch(`/admin/tutor-keys/${keyId}/revoke`);
 }
@@ -78,6 +88,7 @@ export async function deleteTutorKey(keyId) {
   await httpClient.delete(`/admin/tutor-keys/${keyId}`);
 }
 
+// the address of a key's CV or certificate
 export function getTutorKeyDocumentUrl(keyId, type) {
   const base = (httpClient.defaults.baseURL || '').replace(/\/$/, '');
   return `${base}/admin/tutor-keys/${keyId}/documents/${type}`;
@@ -89,6 +100,7 @@ export async function fetchMyClassesForMessaging() {
   return response.data.data.classes;
 }
 
+// send message btn - a tutor messages their students and/or the admin
 export async function sendTutorMessage(payload) {
   const response = await httpClient.post('/tutor/messages', payload);
   return response.data;
@@ -100,11 +112,13 @@ export async function fetchMyReminders() {
   return response.data.data.reminders;
 }
 
+// schedule btn - set a reminder for a date and time
 export async function scheduleReminder(payload) {
   const response = await httpClient.post('/tutor/reminders', payload);
   return response.data;
 }
 
+// cancel btn - remove a reminder that is not sent yet
 export async function cancelReminder(reminderId) {
   await httpClient.delete(`/tutor/reminders/${reminderId}`);
 }
@@ -121,21 +135,25 @@ export async function fetchMyNotifications() {
   return response.data.data.notifications;
 }
 
+// every announcement (admin)
 export async function fetchAllAnnouncements() {
   const response = await httpClient.get('/admin/announcements');
   return response.data.data.announcements;
 }
 
+// publish btn - post an announcement
 export async function createAnnouncement(payload) {
   const response = await httpClient.post('/admin/announcements', payload);
   return response.data.data.announcement;
 }
 
+// edit btn - change an announcement
 export async function updateAnnouncement(announcementId, payload) {
   const response = await httpClient.patch(`/admin/announcements/${announcementId}`, payload);
   return response.data.data.announcement;
 }
 
+// delete btn - archive an announcement
 export async function deleteAnnouncement(announcementId) {
   await httpClient.delete(`/admin/announcements/${announcementId}`);
 }
@@ -146,6 +164,7 @@ export async function fetchReminderCandidates(type) {
   return response.data.data.candidates;
 }
 
+// send reminders btn - fee or attendance reminders
 export async function sendReminders({ type, studentIds }) {
   const response = await httpClient.post('/admin/reminders/send', { type, studentIds });
   return response.data.data.result;
@@ -164,6 +183,7 @@ export async function generateReregistrationKeys(payload) {
   return response.data.data.result;
 }
 
+// the issued re-registration keys for a year
 export async function fetchReregistrationKeys(academicYear) {
   const response = await httpClient.get('/admin/reregistration-keys', {
     params: academicYear ? { academicYear } : {},
@@ -176,10 +196,12 @@ export async function deleteReregistrationKey(keyId) {
   await httpClient.delete(`/admin/reregistration-keys/${keyId}`);
 }
 
+// revoke btn - cancel an unused re-registration key
 export async function revokeReregistrationKey(keyId) {
   await httpClient.patch(`/admin/reregistration-keys/${keyId}/revoke`);
 }
 
+// roll-over preview - who moves up, graduates or leaves
 export async function fetchRolloverPreview(academicYear) {
   const response = await httpClient.get('/admin/reregistration/rollover', {
     params: { academicYear },
@@ -187,6 +209,7 @@ export async function fetchRolloverPreview(academicYear) {
   return response.data.data.preview;
 }
 
+// run roll-over btn - move students up and close the accounts of those who did not re-register
 export async function runYearlyRollover(academicYear) {
   const response = await httpClient.post('/admin/reregistration/rollover', {
     academicYear,
@@ -201,6 +224,7 @@ export async function fetchMyReregistrationStatus() {
   return response.data.data.status;
 }
 
+// re-register btn - the student types the key the office gave them
 export async function redeemReregistrationKey(keyCode) {
   const response = await httpClient.post('/reregistration/redeem', { keyCode });
   return response.data.data.result;

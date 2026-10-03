@@ -6,20 +6,25 @@ import FormField from '../../../../shared/client/src/components/common/FormField
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
 
+// login page - the email and password form
 function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // form fields and their errors
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // show a success message when the user has just registered
   const justRegistered = Boolean(location.state && location.state.justRegistered);
+  // the page the user came from, to go back to after login
   const redirectTo = location.state && location.state.from ? location.state.from.pathname : null;
 
+  // check the form before sending it
   function validate() {
     const errors = {};
     if (!email.trim()) {
@@ -33,6 +38,7 @@ function LoginPage() {
     return errors;
   }
 
+  // login btn - validate, log in, then go back to the page the user came from
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -61,6 +67,7 @@ function LoginPage() {
     }
   }
 
+  // the page - welcome text, the form and the register link
   return (
     <AuthLayout
       imageSrc="/login-art.webp"
@@ -78,6 +85,7 @@ function LoginPage() {
       )}
       <Alert type="error" message={formError} />
 
+      {/* login form - email, password and the forgot password link */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="email"
@@ -115,6 +123,7 @@ function LoginPage() {
         </button>
       </form>
 
+      {/* link to the register page */}
       <div className="form-divider">Or</div>
 
       <p className="auth-footer-note">

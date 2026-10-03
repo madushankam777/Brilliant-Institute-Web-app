@@ -1,10 +1,13 @@
+// payment API calls - fees, online and bank-transfer payments, office payments and tutor payouts
 import httpClient from '../../../shared/client/src/api/httpClient';
 
+// what I still owe on each class
 export async function fetchMyBalances() {
   const response = await httpClient.get('/payments/balance');
   return response.data.data.balances;
 }
 
+// pay btn - instant payment through the payment simulator (used when PayHere is off)
 export async function makePayment({ enrollmentId, amount, paymentMethod, paymentDetails }) {
   const response = await httpClient.post('/payments', {
     enrollmentId,
@@ -46,11 +49,13 @@ export function redirectToGateway({ actionUrl, fields }) {
   form.submit();
 }
 
+// retry btn - try a pending payment again
 export async function retryPayment(paymentId) {
   const response = await httpClient.patch(`/payments/${paymentId}/retry`);
   return response.data.data.payment;
 }
 
+// my payments with receipt numbers
 export async function fetchMyPaymentHistory() {
   const response = await httpClient.get('/payments/history');
   return response.data.data.payments;
@@ -88,11 +93,13 @@ export async function editBankTransferPayment(paymentId, { bankReference, receip
   return response.data.data.payment;
 }
 
+// the address of a bank slip image
 export function getReceiptImageUrl(paymentId) {
   const base = (httpClient.defaults.baseURL || '').replace(/\/$/, '');
   return `${base}/payments/${paymentId}/receipt-image`;
 }
 
+// admin - bank transfers waiting for approval
 export async function fetchPendingBankTransfers() {
   const response = await httpClient.get('/payments/admin/pending-bank-transfers');
   return response.data.data.payments;
@@ -110,6 +117,7 @@ export async function approveBankTransfer(paymentId, amount) {
   return response.data.data.payment;
 }
 
+// reject btn - refuse a bank transfer
 export async function rejectBankTransfer(paymentId) {
   const response = await httpClient.patch(`/payments/admin/${paymentId}/reject`);
   return response.data.data.payment;
@@ -133,6 +141,7 @@ export async function fetchTutorPayoutAccount(tutorId) {
   return response.data.data.account;
 }
 
+// all tutor payouts with totals
 export async function fetchTutorPayouts() {
   const response = await httpClient.get('/payments/admin/tutor-payouts');
   return response.data.data;
@@ -150,6 +159,7 @@ export async function fetchMyBankDetails() {
   return response.data.data.bankDetails;
 }
 
+// tutor - save my payout bank details
 export async function updateMyBankDetails({ bankName, accountHolder, accountNumber, branch }) {
   const response = await httpClient.put('/payments/me/bank-details', {
     bankName,
@@ -179,6 +189,7 @@ export async function fetchPayoutOptions() {
   return response.data.data.options;
 }
 
+// payouts waiting for the next bank file
 export async function fetchPayoutBatch() {
   const response = await httpClient.get('/payments/admin/payouts/batch');
   return response.data.data.batch;
@@ -199,6 +210,7 @@ export async function exportPayoutFile() {
   };
 }
 
+// paid btn - the bank confirmed this payout
 export async function confirmPayoutSettled(payoutId, { providerReference, transferDate }) {
   const response = await httpClient.patch(`/payments/admin/payouts/${payoutId}/settled`, {
     providerReference,
@@ -207,6 +219,7 @@ export async function confirmPayoutSettled(payoutId, { providerReference, transf
   return response.data.data.result;
 }
 
+// failed btn - the payout did not go through
 export async function markPayoutFailed(payoutId, reason) {
   const response = await httpClient.patch(`/payments/admin/payouts/${payoutId}/failed`, { reason });
   return response.data.data.result;

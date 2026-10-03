@@ -8,6 +8,7 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import useFormErrors from '../../../../shared/client/src/hooks/useFormErrors';
 import { useAuth } from '../../context/AuthContext';
 
+// re-register page - a student types the key the office gave them to confirm next year's place
 function ReregisterPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
@@ -21,6 +22,7 @@ function ReregisterPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
 
+  // load my re-registration status
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -33,10 +35,12 @@ function ReregisterPage() {
     }
   }, []);
 
+  // load it when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // confirm btn - check the key and confirm the place
   async function handleSubmit(event) {
     event.preventDefault();
     setSuccessMessage('');
@@ -67,6 +71,7 @@ function ReregisterPage() {
     }
   }
 
+  // the page - where I stand, and the key form
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">

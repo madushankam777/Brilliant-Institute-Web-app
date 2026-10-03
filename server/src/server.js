@@ -8,6 +8,7 @@ const { moveUploadsToDb } = require('./startup/moveUploadsToDb');
 const { startRolloverScheduler } = require('../../S Vithushan/server/src/modules/admin/yearlyRollover');
 const app = require('./app');
 
+// start - connect to MySQL, open the port and run the start-up checks
 async function start() {
   try {
     await verifyDatabaseConnection();
@@ -24,6 +25,7 @@ async function start() {
     process.exit(1);
   }
 
+  // open the port
   const server = app.listen(config.port, () => {
     // eslint-disable-next-line no-console
     console.log(`[startup] Brilliant Institute API listening on port ${config.port} (${config.env})`);
@@ -41,6 +43,7 @@ async function start() {
   // checks once shortly after boot, then daily - see yearlyRollover.js
   startRolloverScheduler();
 
+  // port already in use - say so and stop
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       // eslint-disable-next-line no-console
@@ -54,4 +57,5 @@ async function start() {
   });
 }
 
+// run the server
 start();

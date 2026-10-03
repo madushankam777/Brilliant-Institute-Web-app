@@ -1,3 +1,4 @@
+// QR code maker (not used by any page yet)
 const QRCode = require('qrcode');
 
 // QR code as a data: URL for an <img>

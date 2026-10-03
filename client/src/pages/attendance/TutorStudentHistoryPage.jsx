@@ -9,12 +9,14 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// badge colour for Present, Late or Absent
 function statusBadgeClass(status) {
   if (status === 'PRESENT') return 'badge badge-success';
   if (status === 'LATE') return 'badge badge-warning';
   return 'badge badge-danger';
 }
 
+// one student's attendance history in a class (tutor view)
 function TutorStudentHistoryPage() {
   const { studentId } = useParams();
   const { user } = useAuth();
@@ -29,8 +31,10 @@ function TutorStudentHistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // load the history for this student and class
   useEffect(() => {
     let isMounted = true;
+    // needs the class id from the address
     async function load() {
       // this page is opened from a class's attendance list, which adds the class
       if (!classId) {
@@ -53,12 +57,15 @@ function TutorStudentHistoryPage() {
     };
   }, [studentId, classId]);
 
+  // present or late counts as attended
   const presentCount = history.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
   const absentCount = history.filter((r) => r.status === 'ABSENT').length;
 
+  // the page - breadcrumb, stat cards and the session history
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
+        {/* breadcrumb back to the attendance list */}
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link to="/attendance/classes">Mark Attendance</Link>
           <span className="breadcrumb-sep">/</span>
@@ -78,11 +85,13 @@ function TutorStudentHistoryPage() {
           <LoadingSpinner label="Loading attendance history..." />
         ) : (
           <>
+            {/* stat cards */}
             <div className="stat-grid stat-grid-2">
               <StatCard icon="checkCircle" label="Present / Late" value={presentCount} tone="success" />
               <StatCard icon="xCircle" label="Absent" value={absentCount} tone="danger" />
             </div>
 
+            {/* session history table */}
             <div className="card">
               <h2>Session history</h2>
               {history.length === 0 ? (

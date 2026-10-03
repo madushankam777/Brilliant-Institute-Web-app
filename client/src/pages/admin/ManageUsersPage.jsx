@@ -22,24 +22,31 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// a blank add user form
 const emptyForm = { fullName: '', email: '', password: '', role: 'TUTOR' };
+// a blank tutor key form
 const emptyKeyForm = { intendedFor: '', idNumber: '', cvFile: null, certificateFiles: [] };
 
+// badge colour for Active, Suspended or other
 function statusBadgeClass(status) {
   if (status === 'ACTIVE') return 'badge badge-success';
   if (status === 'SUSPENDED') return 'badge badge-danger';
   return 'badge badge-neutral';
 }
 
+// badge colour for a key - Unused, Used or other
 function keyStatusBadgeClass(status) {
   if (status === 'UNUSED') return 'badge badge-warning';
   if (status === 'USED') return 'badge badge-success';
   return 'badge badge-neutral';
 }
 
+// manage users - find, add, suspend, reactivate and delete accounts; make and revoke tutor keys
 function ManageUsersPage() {
+  // the filters, the users and the page state
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
@@ -52,12 +59,14 @@ function ManageUsersPage() {
   const [confirmNameInput, setConfirmNameInput] = useState('');
   const [confirmError, setConfirmError] = useState('');
 
+  // the add user pop-up and its form
   const [showAddUser, setShowAddUser] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  // the tutor enrollment keys, the key form and their state
   const [tutorKeys, setTutorKeys] = useState([]);
   const [isLoadingKeys, setIsLoadingKeys] = useState(true);
   const [keysError, setKeysError] = useState('');
@@ -66,6 +75,7 @@ function ManageUsersPage() {
   const [justGeneratedKey, setJustGeneratedKey] = useState(null);
   const [revokingKeyId, setRevokingKeyId] = useState(null);
 
+  // load the tutor enrollment keys
   const loadTutorKeys = useCallback(async () => {
     setIsLoadingKeys(true);
     setKeysError('');
@@ -79,10 +89,12 @@ function ManageUsersPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     loadTutorKeys();
   }, [loadTutorKeys]);
 
+  // generate key btn - ask the server for a one-time tutor key (shown once)
   async function handleGenerateKey(event) {
     event.preventDefault();
     setKeysError('');
@@ -105,6 +117,7 @@ function ManageUsersPage() {
     }
   }
 
+  // revoke btn - cancel an unused key
   async function handleRevokeKey(keyId) {
     setKeysError('');
     setRevokingKeyId(keyId);
@@ -118,6 +131,7 @@ function ManageUsersPage() {
     }
   }
 
+  // load the users that match the filters
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -131,17 +145,20 @@ function ManageUsersPage() {
     }
   }, [search, role, status]);
 
+  // reload when a filter changes (typing waits 250 ms)
   useEffect(() => {
     const timeoutId = setTimeout(load, 250);
     return () => clearTimeout(timeoutId);
   }, [load]);
 
+  // close the confirm pop-up and clear it
   function closeConfirmModal() {
     setConfirmTarget(null);
     setConfirmNameInput('');
     setConfirmError('');
   }
 
+  // confirm btn - suspend (the name must be typed), reactivate, or delete a user or a key
   async function handleConfirm() {
     if (!confirmTarget) return;
     setIsConfirming(true);
@@ -168,10 +185,12 @@ function ManageUsersPage() {
     }
   }
 
+  // change one field of the add user form
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // create account btn - check the form, then create a tutor or admin account
   async function handleCreateUser(event) {
     event.preventDefault();
     setFormError('');
@@ -203,6 +222,7 @@ function ManageUsersPage() {
     }
   }
 
+  // the page - title, user filters and table, tutor keys, and the two pop-ups
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -211,6 +231,7 @@ function ManageUsersPage() {
             <h1>Manage Users</h1>
             <p className="muted">Verify identities, grant permissions, and suspend profiles.</p>
           </div>
+          {/* report, generate tutor key and add user btns */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <ReportLink type="users" label="Accounts report" />
             <button
@@ -228,6 +249,7 @@ function ManageUsersPage() {
           </div>
         </div>
 
+        {/* filters - search, role and status */}
         <div className="card">
           <div className="inline-form">
             <div style={{ flex: 2, minWidth: '200px' }}>
@@ -263,6 +285,7 @@ function ManageUsersPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* a spinner, or the users table */}
         {isLoading ? (
           <LoadingSpinner label="Loading users..." />
         ) : (
@@ -309,6 +332,7 @@ function ManageUsersPage() {
                           <Link to={`/admin/users/${user.id}`} className="btn btn-secondary btn-sm">
                             View
                           </Link>
+                          {/* suspend btn for an active user; reactivate and delete btns for the others */}
                           {user.status === 'ACTIVE' ? (
                             <button
                               type="button"
@@ -358,6 +382,7 @@ function ManageUsersPage() {
           </div>
         )}
 
+        {/* tutor enrollment keys - a tutor needs a one-time key to register */}
         <div className="card" id="tutor-enrollment-keys">
           <h2>Tutor Enrollment Keys</h2>
           <p className="muted" style={{ fontSize: '0.88rem' }}>
@@ -368,6 +393,7 @@ function ManageUsersPage() {
 
           <Alert type="error" message={keysError} />
 
+          {/* the new key - shown only once */}
           {justGeneratedKey && (
             <div className="callout" style={{ background: 'var(--color-success-bg)', borderColor: '#bbf7d0' }}>
               <span>
@@ -380,6 +406,7 @@ function ManageUsersPage() {
             </div>
           )}
 
+          {/* new key form - who it is for, ID number, CV and certificates */}
           <form onSubmit={handleGenerateKey} style={{ marginBottom: '18px' }}>
             <div className="inline-form">
               <div style={{ flex: 1, minWidth: '220px' }}>
@@ -437,6 +464,7 @@ function ManageUsersPage() {
             </button>
           </form>
 
+          {/* a spinner, an empty message, or the keys table */}
           {isLoadingKeys ? (
             <LoadingSpinner label="Loading enrollment keys..." />
           ) : tutorKeys.length === 0 ? (
@@ -498,6 +526,7 @@ function ManageUsersPage() {
                       <td>{key.createdAt}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '6px' }}>
+                          {/* revoke btn - only for an unused key */}
                           {key.status === 'UNUSED' && (
                             <button
                               type="button"
@@ -508,6 +537,7 @@ function ManageUsersPage() {
                               {revokingKeyId === key.id ? 'Revoking...' : 'Revoke'}
                             </button>
                           )}
+                          {/* delete key btn - asks to confirm */}
                           <button
                             type="button"
                             className="btn btn-danger btn-sm"
@@ -530,6 +560,7 @@ function ManageUsersPage() {
         </div>
       </div>
 
+      {/* confirm pop-up - a suspension needs the name typed in capitals */}
       {confirmTarget && (
         <div className="modal-overlay" onClick={() => !isConfirming && closeConfirmModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
@@ -572,6 +603,7 @@ function ManageUsersPage() {
 
             <Alert type="error" message={confirmError} />
 
+            {/* name check - only for a suspension */}
             {confirmTarget.action === 'suspend' && (
               <div className="form-field">
                 <label htmlFor="confirmSuspendName">
@@ -621,6 +653,7 @@ function ManageUsersPage() {
         </div>
       )}
 
+      {/* add user pop-up - a tutor or admin account (students register themselves) */}
       {showAddUser && (
         <div className="modal-overlay" onClick={() => !isCreating && setShowAddUser(false)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>

@@ -15,12 +15,15 @@ import RecordPaymentCard from './RecordPaymentCard';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// a date and time as, for example, 12 Oct, 3:30 PM
 function formatDateTime(value) {
   return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
     day: 'numeric',
@@ -30,7 +33,9 @@ function formatDateTime(value) {
   });
 }
 
+// payment verification - check the bank slips students upload, and record office payments
 function PaymentVerificationPage() {
+  // the waiting bank slips and the page state
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -43,6 +48,7 @@ function PaymentVerificationPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
 
+  // load the bank slips waiting for verification
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -55,10 +61,12 @@ function PaymentVerificationPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // verify / reject btn - open the pop-up for a slip
   function openModal(payment, action) {
     setTarget({ payment, action });
     setReceivedAmount(String(payment.amount));
@@ -68,11 +76,13 @@ function PaymentVerificationPage() {
     setSuccessMessage('');
   }
 
+  // close the pop-up (not while saving)
   function closeModal() {
     if (isConfirming) return;
     setTarget(null);
   }
 
+  // confirm btn - approve the slip with the amount it shows, or reject it
   async function handleConfirm() {
     const { payment, action } = target;
     setConfirmError('');
@@ -110,9 +120,11 @@ function PaymentVerificationPage() {
     }
   }
 
+  // the amount typed, and whether it differs from what the student entered
   const received = Number(receivedAmount);
   const differsFromClaim = target && target.action === 'approve' && received > 0 && received !== target.payment.amount;
 
+  // the page - title, the office payment card, the waiting slips and the verify pop-up
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -127,12 +139,15 @@ function PaymentVerificationPage() {
           <ReportLink type="finance" label="Payments report" />
         </div>
 
+        {/* record a payment made at the office */}
         <RecordPaymentCard onRecorded={load} />
 
+        {/* bank slips waiting for verification */}
         <h2 className="section-title">Bank slips waiting for verification</h2>
         <Alert type="error" message={errorMessage} />
         <Alert type="success" message={successMessage} />
 
+        {/* a spinner, an empty message, or the slips table */}
         {isLoading ? (
           <LoadingSpinner label="Loading bank slips..." />
         ) : payments.length === 0 ? (
@@ -166,6 +181,7 @@ function PaymentVerificationPage() {
                       <td>{formatCurrency(payment.amount)}</td>
                       <td>{payment.bankReference}</td>
                       <td>
+                        {/* verify and reject btns */}
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button type="button" className="btn btn-primary btn-sm" onClick={() => openModal(payment, 'approve')}>
                             Verify
@@ -184,6 +200,7 @@ function PaymentVerificationPage() {
         )}
       </div>
 
+      {/* verify / reject pop-up - the slip details and the amount received */}
       {target && (
         <div className="modal-overlay" onClick={closeModal}>
           <div
@@ -218,6 +235,7 @@ function PaymentVerificationPage() {
               </div>
             </dl>
 
+            {/* the slip photo, with a link to open it full size */}
             {target.payment.hasReceiptImage && (
               <div className="transfer-box soft" style={{ textAlign: 'center' }}>
                 {slipFailed ? (
@@ -242,6 +260,7 @@ function PaymentVerificationPage() {
               </div>
             )}
 
+            {/* approve - the amount the slip shows; reject - a note about asking the student again */}
             {target.action === 'approve' ? (
               <div className="form-field">
                 <label htmlFor="received-amount">Amount received (LKR)</label>
@@ -274,6 +293,7 @@ function PaymentVerificationPage() {
 
             <Alert type="error" message={confirmError} />
 
+            {/* cancel and approve / reject btns */}
             <div className="flex-between" style={{ marginTop: '18px' }}>
               <button type="button" className="btn btn-secondary" disabled={isConfirming} onClick={closeModal}>
                 Cancel

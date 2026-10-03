@@ -1,6 +1,7 @@
 // Writes to the audit_log table
 const { pool } = require('../config/db');
 
+// save one audit row - who did what to which record (a failure is logged, never thrown)
 async function recordAuditEvent({ actorId, action, entityType, entityId, details }) {
   try {
     await pool.execute(

@@ -1,10 +1,12 @@
 // Paying tutors - bank transfer, bank file or payout API
 const config = require('../../../../../shared/server/src/config/env');
 
+// is a payout provider (API mode) fully set up?
 function isApiConfigured() {
   return config.payouts.provider === 'API' && Boolean(config.payouts.apiBaseUrl && config.payouts.apiKey);
 }
 
+// last 4 digits of an account number - shown instead of the full number
 function last4(accountNumber) {
   const digits = String(accountNumber || '').replace(/\D/g, '');
   return digits.length >= 4 ? digits.slice(-4) : null;
@@ -55,6 +57,7 @@ const FILE_COLUMNS = [
   'Remarks',
 ];
 
+// one CSV cell - quoted when needed, and made safe against Excel formulas
 function csvCell(value) {
   let text = String(value === null || value === undefined ? '' : value);
   // stop Excel running a cell as a formula
@@ -85,7 +88,9 @@ function buildBankTransferFile(payouts) {
     ]);
   });
 
+  // header row + one line per payout
   const lines = [FILE_COLUMNS, ...rows].map((row) => row.map(csvCell).join(','));
+  // total amount in the file
   const total = rows.reduce((sum, row) => sum + Number(row[4]), 0);
 
   return { csv: `${lines.join('\r\n')}\r\n`, rowCount: rows.length, total, skipped };

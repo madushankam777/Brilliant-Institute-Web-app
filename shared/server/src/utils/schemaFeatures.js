@@ -2,10 +2,12 @@
 const { pool } = require('../config/db');
 const ApiError = require('./ApiError');
 
+// answers are remembered for 30 seconds, so the database is not asked on every request
 const CACHE_MS = 30 * 1000;
 const UPDATE_FILE = 'sql/update_database.sql';
 const cache = new Map();
 
+// ask once, then reuse the answer for 30 seconds
 async function cached(key, lookup) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
@@ -14,6 +16,7 @@ async function cached(key, lookup) {
   return value;
 }
 
+// does this table exist?
 function hasTable(table) {
   return cached(`t:${table}`, async () => {
     const [rows] = await pool.execute(
@@ -25,6 +28,7 @@ function hasTable(table) {
   });
 }
 
+// does this column exist?
 function hasColumn(table, column) {
   return cached(`c:${table}.${column}`, async () => {
     const [rows] = await pool.execute(
@@ -36,14 +40,17 @@ function hasColumn(table, column) {
   });
 }
 
+// is the re-registration update applied?
 async function hasReregistration() {
   return (await hasTable('student_reregistration_keys')) && (await hasColumn('users', 'reregistered_for_year'));
 }
 
+// is the payout tracking update applied?
 function hasPayoutTracking() {
   return hasColumn('tutor_payouts', 'status');
 }
 
+// do classes have a start date column?
 function hasClassStartDate() {
   return hasColumn('classes', 'start_date');
 }

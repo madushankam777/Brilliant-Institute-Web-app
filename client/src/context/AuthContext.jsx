@@ -3,15 +3,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import * as authApi from '../api/authApi';
 import { setSessionExpiredHandler } from '../../../shared/client/src/api/httpClient';
 
+// shared login state - who is logged in
 const AuthContext = createContext(null);
 
+// gives every page the logged-in user and the login, logout and refresh functions
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
+  // when the website opens, ask the server if the session is still valid
   useEffect(() => {
     let isMounted = true;
 
+    // read the session - not logged in is normal on a fresh visit
     async function loadSession() {
       try {
         const currentUser = await authApi.fetchCurrentSession();
@@ -35,12 +39,14 @@ export function AuthProvider({ children }) {
     setSessionExpiredHandler(() => setUser(null));
   }, []);
 
+  // login - save the logged-in user
   const login = useCallback(async (credentials) => {
     const loggedInUser = await authApi.login(credentials);
     setUser(loggedInUser);
     return loggedInUser;
   }, []);
 
+  // logout - end the session, then forget the user
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -49,12 +55,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // reload my details after a profile change
   const refreshProfile = useCallback(async () => {
     const latestUser = await authApi.fetchMyProfile();
     setUser(latestUser);
     return latestUser;
   }, []);
 
+  // what every page can read from the login state
   const value = useMemo(
     () => ({
       user,

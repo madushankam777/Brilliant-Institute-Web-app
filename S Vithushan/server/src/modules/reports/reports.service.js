@@ -8,6 +8,7 @@ const { zipSync } = require('fflate');
 const parts = require('./reportParts');
 const { renderReportPdfInWorker } = require('./reportPdf');
 
+// one builder per report - each reads the database and returns the report's content
 const BUILDERS = {
   overview: require('./builders/overview'),
   students: require('./builders/students'),
@@ -54,12 +55,16 @@ const CATALOG = [
     description: 'Who did what and when: sign-ins, payments, account changes and every other recorded action - for everyone or one person.' },
 ];
 
+// the report types, taken from the list above
 const REPORT_TYPES = CATALOG.map((entry) => entry.type);
+// the filters a report request can carry
 const QUERY_KEYS = ['from', 'to', 'studentId', 'tutorId', 'classId', 'userId', 'grade', 'role', 'status', 'academicYear', 'detail'];
+// filters that are numbers
 const NUMBER_KEYS = ['studentId', 'tutorId', 'classId', 'userId', 'academicYear'];
 
 // reports that can be downloaded as one PDF per person
 const PEOPLE_REPORTS = { tutors: { role: 'TUTOR', idKey: 'tutorId' }, students: { role: 'STUDENT_PARENT', idKey: 'studentId' } };
+// a ZIP holds at most 150 people
 const MAX_ZIP_PEOPLE = 150;
 
 // reports that need an optional database update
@@ -69,6 +74,7 @@ async function isAvailable(type) {
   return true;
 }
 
+// the reports available on this install (some need a database update)
 async function getCatalog() {
   const list = [];
   for (const entry of CATALOG) {
@@ -118,19 +124,25 @@ function cleanQuery(entry, query) {
   return clean;
 }
 
+// build one report - clean the filters, pick the period, run the builder, add who made it and its number
 async function buildReport(type, query, adminUser) {
+  // find the report in the list
   const entry = CATALOG.find((item) => item.type === type);
   if (!entry || !(await isAvailable(type))) {
     throw ApiError.notFound('That report is not available.');
   }
+  // keep only the filters this report uses
   const params = cleanQuery(entry, query);
+  // the date range of the report
   const period = parts.resolvePeriod(params.from, params.to);
   const builder = BUILDERS[type];
+  // the builder returns the title, summary, highlights and sections
   const result = await builder.build(params, {
     period,
     threshold: config.business.lowAttendanceThresholdPercent,
   });
 
+  // who generated it, and when
   const admin = await parts.one('SELECT full_name FROM users WHERE id = ?', [adminUser.id]);
   const generatedAt = parts.nowText();
   return {
@@ -170,6 +182,7 @@ async function recordUse(adminUser, report, format) {
   });
 }
 
+// the 40 most recent report runs and downloads, from the audit log
 async function getHistory() {
   const list = await parts.rows(
     `SELECT a.id, a.action, a.details, a.created_at, u.full_name AS actor_name
@@ -215,8 +228,10 @@ async function buildPeopleZip(type, query, adminUser) {
   if (!people) {
     throw ApiError.badRequest('Separate files are only made for the tutor and student reports.');
   }
+  // find the report in the list
   const entry = CATALOG.find((item) => item.type === type);
   const params = cleanQuery(entry, query);
+  // the student ZIP can be limited to one grade
   const filter = params.grade && type === 'students' ? 'AND grade = ?' : '';
   const list = await parts.rows(
     `SELECT id, full_name, student_code FROM users WHERE role = ? AND status <> 'DELETED' ${filter} ORDER BY full_name`,
@@ -231,6 +246,7 @@ async function buildPeopleZip(type, query, adminUser) {
     ]);
   }
 
+  // build one PDF per person
   const files = {};
   let first = null;
   for (const person of list) {
@@ -240,8 +256,10 @@ async function buildPeopleZip(type, query, adminUser) {
     const name = `${person.full_name}${person.student_code ? `-${person.student_code}` : ''}`.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
     files[`${name || 'person'}-${person.id}.pdf`] = new Uint8Array(pdf);
   }
+  // put all the PDFs into one ZIP (stored as they are - PDFs are already compressed)
   const zip = zipSync(files, { level: 0 });
 
+  // name the ZIP and log the download in the history
   const label = type === 'tutors' ? 'Tutor' : 'Student';
   const stamp = parts.toDateKey(new Date());
   await recordUse(

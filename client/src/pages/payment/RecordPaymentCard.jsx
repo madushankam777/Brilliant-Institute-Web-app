@@ -5,16 +5,20 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 
+// the ways a payment is made at the office
 const METHODS = [
   { value: 'CASH', label: 'Cash' },
   { value: 'BANK_DEPOSIT', label: 'Bank deposit slip' },
 ];
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// record a payment card - find the student, choose the class, then save a cash or bank slip payment
 function RecordPaymentCard({ onRecorded }) {
+  // the student search, the chosen student and the form fields
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -56,8 +60,10 @@ function RecordPaymentCard({ onRecorded }) {
     };
   }, [search, student]);
 
+  // the class being paid for
   const enrollment = student ? student.enrollments.find((item) => item.enrollmentId === enrollmentId) : null;
 
+  // pick a student - the first class with a balance is chosen
   function pickStudent(picked) {
     setStudent(picked);
     setSuccess('');
@@ -68,12 +74,14 @@ function RecordPaymentCard({ onRecorded }) {
     setAmount(firstOwing && firstOwing.balance > 0 ? String(firstOwing.balance) : '');
   }
 
+  // pick a class - the amount becomes its balance
   function pickEnrollment(item) {
     setEnrollmentId(item.enrollmentId);
     setAmount(item.balance > 0 ? String(item.balance) : '');
     setErrors({});
   }
 
+  // change student btn - clear the form
   function reset() {
     setStudent(null);
     setSearch('');
@@ -86,6 +94,7 @@ function RecordPaymentCard({ onRecorded }) {
     setFormError('');
   }
 
+  // record btn - check the fields, then record the office payment
   async function handleSubmit(event) {
     event.preventDefault();
     const paid = Number(amount);
@@ -122,6 +131,7 @@ function RecordPaymentCard({ onRecorded }) {
     }
   }
 
+  // the card - title, messages, then the student search or the payment form
   return (
     <div className="card">
       <h2>Record a payment</h2>
@@ -131,6 +141,7 @@ function RecordPaymentCard({ onRecorded }) {
       <Alert type="success" message={success} />
       <Alert type="error" message={formError} />
 
+      {/* step 1 - search for the student; step 2 - the payment form */}
       {!student ? (
         <div className="record-search">
           <div className="form-field" style={{ marginBottom: 0 }}>
@@ -147,6 +158,7 @@ function RecordPaymentCard({ onRecorded }) {
               }}
             />
           </div>
+          {/* search results - searching, no match, or the matching students */}
           {search.trim().length >= 2 && (
             <div className="record-results">
               {isSearching ? (
@@ -171,6 +183,7 @@ function RecordPaymentCard({ onRecorded }) {
         </div>
       ) : (
         <form onSubmit={handleSubmit} noValidate>
+          {/* the chosen student with a Change student btn */}
           <div className="record-student">
             <span>
               <strong>{student.fullName}</strong> <span className="reg-no">{student.studentCode}</span>
@@ -181,10 +194,12 @@ function RecordPaymentCard({ onRecorded }) {
             </button>
           </div>
 
+          {/* the student's classes, or a message when they have none */}
           {student.enrollments.length === 0 ? (
             <p className="muted">This student is not enrolled in any class.</p>
           ) : (
             <>
+              {/* pick the class being paid for */}
               <div className="form-field">
                 <label>Class</label>
                 <div className="choice-group" role="radiogroup">
@@ -206,6 +221,7 @@ function RecordPaymentCard({ onRecorded }) {
                 {errors.enrollment && <p className="field-error">{errors.enrollment}</p>}
               </div>
 
+              {/* amount and how it was paid */}
               <div className="card-field-row">
                 <div className="form-field">
                   <label htmlFor="record-amount">Amount paid (LKR)</label>
@@ -241,6 +257,7 @@ function RecordPaymentCard({ onRecorded }) {
                 </div>
               </div>
 
+              {/* receipt book number or slip reference, and a note */}
               <div className="card-field-row">
                 <div className="form-field">
                   <label htmlFor="record-reference">
@@ -261,6 +278,7 @@ function RecordPaymentCard({ onRecorded }) {
                 </div>
               </div>
 
+              {/* record btn */}
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
                 <Icon name="checkCircle" size={16} /> {isSaving ? 'Recording...' : `Record ${amount ? formatCurrency(Number(amount)) : 'payment'}`}
               </button>

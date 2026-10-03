@@ -8,8 +8,10 @@ const { getActivity, getStaffActions, activityBlocks } = require('../reportActiv
 
 const { num, percent, kpi, table, bars, facts, tiles, heading, section, note, rows, one, money } = parts;
 
+// weekday names in JavaScript's order (Sunday first)
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// weekday name of a YYYY-MM-DD date
 function weekdayOf(dateKey) {
   return WEEKDAYS[new Date(`${dateKey}T00:00:00`).getDay()];
 }
@@ -24,9 +26,11 @@ async function loadHolidays(period) {
   }
 }
 
+// tutor report - one tutor in full, or every tutor with an overview and a full report for each
 async function build(params, context) {
   const { period } = context;
   const tutorFilter = params.tutorId ? 'AND id = ?' : '';
+  // the tutors to report on
   const tutors = await rows(
     `SELECT id, full_name, email, phone, status, bio, bank_name, bank_account_number, bank_branch, created_at, last_login_at
      FROM users
@@ -73,6 +77,7 @@ async function build(params, context) {
     hasEvents,
   };
 
+  // one detailed result per tutor
   const details = [];
   for (const tutor of tutors) {
     details.push(await tutorDetail(tutor, context, shared));
@@ -92,6 +97,7 @@ async function build(params, context) {
     };
   }
 
+  // totals over all tutors
   const totals = details.reduce(
     (sum, item) => ({
       classes: sum.classes + item.classes,
@@ -103,12 +109,14 @@ async function build(params, context) {
     }),
     { classes: 0, collected: 0, paid: 0, waiting: 0, expected: 0, missed: 0 }
   );
+  // different students taught across all tutors
   const distinctStudents = await one(
     `SELECT COUNT(DISTINCT e.student_id) AS total
      FROM enrollments e JOIN classes c ON c.id = e.class_id
      WHERE e.status = 'ACTIVE' AND c.status = 'ACTIVE'`
   );
 
+  // the key findings
   const highlights = [];
   if (details.length > 1) {
     const mostStudents = [...details].sort((a, b) => b.students - a.students)[0];
@@ -119,11 +127,13 @@ async function build(params, context) {
   highlights.push(`LKR ${money(totals.paid)} was paid to tutors during the period.`);
   if (totals.missed > 0) highlights.push(`${totals.missed} class day(s) have no attendance marked.`);
   if (totals.waiting > 0) highlights.push(`LKR ${money(totals.waiting)} in payouts is still waiting to be transferred or retried.`);
+  // tutors with no payout bank account on file
   const noAccount = details.filter((item) => !item.tutor.bank_account_number);
   if (noAccount.length > 0) {
     highlights.push(`${noAccount.map((item) => item.name).join(', ')} ${noAccount.length === 1 ? 'has' : 'have'} no payout bank account on file.`);
   }
 
+  // the overview table and chart, then (unless summary only) a full report per tutor
   const sections = [
     section('Tutor overview', [
       table(
@@ -162,6 +172,7 @@ async function build(params, context) {
     });
   }
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'Tutor Report',
     subtitle: `All tutors - ${params.detail === 'summary' ? 'overview' : 'overview plus a full report for each tutor'}`,
@@ -187,7 +198,9 @@ async function build(params, context) {
 
 // --- one tutor's complete picture ---
 async function tutorDetail(tutor, { period }, shared) {
+  // this tutor's classes
   const own = shared.classes.filter((item) => item.tutor_id === tutor.id);
+  // the classes that are running
   const active = own.filter((item) => item.status === 'ACTIVE');
 
   // numbers for each of the tutor's classes
@@ -211,10 +224,15 @@ async function tutorDetail(tutor, { period }, shared) {
     owed += row.owed;
   });
 
+  // payouts to this tutor in the period
   const tutorPayouts = shared.payouts.filter((item) => item.tutor_id === tutor.id);
+  // paid in the period
   const paid = tutorPayouts.filter(data.isPaid).reduce((sum, item) => sum + item.amount, 0);
+  // still waiting or failed, from any date
   const waiting = shared.unsettled.filter((item) => item.tutor_id === tutor.id).reduce((sum, item) => sum + item.amount, 0);
+  // every class day and whether its register was marked
   const register = await registerLog(tutor.id, own, period, shared);
+  // counts of class days by register state
   const registers = {
     expected: register.filter((item) => !['CANCELLED', 'HOLIDAY', 'NOT_YET', 'NO_STUDENTS'].includes(item.status)).length,
     sameDay: register.filter((item) => item.status === 'SAME_DAY').length,
@@ -225,6 +243,7 @@ async function tutorDetail(tutor, { period }, shared) {
     holidays: register.filter((item) => item.status === 'HOLIDAY').length,
   };
 
+  // the tutor's students in each class
   const roster = await rows(
     `SELECT c.id AS class_id, c.subject, u.id AS student_id, u.full_name, u.student_code, u.grade, u.phone, e.enrolled_at, e.balance
      FROM enrollments e JOIN classes c ON c.id = e.class_id JOIN users u ON u.id = e.student_id
@@ -232,6 +251,7 @@ async function tutorDetail(tutor, { period }, shared) {
      ORDER BY c.subject, u.full_name`,
     [tutor.id]
   );
+  // each student's attendance in this tutor's classes
   const rosterAttendance = await rows(
     `SELECT cs.class_id, ar.student_id, COUNT(*) AS marks, SUM(ar.status IN ('PRESENT', 'LATE')) AS attended
      FROM attendance_records ar JOIN class_sessions cs ON cs.id = ar.session_id JOIN classes c ON c.id = cs.class_id
@@ -239,13 +259,16 @@ async function tutorDetail(tutor, { period }, shared) {
      GROUP BY cs.class_id, ar.student_id`,
     [tutor.id, period.from, period.to]
   );
+  // attendance rate by class and student
   const rateMap = new Map(rosterAttendance.map((item) => [`${item.class_id}|${item.student_id}`, percent(item.attended, item.marks)]));
+  // messages and reminders the tutor sent
   const messages = await rows(
     `SELECT message, sent_at, type, COUNT(*) AS recipients, MAX(sent_at > NOW()) AS upcoming
      FROM notification_log WHERE sent_by = ? AND sent_at >= ? AND sent_at < ?
      GROUP BY message, sent_at, type ORDER BY sent_at ASC`,
     [tutor.id, period.start, period.end]
   );
+  // feedback tickets addressed to this tutor
   const tickets = await rows(
     `SELECT f.ticket_number, f.created_at, f.subject, f.category, f.priority, f.status, f.resolved_at, u.full_name AS from_name
      FROM feedback_complaints f JOIN users u ON u.id = f.submitted_by
@@ -253,6 +276,7 @@ async function tutorDetail(tutor, { period }, shared) {
      ORDER BY f.created_at ASC`,
     [tutor.id, period.start, period.end]
   );
+  // cancelled days and extra classes this tutor made
   const changes = shared.hasEvents
     ? await rows(
       `SELECT ce.created_at, ce.event_date, ce.type, ce.start_time, ce.end_time, ce.venue, ce.note, c.subject
@@ -262,9 +286,11 @@ async function tutorDetail(tutor, { period }, shared) {
       [tutor.id, period.start, period.end]
     )
     : null;
+  // what the tutor did on the site, and what staff did on their account
   const siteActivity = await getActivity(tutor.id, period);
   const staffActions = await getStaffActions(tutor.id, period);
 
+  // headline figures
   const students = num(shared.students.get(tutor.id)?.students);
   const rate = percent(attended, marks);
   const signIns = siteActivity.filter((item) => item.action === 'LOGIN_SUCCESS').length;
@@ -273,6 +299,7 @@ async function tutorDetail(tutor, { period }, shared) {
   const ticketCounts = shared.feedback.get(tutor.id);
   const registerText = registers.expected ? `${registers.expected - registers.missed} / ${registers.expected}` : '-';
 
+  // the key findings
   const highlights = [
     `${tutor.full_name} teaches ${active.length} active class${active.length === 1 ? '' : 'es'} with ${students} student${students === 1 ? '' : 's'}.`,
   ];
@@ -291,6 +318,7 @@ async function tutorDetail(tutor, { period }, shared) {
   if (messages.length > 0) highlights.push(`Sent ${messages.length} message(s) or reminder(s) to students.`);
   highlights.push(`Paid LKR ${money(paid)} this period${waiting > 0 ? `; LKR ${money(waiting)} is still waiting` : ''}.`);
 
+  // the parts of the report, one group per topic
   const groups = [
     {
       title: 'Tutor profile',
@@ -476,6 +504,7 @@ async function tutorDetail(tutor, { period }, shared) {
     },
   ].filter(Boolean);
 
+  // what the report needs from this tutor - the figures, key findings and groups
   return {
     tutor,
     name: tutor.full_name,
@@ -505,8 +534,10 @@ async function tutorDetail(tutor, { period }, shared) {
 
 // every class day in the period and whether its register was marked
 async function registerLog(tutorId, classes, period, shared) {
+  // count class days only up to today
   const today = parts.toDateKey(new Date());
   const last = period.to < today ? period.to : today;
+  // the sessions held, with how many marks and who marked first
   const sessions = await rows(
     `SELECT cs.class_id, cs.session_date, COUNT(ar.id) AS marks, SUM(ar.status = 'PRESENT') AS present,
             SUM(ar.status = 'LATE') AS late, SUM(ar.status = 'ABSENT') AS absent,
@@ -518,10 +549,12 @@ async function registerLog(tutorId, classes, period, shared) {
      GROUP BY cs.id, cs.class_id, cs.session_date`,
     [tutorId, period.from, period.to]
   );
+  // sessions by class and date
   const sessionMap = new Map(sessions.map((item) => [`${item.class_id}|${item.session_date}`, item]));
   const list = [];
   const seen = new Set();
 
+  // for each active class, list its class days - the weekly day plus any extra classes
   classes
     .filter((cls) => cls.status === 'ACTIVE')
     .forEach((cls) => {
@@ -530,6 +563,7 @@ async function registerLog(tutorId, classes, period, shared) {
       const firstSession = sessions.filter((item) => item.class_id === cls.id).map((item) => item.session_date).sort()[0];
       if (firstSession && firstSession < begin) begin = firstSession;
       const first = begin > period.from ? begin : period.from;
+      // cancelled days and extra classes of this class
       const classEvents = shared.events.filter((item) => item.class_id === cls.id);
       // weekly days plus extra classes
       const planned = new Map();
@@ -542,6 +576,7 @@ async function registerLog(tutorId, classes, period, shared) {
       planned.forEach((kind, day) => {
         const key = `${cls.id}|${day}`;
         seen.add(key);
+        // was this day cancelled?
         const cancelled = classEvents.find((item) => item.type === 'CANCELLED' && item.event_date === day);
         list.push(registerRow(cls.subject, day, kind, sessionMap.get(key), {
           cancelled,
@@ -556,13 +591,16 @@ async function registerLog(tutorId, classes, period, shared) {
   sessions.forEach((session) => {
     const key = `${session.class_id}|${session.session_date}`;
     if (seen.has(key) || num(session.marks) === 0) return;
+    // the class a stray session belongs to
     const cls = classes.find((item) => item.id === session.class_id);
     list.push(registerRow(cls ? cls.subject : 'Class', session.session_date, 'Other day', session, { today }));
   });
 
+  // oldest class day first
   return list.sort((a, b) => a.date.localeCompare(b.date) || a.subject.localeCompare(b.subject));
 }
 
+// one class day and the state of its register (marked on the day, later, not marked, cancelled ...)
 function registerRow(subject, day, kind, session, { cancelled, holiday, today, noStudents }) {
   const marks = num(session?.marks);
   let status = 'NOT_MARKED';

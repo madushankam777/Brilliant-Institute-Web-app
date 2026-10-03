@@ -16,20 +16,25 @@ import PasswordStrength from '../../../../shared/client/src/components/common/Pa
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 
+// a profile picture can be up to 3 MB
 const MAX_PICTURE_BYTES = 3 * 1024 * 1024;
 
+// what a strong password needs
 const PASSWORD_RULE_MESSAGE =
   'New password must be at least 8 characters long and include an uppercase letter, ' +
   'a lowercase letter, and a number.';
 
+// 8-72 characters with upper case, lower case and a number
 function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
+// my profile page - picture, account details, banking details (tutors) and change password
 function ProfilePage() {
   const { user, refreshProfile } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
+  // account details form
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone || '');
   const [bio, setBio] = useState(user.bio || '');
@@ -38,6 +43,7 @@ function ProfilePage() {
   const [profileError, setProfileError] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // profile picture
   const pictureInputRef = useRef(null);
   const [pictureError, setPictureError] = useState('');
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
@@ -57,6 +63,7 @@ function ProfilePage() {
     }
   }
 
+  // upload btn - check the file type and size, then upload the picture
   async function handlePictureSelected(event) {
     const file = event.target.files && event.target.files[0];
     event.target.value = ''; // let the same file be picked again if they retry
@@ -83,12 +90,14 @@ function ProfilePage() {
     }
   }
 
+  // refresh the form when the profile changes
   useEffect(() => {
     setFullName(user.fullName);
     setPhone(user.phone || '');
     setBio(user.bio || '');
   }, [user]);
 
+  // save details btn - name, phone and bio
   async function handleProfileSubmit(event) {
     event.preventDefault();
     setProfileError('');
@@ -121,6 +130,7 @@ function ProfilePage() {
     }
   }
 
+  // banking details form (tutors only)
   const isTutor = user.role === 'TUTOR';
   const [bankForm, setBankForm] = useState({ bankName: '', accountHolder: '', accountNumber: '', branch: '' });
   const [isLoadingBank, setIsLoadingBank] = useState(isTutor);
@@ -129,6 +139,7 @@ function ProfilePage() {
   const [bankFieldErrors, setBankFieldErrors] = useState({});
   const [isSavingBank, setIsSavingBank] = useState(false);
 
+  // tutors - load my saved bank details
   useEffect(() => {
     if (!isTutor) return;
     let isMounted = true;
@@ -154,6 +165,7 @@ function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // save banking btn - bank name, account holder, account number and branch
   async function handleBankSubmit(event) {
     event.preventDefault();
     setBankError('');
@@ -178,6 +190,7 @@ function ProfilePage() {
     }
   }
 
+  // change password form
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -186,6 +199,7 @@ function ProfilePage() {
   const [passwordError, setPasswordError] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
+  // change password btn - needs the current password and a strong new one
   async function handlePasswordSubmit(event) {
     event.preventDefault();
     setPasswordError('');
@@ -220,6 +234,7 @@ function ProfilePage() {
     }
   }
 
+  // the page - picture, account details, banking (tutors) and change password cards
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -228,6 +243,7 @@ function ProfilePage() {
           <p className="muted">Update your account details or change your password.</p>
         </div>
 
+        {/* profile picture */}
         <div className="card">
           <h2>Profile picture</h2>
           <Alert type="error" message={pictureError} />
@@ -273,6 +289,7 @@ function ProfilePage() {
           </div>
         </div>
 
+        {/* account details */}
         <div className="card">
           <h2>Account details</h2>
           <Alert type="success" message={profileMessage} />
@@ -332,6 +349,7 @@ function ProfilePage() {
           </form>
         </div>
 
+        {/* banking details - tutors only */}
         {isTutor && (
           <div className="card">
             <h2>Banking information</h2>
@@ -387,6 +405,7 @@ function ProfilePage() {
           </div>
         )}
 
+        {/* change password */}
         <div className="card">
           <h2>Change password</h2>
           <Alert type="success" message={passwordMessage} />

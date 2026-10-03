@@ -2,7 +2,9 @@
 import { useEffect } from 'react';
 import Icon from './Icon';
 
+// close btn - the X on every pop-up
 function ModalClose({ onClose, disabled = false }) {
+  // pressing Esc closes the pop-up too
   useEffect(() => {
     function handleKey(event) {
       if (event.key === 'Escape' && !disabled) onClose();

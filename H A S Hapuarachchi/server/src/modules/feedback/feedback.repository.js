@@ -1,6 +1,7 @@
 // All the SQL for the Feedback & Complaint module lives here.
 const { pool } = require('../../../../../shared/server/src/config/db');
 
+// a ticket with who sent it and the tutor it is for - reused by the ticket lists
 const TICKET_WITH_SUBMITTER_SELECT = `
   SELECT f.*, u.full_name AS submitted_by_name, u.role AS submitted_by_role,
          t.full_name AS recipient_tutor_name
@@ -9,6 +10,7 @@ const TICKET_WITH_SUBMITTER_SELECT = `
   LEFT JOIN users t ON t.id = f.recipient_tutor_id
 `;
 
+// save a new ticket as PENDING with an empty reply list
 async function createTicket({
   ticketNumber,
   submittedBy,
@@ -28,6 +30,7 @@ async function createTicket({
   return result.insertId;
 }
 
+// one active tutor by id
 async function findActiveTutorById(tutorId) {
   const [rows] = await pool.execute(
     `SELECT id, full_name FROM users WHERE id = ? AND role = 'TUTOR' AND status = 'ACTIVE' LIMIT 1`,
@@ -36,6 +39,7 @@ async function findActiveTutorById(tutorId) {
   return rows[0] || null;
 }
 
+// save the ticket number such as FB-0001
 async function setTicketNumber(ticketId, ticketNumber) {
   await pool.execute(`UPDATE feedback_complaints SET ticket_number = ? WHERE id = ?`, [
     ticketNumber,
@@ -43,6 +47,7 @@ async function setTicketNumber(ticketId, ticketNumber) {
   ]);
 }
 
+// one ticket by id
 async function findTicketById(ticketId) {
   const [rows] = await pool.execute(`${TICKET_WITH_SUBMITTER_SELECT} WHERE f.id = ? LIMIT 1`, [
     ticketId,
@@ -50,6 +55,7 @@ async function findTicketById(ticketId) {
   return rows[0] || null;
 }
 
+// the tickets one person sent, newest first
 async function listTicketsBySubmitter(userId) {
   const [rows] = await pool.execute(
     `${TICKET_WITH_SUBMITTER_SELECT} WHERE f.submitted_by = ? ORDER BY f.created_at DESC`,
@@ -82,6 +88,7 @@ async function listTicketsForStaff({ role, userId, status }) {
   return rows;
 }
 
+// add a reply to the ticket's reply list and set its new status
 async function appendResponse(ticketId, responseEntry, newStatus) {
   await pool.execute(
     `UPDATE feedback_complaints
@@ -93,6 +100,7 @@ async function appendResponse(ticketId, responseEntry, newStatus) {
   );
 }
 
+// mark a ticket RESOLVED and note who and when
 async function markResolved(ticketId, resolvedBy) {
   await pool.execute(
     `UPDATE feedback_complaints
@@ -102,11 +110,13 @@ async function markResolved(ticketId, resolvedBy) {
   );
 }
 
+// a person's full name, shown on their reply
 async function findUserFullName(userId) {
   const [rows] = await pool.execute(`SELECT full_name FROM users WHERE id = ? LIMIT 1`, [userId]);
   return rows[0] ? rows[0].full_name : null;
 }
 
+// number of tickets in each status
 async function countTicketsByStatus() {
   const [rows] = await pool.execute(
     `SELECT status, COUNT(*) AS total FROM feedback_complaints GROUP BY status`

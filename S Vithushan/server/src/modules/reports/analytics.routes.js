@@ -11,6 +11,7 @@ const { getAnalytics } = require('./analytics.service');
 
 const router = express.Router();
 
+// analytics is for admins only
 router.use(authenticate, authorize(ROLES.ADMIN));
 
 // analytics dashboard data for a period

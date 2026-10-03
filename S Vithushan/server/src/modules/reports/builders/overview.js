@@ -6,7 +6,9 @@ const data = require('../reportData');
 
 const { num, percent, change, kpi, table, bars, columnChart, facts, section, rows, one, money } = parts;
 
+// institute summary - gather the numbers, then build the money, people, teaching and support sections
 async function build(params, { period, threshold }) {
+  // student, tutor and new student counts
   const people = await one(
     `SELECT SUM(role = 'STUDENT_PARENT' AND status = 'ACTIVE') AS students,
             SUM(role = 'TUTOR' AND status = 'ACTIVE') AS tutors,
@@ -14,19 +16,26 @@ async function build(params, { period, threshold }) {
      FROM users`,
     [period.start, period.end]
   );
+  // active classes
   const classCount = await one(`SELECT COUNT(*) AS total FROM classes WHERE status = 'ACTIVE'`);
+  // fees collected in this period and in the one before it
   const collected = await data.getCollectedTotal(period);
   const previous = await data.getCollectedTotal(period.previous);
+  // unpaid balances right now
   const outstanding = await one(
     `SELECT COUNT(*) AS enrolments, COALESCE(SUM(balance), 0) AS total FROM enrollments WHERE status = 'ACTIVE' AND balance > 0`
   );
+  // bank transfer slips waiting for verification
   const pending = await one(
     `SELECT COUNT(*) AS total, COALESCE(SUM(amount), 0) AS amount
      FROM payments WHERE status = 'PENDING' AND payment_method = 'BANK_TRANSFER'`
   );
+  // money paid to tutors in the period
   const payouts = await data.getPayouts(period);
+  // total paid to tutors
   const paidOut = payouts.filter(data.isPaid).reduce((sum, item) => sum + item.amount, 0);
 
+  // attendance marks in the period
   const attendance = await one(
     `SELECT COUNT(*) AS marks, SUM(ar.status IN ('PRESENT', 'LATE')) AS attended
      FROM attendance_records ar JOIN class_sessions cs ON cs.id = ar.session_id
@@ -38,6 +47,7 @@ async function build(params, { period, threshold }) {
   const lowAttendance = await data.getLowAttendance(period, threshold);
   const lowStudents = new Set(lowAttendance.map((item) => item.id)).size;
 
+  // complaints received and resolved, and how many are open
   const feedback = await one(
     `SELECT SUM(created_at >= ? AND created_at < ?) AS received,
             SUM(resolved_at >= ? AND resolved_at < ?) AS resolved,
@@ -61,20 +71,24 @@ async function build(params, { period, threshold }) {
   const trendFrom = parts.toDateKey(firstMonth);
   const trend = await data.getMonthlyCollections(trendFrom, parts.addDays(period.to, 1), parts.monthKeys(trendFrom, period.to));
 
+  // active students per grade
   const grades = await rows(
     `SELECT COALESCE(grade, 'Not set') AS grade, COUNT(*) AS total
      FROM users WHERE role = 'STUDENT_PARENT' AND status = 'ACTIVE' GROUP BY grade`
   );
   grades.sort((a, b) => indexOfGrade(a.grade) - indexOfGrade(b.grade));
 
+  // the active classes with their enrolment, fees and attendance
   const classes = (await data.getClasses()).filter((item) => item.status === 'ACTIVE');
   const collections = await data.getCollectionsByClass(period);
   const attendanceByClass = await data.getAttendanceByClass(period);
+  // the 10 biggest classes
   const topClasses = [...classes].sort((a, b) => b.enrolled - a.enrolled).slice(0, 10);
   const topEarner = [...classes].sort(
     (a, b) => (collections.get(b.id)?.collected || 0) - (collections.get(a.id)?.collected || 0)
   )[0];
 
+  // Contact Us messages (only when that table exists)
   let enquiries = null;
   if (await schema.hasTable('contact_messages')) {
     enquiries = await one(
@@ -83,6 +97,7 @@ async function build(params, { period, threshold }) {
       [period.start, period.end]
     );
   }
+  // cancelled days and extra classes (only when that table exists)
   let changes = null;
   if (await schema.hasClassEvents()) {
     changes = await one(
@@ -92,6 +107,7 @@ async function build(params, { period, threshold }) {
     );
   }
 
+  // the key findings - plain sentences about the biggest numbers
   const collectedChange = change(collected.total, previous.total);
   const highlights = [];
   if (collectedChange !== null) {
@@ -114,6 +130,7 @@ async function build(params, { period, threshold }) {
   }
   if (num(feedback.high_open) > 0) highlights.push(`${num(feedback.high_open)} high-priority complaint(s) are still open.`);
 
+  // the report - title, key figures, key findings and sections
   return {
     title: 'Institute Summary Report',
     subtitle: 'Students, classes, fees, attendance and support at a glance',
@@ -212,6 +229,7 @@ async function build(params, { period, threshold }) {
   };
 }
 
+// position of a grade in school order, unknown grades last
 function indexOfGrade(grade) {
   const index = GRADES.indexOf(grade);
   return index === -1 ? 99 : index;

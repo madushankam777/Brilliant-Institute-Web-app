@@ -9,12 +9,14 @@ import { getNavItems } from '../../components/layout/navItems';
 
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
+// badge colour for Present, Late or Absent
 function statusBadgeClass(status) {
   if (status === 'PRESENT') return 'badge badge-success';
   if (status === 'LATE') return 'badge badge-warning';
   return 'badge badge-danger';
 }
 
+// my attendance - the rate per class and every session I attended or missed
 function AttendanceHistoryPage() {
   const [history, setHistory] = useState([]);
   const [summaryByClass, setSummaryByClass] = useState([]);
@@ -23,6 +25,7 @@ function AttendanceHistoryPage() {
 
   useEffect(() => {
     let isMounted = true;
+    // fetch the history and the summary per class
     async function load() {
       try {
         const data = await fetchMyAttendanceHistory();
@@ -42,8 +45,10 @@ function AttendanceHistoryPage() {
     };
   }, []);
 
+  // present or late counts as attended
   const presentCount = history.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
   const absentCount = history.filter((r) => r.status === 'ABSENT').length;
+  // classes under the low-attendance limit
   const lowAttendanceClasses = summaryByClass.filter((s) => s.isLowAttendance);
 
   return (
@@ -99,6 +104,7 @@ function AttendanceHistoryPage() {
               </div>
             )}
 
+            {/* session history table */}
             <div className="card">
               <h2>Session history</h2>
               {history.length === 0 ? (

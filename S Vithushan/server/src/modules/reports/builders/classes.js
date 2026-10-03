@@ -6,8 +6,10 @@ const data = require('../reportData');
 
 const { num, percent, kpi, table, bars, facts, section, rows, money } = parts;
 
+// weekday order, Monday first
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+// the columns of the class register table
 const REGISTER_COLUMNS = [
   { key: 'subject', label: 'Class' },
   { key: 'tutor', label: 'Tutor' },
@@ -21,9 +23,12 @@ const REGISTER_COLUMNS = [
   { key: 'attendance', label: 'Attendance', format: 'percent' },
 ];
 
+// class report - one class in detail, or every class
 async function build(params, context) {
+  // the class (or all classes) with its tutor and enrolment
   const classes = await data.getClasses({ classId: params.classId });
   if (params.classId && classes.length === 0) throw ApiError.notFound('Class not found.');
+  // fees collected, unpaid balances, attendance and schedule changes per class
   const collections = await data.getCollectionsByClass(context.period);
   const outstanding = await data.getOutstandingByClass();
   const attendance = await data.getAttendanceByClass(context.period);
@@ -45,6 +50,7 @@ async function getChanges(period, classId) {
   );
 }
 
+// the table of cancelled days and extra classes (nothing when that update is missing)
 function changesTable(changes) {
   if (!changes) return null;
   return table(
@@ -65,9 +71,13 @@ function changesTable(changes) {
 }
 
 // --- all classes ---
+// the report for every class - register, timetable, subject areas and cancelled classes
 function buildAll(classes, { collections, outstanding, attendance, changes }) {
+  // classes that are running
   const active = classes.filter((item) => item.status === 'ACTIVE');
+  // classes that were cancelled
   const cancelled = classes.filter((item) => item.status !== 'ACTIVE');
+  // one class as a register row
   const toRow = (item) => ({
     subject: item.subject,
     tutor: item.tutor_name,
@@ -82,12 +92,17 @@ function buildAll(classes, { collections, outstanding, attendance, changes }) {
   });
   const register = active.map(toRow);
   const cancelledRows = cancelled.map(toRow);
+  // total seats in the active classes
   const seats = active.reduce((sum, item) => sum + item.capacity, 0);
+  // students enrolled
   const enrolled = active.reduce((sum, item) => sum + item.enrolled, 0);
+  // fees collected over all classes
   const collected = [...register, ...cancelledRows].reduce((sum, item) => sum + item.collected, 0);
+  // fees still unpaid
   const owed = [...register, ...cancelledRows].reduce((sum, item) => sum + item.owed, 0);
   const fill = percent(enrolled, seats);
 
+  // the weekly timetable - by day, then start time
   const timetable = [...active].sort(
     (a, b) => DAY_ORDER.indexOf(a.day_of_week) - DAY_ORDER.indexOf(b.day_of_week) || String(a.start_time).localeCompare(String(b.start_time))
   );
@@ -103,9 +118,12 @@ function buildAll(classes, { collections, outstanding, attendance, changes }) {
     areas.set(key, entry);
   });
 
+  // the key findings
   const highlights = [`${active.length} active classes have ${enrolled} enrolments for ${seats} seats (${fill ?? 0}% full).`];
+  // classes with no seats left
   const full = active.filter((item) => item.enrolled >= item.capacity);
   if (full.length > 0) highlights.push(`${full.length} class(es) are full: ${full.map((item) => item.subject).join(', ')}.`);
+  // classes with no students yet
   const empty = active.filter((item) => item.enrolled === 0);
   if (empty.length > 0) highlights.push(`${empty.length} class(es) have no students yet: ${empty.map((item) => item.subject).join(', ')}.`);
   highlights.push(`Classes collected LKR ${money(collected)} in the period; LKR ${money(owed)} is still unpaid.`);
@@ -114,6 +132,7 @@ function buildAll(classes, { collections, outstanding, attendance, changes }) {
     highlights.push(`${cancelled} class day(s) were cancelled and ${changes.length - cancelled} extra class(es) were added.`);
   }
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'Class & Timetable Report',
     subtitle: 'Enrolment, fees, attendance and the weekly timetable for every class',
@@ -177,7 +196,9 @@ function buildAll(classes, { collections, outstanding, attendance, changes }) {
 }
 
 // --- one class ---
+// the report for one class - details, students, attendance, sessions and payments
 async function buildOne(cls, { collections, outstanding, attendance, changes }, { period, threshold }) {
+  // every student enrolled in this class, with their balance
   const students = await rows(
     `SELECT u.id, u.student_code, u.full_name, u.grade, u.phone, e.enrolled_at, e.status, e.payment_status, e.balance
      FROM enrollments e JOIN users u ON u.id = e.student_id
@@ -185,6 +206,7 @@ async function buildOne(cls, { collections, outstanding, attendance, changes }, 
      ORDER BY e.status, u.full_name`,
     [cls.id]
   );
+  // each student's attendance in the period
   const studentAttendance = await rows(
     `SELECT ar.student_id, COUNT(*) AS marks, SUM(ar.status IN ('PRESENT', 'LATE')) AS attended
      FROM attendance_records ar JOIN class_sessions cs ON cs.id = ar.session_id
@@ -192,6 +214,7 @@ async function buildOne(cls, { collections, outstanding, attendance, changes }, 
      GROUP BY ar.student_id`,
     [cls.id, period.from, period.to]
   );
+  // the sessions held in the period
   const sessions = await rows(
     `SELECT cs.session_date, COUNT(ar.id) AS marks, SUM(ar.status = 'PRESENT') AS present,
             SUM(ar.status = 'LATE') AS late, SUM(ar.status = 'ABSENT') AS absent
@@ -201,6 +224,7 @@ async function buildOne(cls, { collections, outstanding, attendance, changes }, 
      ORDER BY cs.session_date ASC`,
     [cls.id, period.from, period.to]
   );
+  // payments for this class in the period
   const payments = await rows(
     `SELECT COALESCE(p.paid_at, p.created_at) AS date, r.receipt_number, u.full_name, p.payment_method, p.status, p.amount
      FROM payments p
@@ -217,12 +241,15 @@ async function buildOne(cls, { collections, outstanding, attendance, changes }, 
   const owed = outstanding.get(cls.id)?.owed || 0;
   const fill = percent(cls.enrolled, cls.capacity);
 
+  // the students with their attendance rate
   const roster = students.map((item) => {
     const own = attendanceMap.get(item.id);
     return { ...item, attendance: own ? percent(own.attended, own.marks) : null };
   });
+  // active students under the attendance target
   const low = roster.filter((item) => item.status === 'ACTIVE' && item.attendance !== null && item.attendance < threshold);
 
+  // the key findings
   const highlights = [
     `${cls.enrolled} of ${cls.capacity} seats are taken (${fill ?? 0}% full).`,
     `${att.sessions} session(s) held in the period with ${att.rate ?? 0}% attendance.`,
@@ -230,6 +257,7 @@ async function buildOne(cls, { collections, outstanding, attendance, changes }, 
   ];
   if (low.length > 0) highlights.push(`${low.length} student(s) are below the ${threshold}% attendance target.`);
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'Class Report',
     subtitle: `${cls.subject} - ${cls.tutor_name}`,

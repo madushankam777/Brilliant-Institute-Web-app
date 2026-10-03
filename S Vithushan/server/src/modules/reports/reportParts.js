@@ -2,7 +2,9 @@
 const crypto = require('crypto');
 const { pool } = require('../../../../../shared/server/src/config/db');
 
+// short month names
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// a table shows at most 2000 rows
 const MAX_ROWS = 2000;
 
 // enum value -> colour of its badge
@@ -26,6 +28,7 @@ const LABELS = {
   NOT_MARKED: 'Not marked', NOT_YET: 'Not marked yet', HOLIDAY: 'Public holiday', NO_STUDENTS: 'No students yet',
 };
 
+// a number, or 0 when it is not a number
 const num = (value) => Number(value) || 0;
 
 // share as a 0-100 number with one decimal, or null when there is nothing to divide
@@ -40,6 +43,7 @@ function change(current, previous) {
   return Math.round(((num(current) - num(previous)) / num(previous)) * 1000) / 10;
 }
 
+// an enum value as friendly words, e.g. IN_PROGRESS gives In progress
 function label(value) {
   if (value === null || value === undefined || value === '') return '-';
   if (LABELS[value]) return LABELS[value];
@@ -51,25 +55,30 @@ function label(value) {
 
 // --- dates ---
 
+// a number as two digits
 function pad(value) {
   return String(value).padStart(2, '0');
 }
 
+// a Date as YYYY-MM-DD
 function toDateKey(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+// YYYY-MM-DD text as a Date
 function parseDateKey(key) {
   const [year, month, day] = String(key).slice(0, 10).split('-').map(Number);
   return new Date(year, month - 1, day);
 }
 
+// a date key plus some days
 function addDays(key, days) {
   const date = parseDateKey(key);
   date.setDate(date.getDate() + days);
   return toDateKey(date);
 }
 
+// number of days from one date key to another
 function daysBetween(fromKey, toKey) {
   return Math.round((parseDateKey(toKey) - parseDateKey(fromKey)) / 86400000);
 }
@@ -106,11 +115,13 @@ function formatSchedule(day, start, end, short = false) {
   return `${dayText} ${formatTime(start)} - ${formatTime(end)}`;
 }
 
+// 2026-09 as Sep 2026
 function monthLabel(key) {
   const [year, month] = String(key).split('-').map(Number);
   return `${MONTHS[month - 1]} ${year}`;
 }
 
+// the current time as YYYY-MM-DD HH:MM:SS
 function nowText() {
   const now = new Date();
   return `${toDateKey(now)} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
@@ -155,10 +166,12 @@ function monthKeys(fromKey, toKey) {
 
 // --- formatting ---
 
+// a number with thousands commas and 2 decimals
 function money(value) {
   return num(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// show a value in the format a column asks for - money, number, percent, date, status ...
 function formatValue(value, format) {
   if (format === 'text' || !format) return value === null || value === undefined || value === '' ? '-' : String(value);
   if (value === null || value === undefined || value === '') return '-';
@@ -181,6 +194,7 @@ function formatHours(hours) {
   return `${(value / 24).toFixed(1)} days`;
 }
 
+// is this a number format? (numbers are aligned right)
 function isNumeric(format) {
   return ['money', 'lkr', 'lkr0', 'number', 'percent', 'hours'].includes(format);
 }
@@ -194,6 +208,7 @@ function kpi(title, value, format = 'number', extra = {}) {
 
 // table - columns: { key, label, format, width }, rows: plain objects
 function table(columns, rows, options = {}) {
+  // column settings - label, alignment and width
   const cols = columns.map((column) => {
     const width = column.width || (isNumeric(column.format) ? 'auto' : '*');
     return {
@@ -208,6 +223,7 @@ function table(columns, rows, options = {}) {
   // raw numbers and dates are kept for the Excel download
   const keepRaw = (format) => isNumeric(format) || format === 'date' || format === 'datetime';
   const limited = rows.slice(0, MAX_ROWS);
+  // the table cells - text for the page, the raw value for Excel, a colour for statuses
   const body = limited.map((row) =>
     columns.map((column) => {
       const raw = row[column.key];
@@ -222,6 +238,7 @@ function table(columns, rows, options = {}) {
     totals = columns.map((column, index) => {
       if (index === 0) return { text: options.totalsLabel || 'Total' };
       if (!options.totals.includes(column.key)) return { text: '' };
+      // column total for the totals row
       const sum = rows.reduce((total, row) => total + num(row[column.key]), 0);
       return { text: formatValue(sum, column.format), value: sum };
     });
@@ -278,6 +295,7 @@ function tiles(items) {
   return { type: 'kpis', items };
 }
 
+// a note line inside a section
 function note(text) {
   return { type: 'note', text };
 }
@@ -287,10 +305,12 @@ function heading(text) {
   return { type: 'heading', text };
 }
 
+// signature boxes at the end of a report
 function signatures(roles = ['Prepared by', 'Checked by', 'Approved by']) {
   return { type: 'signatures', items: roles };
 }
 
+// a report section - title, optional intro, optional page break and its blocks
 function section(title, blocks, options = {}) {
   return { title, intro: options.intro || '', pageBreak: Boolean(options.pageBreak), blocks: blocks.filter(Boolean) };
 }
@@ -316,6 +336,7 @@ async function rows(sql, params = []) {
   return result;
 }
 
+// the first row of a query (or an empty object)
 async function one(sql, params = []) {
   const [result] = await pool.execute(sql, params);
   return result[0] || {};

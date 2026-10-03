@@ -1,6 +1,8 @@
+// 404 page - shown when the address does not exist
 import { Link } from 'react-router-dom';
 import Icon from '../components/common/Icon';
 
+// not found page - the 404 message with links to the home and contact pages
 function NotFoundPage() {
   return (
     <div className="not-found">

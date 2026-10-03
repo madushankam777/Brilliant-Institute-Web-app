@@ -1,3 +1,4 @@
+// auth controller - reads the request, calls the auth service and sends the JSON reply
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { saveUpload } = require('../../../../../shared/server/src/utils/fileStore');
@@ -56,6 +57,7 @@ const updateProfile = asyncHandler(async (req, res) => {
   });
 });
 
+// POST /api/auth/profile/picture - save the uploaded photo and attach it to the user
 const uploadProfilePicture = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw ApiError.badRequest('Please choose an image to upload.');

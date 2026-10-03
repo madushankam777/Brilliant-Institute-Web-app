@@ -15,6 +15,7 @@ const config = require('../../../../../shared/server/src/config/env');
 // gateway timeout error
 class GatewayUnavailableError extends Error {}
 
+// round money to 2 decimal places
 function roundMoney(value) {
   return Math.round(value * 100) / 100;
 }
@@ -24,11 +25,13 @@ function formatLkr(amount) {
   return `LKR ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// payment details are saved as JSON text - turn them back into an object
 function parseDetails(details) {
   if (!details) return {};
   return typeof details === 'string' ? JSON.parse(details) : details;
 }
 
+// today's date as YYYY-MM-DD in local time
 function todayDateString() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -41,10 +44,12 @@ function lastDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
 
+// bank transfer is open every day except the last day of the month
 function isBankTransferWindowOpen(date = new Date()) {
   return date.getDate() !== lastDayOfMonth(date);
 }
 
+// tell the page if bank transfer is open today, and why not if it is closed
 function getBankTransferAvailability() {
   const now = new Date();
   const available = isBankTransferWindowOpen(now);
@@ -58,6 +63,7 @@ function getBankTransferAvailability() {
   };
 }
 
+// student - what is still owed on each class
 async function getMyBalances(studentUser) {
   const rows = await repository.listBalancesForStudent(studentUser.id);
   return rows.map((row) => ({
@@ -69,12 +75,14 @@ async function getMyBalances(studentUser) {
   }));
 }
 
+// receipt number, e.g. RCPT-2026-000015
 function buildReceiptNumber(paymentId) {
   const year = new Date().getFullYear();
   const paddedId = String(paymentId).padStart(6, '0');
   return `RCPT-${year}-${paddedId}`;
 }
 
+// keep only safe details per method (card last 4 digits, wallet phone, bank reference) - never full card data
 function buildStoredPaymentDetails(paymentMethod, rawDetails = {}) {
   if (paymentMethod === 'CARD') {
     return {
@@ -100,6 +108,7 @@ function buildStoredPaymentDetails(paymentMethod, rawDetails = {}) {
   return { method: paymentMethod };
 }
 
+// run work as one database transaction - all of it is saved, or none of it
 async function withTransaction(work) {
   const connection = await pool.getConnection();
   let transactionOpen = false;
@@ -131,6 +140,7 @@ async function createPendingPaymentRecord(
 
   const safeDetails = buildStoredPaymentDetails(paymentMethod, paymentDetails);
 
+  // lock the enrolment, then check it is the student's own and the amount is within the balance
   return withTransaction(async (connection) => {
     const enrollment = await repository.findEnrollmentByIdForUpdate(enrollmentId, connection);
     if (!enrollment || enrollment.status !== 'ACTIVE') {
@@ -153,9 +163,11 @@ async function createPendingPaymentRecord(
   });
 }
 
+// charge a PENDING payment - approved: balance down + receipt, declined: FAILED, gateway timeout: stays pending
 async function finalizePendingPayment(studentUser, paymentId) {
   try {
     return await withTransaction(async (connection) => {
+      // lock the payment and check it is this student's and still pending
       const payment = await repository.findPaymentByIdForUpdate(paymentId, connection);
       if (!payment) {
         throw ApiError.notFound('Payment not found.');
@@ -177,6 +189,7 @@ async function finalizePendingPayment(studentUser, paymentId) {
         connection
       );
 
+      // ask the gateway to charge it (a timeout becomes GatewayUnavailableError)
       let gatewayResult;
       try {
         gatewayResult = await gateway.chargePaymentToken({ amount: Number(payment.amount) });
@@ -184,6 +197,7 @@ async function finalizePendingPayment(studentUser, paymentId) {
         throw new GatewayUnavailableError(gatewayError.message);
       }
 
+      // declined - mark the payment FAILED
       if (!gatewayResult.approved) {
         await repository.markPaymentFailed(
           payment.id,
@@ -194,6 +208,7 @@ async function finalizePendingPayment(studentUser, paymentId) {
         return { declinedReason: gatewayResult.reason, subject: enrollment.subject };
       }
 
+      // approved - mark it SUCCESSFUL, lower the class balance and make the receipt
       const balanceAfter = Number(enrollment.balance) - Number(payment.amount);
       await repository.markPaymentSuccessful(
         payment.id,
@@ -207,6 +222,7 @@ async function finalizePendingPayment(studentUser, paymentId) {
 
       return { receiptNumber, subject: enrollment.subject };
     }).then(async (outcome) => {
+      // after the transaction - declined: audit it and tell the student, approved: audit it and return the payment
       if (outcome.declinedReason) {
         await recordAuditEvent({
           actorId: studentUser.id,
@@ -247,6 +263,7 @@ async function finalizePendingPayment(studentUser, paymentId) {
       throw error;
     }
 
+    // a gateway timeout - log it and keep the payment PENDING so it can be retried
     await recordAuditEvent({
       actorId: studentUser.id,
       action: 'PAYMENT_GATEWAY_ERROR',
@@ -285,6 +302,7 @@ function checkoutMethodsFor(enabled) {
   return tabs;
 }
 
+// refuse a payment method the admin has switched off
 async function assertMethodAllowed(method) {
   const tabs = checkoutMethodsFor(await loadEnabledMethods());
   if (!tabs.includes(method)) {
@@ -292,6 +310,7 @@ async function assertMethodAllowed(method) {
   }
 }
 
+// pay btn - save the payment as PENDING, then charge it
 async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, paymentDetails }) {
   await assertMethodAllowed(paymentMethod);
   const paymentId = await createPendingPaymentRecord(studentUser, {
@@ -303,6 +322,7 @@ async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, p
   return finalizePendingPayment(studentUser, paymentId);
 }
 
+// retry btn - try a pending payment again
 async function retryPendingPayment(studentUser, paymentId) {
   const pending = await repository.findPaymentById(paymentId);
   if (pending) await assertMethodAllowed(pending.payment_method);
@@ -315,11 +335,13 @@ async function submitBankTransferPayment(
   { enrollmentId, amount, bankReference, receiptImagePath }
 ) {
   await assertMethodAllowed('BANK_TRANSFER');
+  // bank transfer is closed on the last day of the month
   const { available, message } = getBankTransferAvailability();
   if (!available) {
     throw ApiError.badRequest(message);
   }
 
+  // save it as PENDING until an admin approves it
   const paymentId = await createPendingPaymentRecord(studentUser, {
     enrollmentId,
     amount,
@@ -392,6 +414,7 @@ async function editBankTransferPayment(studentUser, paymentId, { bankReference, 
   return toSafePayment(updated);
 }
 
+// admin - bank transfers waiting for approval, with the claimed amount
 async function listPendingBankTransfers() {
   const rows = await repository.listPendingBankTransfers();
   return rows.map((row) => {
@@ -412,6 +435,7 @@ async function listPendingBankTransfers() {
   });
 }
 
+// load a bank transfer that is still waiting for review, or stop with an error
 async function findPendingBankTransferOrThrow(paymentId) {
   const payment = await repository.findPaymentById(paymentId);
   if (!payment || payment.payment_method !== 'BANK_TRANSFER') {
@@ -425,6 +449,7 @@ async function findPendingBankTransferOrThrow(paymentId) {
 
 // Admin checks the slip and enters the amount actually received
 async function approveBankTransferPayment(adminUser, paymentId, { amount } = {}) {
+  // approve in one transaction - the amount received is taken off the class balance
   const outcome = await withTransaction(async (connection) => {
     const payment = await repository.findPaymentByIdForUpdate(paymentId, connection);
     if (!payment || payment.payment_method !== 'BANK_TRANSFER' || payment.status !== PAYMENT_STATUS.PENDING) {
@@ -460,12 +485,14 @@ async function approveBankTransferPayment(adminUser, paymentId, { amount } = {})
     );
     await repository.updateEnrollmentBalance(payment.enrollment_id, balanceAfter, connection);
 
+    // make the receipt
     const receiptNumber = buildReceiptNumber(payment.id);
     await repository.createReceipt(payment.id, receiptNumber, connection);
 
     return { subject: enrollment.subject, receiptNumber, claimedAmount, receivedAmount };
   });
 
+  // audit log - transfer approved
   await recordAuditEvent({
     actorId: adminUser.id,
     action: 'BANK_TRANSFER_APPROVED',
@@ -479,6 +506,7 @@ async function approveBankTransferPayment(adminUser, paymentId, { amount } = {})
   });
 
   const payment = await repository.findPaymentById(paymentId);
+  // tell the student - and say so when the approved amount differs from what they entered
   const message =
     outcome.receivedAmount === outcome.claimedAmount
       ? `Your bank transfer of ${formatLkr(outcome.receivedAmount)} for ${outcome.subject} was approved.`
@@ -521,6 +549,7 @@ async function searchStudentsForPayment(term) {
   }));
 }
 
+// payment types an admin can record at the office
 const OFFICE_METHODS = { CASH: 'Cash', BANK_DEPOSIT: 'Bank deposit slip' };
 
 // record payment btn - admin types what the student paid at the office
@@ -530,6 +559,7 @@ async function recordOfficePayment(adminUser, { enrollmentId, amount, method, re
     throw ApiError.badRequest('Enter the amount the student paid.');
   }
 
+  // record it in one transaction - saved as SUCCESSFUL, balance lowered, receipt made
   const outcome = await withTransaction(async (connection) => {
     const enrollment = await repository.findEnrollmentByIdForUpdate(enrollmentId, connection);
     if (!enrollment || enrollment.status !== 'ACTIVE') {
@@ -569,6 +599,7 @@ async function recordOfficePayment(adminUser, { enrollmentId, amount, method, re
     return { paymentId, studentId: enrollment.student_id, subject: enrollment.subject, receiptNumber, balanceAfter };
   });
 
+  // audit log, then tell the student
   await recordAuditEvent({
     actorId: adminUser.id,
     action: 'PAYMENT_RECORDED_BY_ADMIN',
@@ -593,6 +624,7 @@ async function recordOfficePayment(adminUser, { enrollmentId, amount, method, re
   };
 }
 
+// reject btn - mark the transfer FAILED and tell the student
 async function rejectBankTransferPayment(adminUser, paymentId) {
   const pendingPayment = await findPendingBankTransferOrThrow(paymentId);
   await repository.markPaymentFailed(paymentId, { gatewayTransactionId: null });
@@ -651,6 +683,7 @@ async function listRecentPayments() {
   }));
 }
 
+// student - all my payments with their receipt numbers
 async function getMyPaymentHistory(studentUser) {
   const rows = await repository.listPaymentHistoryForStudent(studentUser.id);
   return rows.map(toSafePayment);
@@ -682,6 +715,7 @@ async function getPaymentSettings() {
   };
 }
 
+// save btn - the institute's bank details, wallet numbers and which methods are switched on
 async function updatePaymentSettings(adminUser, settings) {
   let methods = null;
   if (Array.isArray(settings.enabledMethods)) {
@@ -706,6 +740,7 @@ async function updatePaymentSettings(adminUser, settings) {
   return getPaymentSettings();
 }
 
+// Pay Tutors page - active tutors with their account number masked
 async function listActiveTutors() {
   const rows = await repository.listActiveTutors();
   return rows.map((row) => ({
@@ -732,6 +767,7 @@ async function getMyBankDetails(tutorUser) {
   };
 }
 
+// tutor - save my own bank details
 async function updateMyBankDetails(tutorUser, { bankName, accountHolder, accountNumber, branch }) {
   await repository.updateBankDetails(tutorUser.id, { bankName, accountHolder, accountNumber, branch });
   await recordAuditEvent({
@@ -777,6 +813,7 @@ async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, acc
 
 // --- Tutor payouts ---------------------------------------------------------
 
+// ways to pay a tutor: a bank transfer done by hand, a bank file, or a payout API
 const PAYOUT_METHODS = ['BANK_TRANSFER', 'BANK_FILE', 'PAYOUT_API'];
 
 // What the Pay Tutors page can offer on this install.
@@ -823,6 +860,7 @@ async function getTutorPayoutAccount(adminUser, tutorId) {
   };
 }
 
+// the message a tutor gets when they are paid
 function payoutNotification({ method, amount, periodLabel, destination, reference }) {
   const what = `${formatLkr(amount)}${periodLabel ? ` (${periodLabel})` : ''}`;
   if (method === 'BANK_TRANSFER') {
@@ -839,6 +877,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
   if (!(amount > 0)) {
     throw ApiError.badRequest('Payout amount must be greater than zero.');
   }
+  // the tutor must be active and have a bank account on file
   const tutor = await repository.findActiveTutorById(tutorId);
   if (!tutor) {
     throw ApiError.badRequest('Please select a valid, active Tutor.');
@@ -851,6 +890,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
     );
   }
 
+  // payout tracking = the database update that adds the status and reference columns
   const tracking = await schema.hasPayoutTracking();
   // older clients send no method - they always queued the payout
   const payoutMethod = PAYOUT_METHODS.includes(method) ? method : 'BANK_FILE';
@@ -865,6 +905,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
     throw ApiError.badRequest('Online payouts are not set up. Pay by bank transfer instead.');
   }
 
+  // where the money goes, with the account number masked
   const destination = `${bank.bank_name || 'bank account'} ${maskAccountNumber(bank.bank_account_number)}`;
   // null means "now"; an earlier date keeps the real transfer day
   const settledAt = payoutMethod === 'BANK_TRANSFER' && transferDate && transferDate !== todayDateString()
@@ -878,6 +919,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
   }
   const fullNote = noteParts.filter(Boolean).join(' - ').slice(0, 255);
 
+  // save the payout - SENT when the admin already did the transfer, otherwise QUEUED
   const payoutId = await repository.createTutorPayout({
     tutorId,
     amount,
@@ -897,6 +939,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
   let status = tracking ? (payoutMethod === 'BANK_TRANSFER' ? 'SENT' : 'QUEUED') : 'RECORDED';
   let failureReason = null;
 
+  // payout API - send the transfer now, a failure marks the payout FAILED
   if (payoutMethod === 'PAYOUT_API') {
     try {
       const { reference } = await payoutGateway.sendTransfer({
@@ -914,6 +957,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
     }
   }
 
+  // audit log - tutor paid
   await recordAuditEvent({
     actorId: adminUser.id,
     action: 'TUTOR_PAID',
@@ -948,6 +992,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
 // Queued payouts are exported as one bulk-credit file for corporate online
 // banking. The bank moves the money; admin then marks each one paid.
 
+// payouts waiting for the next bank file, with their total
 async function getPayoutBatch() {
   const rows = await repository.listPayoutsAwaitingTransfer();
   return {
@@ -968,6 +1013,7 @@ async function getPayoutBatch() {
   };
 }
 
+// export btn - build the bank file (CSV) of all waiting payouts and mark them exported
 async function exportPayoutFile(adminUser) {
   if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
 
@@ -981,6 +1027,7 @@ async function exportPayoutFile(adminUser) {
     throw ApiError.badRequest('None of the waiting payouts have a bank account on file.');
   }
 
+  // only payouts with a bank account are in the file
   const includedIds = rows
     .filter((row) => row.bank_account_number)
     .map((row) => row.id);
@@ -1039,6 +1086,7 @@ async function confirmPayoutSettled(adminUser, payoutId, { providerReference, tr
   return { id: payoutId, status: 'SENT' };
 }
 
+// failed btn - the payout did not go through
 async function markPayoutFailed(adminUser, payoutId, reason) {
   if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
   const payout = await repository.findTutorPayoutById(payoutId);
@@ -1061,6 +1109,7 @@ async function markPayoutFailed(adminUser, payoutId, reason) {
   return { id: payoutId, status: 'FAILED' };
 }
 
+// Pay Tutors page - every payout plus the totals per tutor
 async function listTutorPayouts() {
   const [payouts, totals] = await Promise.all([
     repository.listTutorPayouts(),
@@ -1156,6 +1205,7 @@ async function handlePayHereNotification(body) {
     return { handled: false, reason: 'Unrecognised order id.' };
   }
 
+  // update the payment in one transaction - safe even if PayHere sends the same notice twice
   const outcome = await withTransaction(async (connection) => {
     const payment = await repository.findPaymentByIdForUpdate(result.paymentId, connection);
     if (!payment) {
@@ -1187,6 +1237,7 @@ async function handlePayHereNotification(body) {
       cardLast4: result.cardLast4,
     };
 
+    // not successful - still pending means wait, anything else marks it FAILED
     if (result.statusCode !== payhere.STATUS.SUCCESS) {
       if (result.statusCode === payhere.STATUS.PENDING) {
         // still clearing - wait for the next notification
@@ -1205,6 +1256,7 @@ async function handlePayHereNotification(body) {
       return { status: 'failed', studentId: payment.student_id, amount: Number(payment.amount) };
     }
 
+    // successful - mark it SUCCESSFUL, lower the class balance and make the receipt
     const enrollment = await repository.findEnrollmentByIdForUpdate(
       payment.enrollment_id,
       connection
@@ -1235,6 +1287,7 @@ async function handlePayHereNotification(body) {
     };
   });
 
+  // audit log and a notification for the student
   if (outcome.status === 'successful') {
     await recordAuditEvent({
       actorId: outcome.studentId,

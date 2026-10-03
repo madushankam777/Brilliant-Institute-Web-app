@@ -6,8 +6,10 @@ const ApiError = require('./ApiError');
 const { hasTable, migrationRequired } = require('./schemaFeatures');
 const { resolveUploadPath } = require('./resolveUploadPath');
 
+// stored files are served from /api/files/<id>
 const PATH_PREFIX = '/api/files/';
 
+// has the uploaded_files table been created yet?
 function hasFileTable() {
   return hasTable('uploaded_files');
 }
@@ -21,6 +23,7 @@ function publicIdOf(storedPath) {
 // save btn - keep the file in MySQL, return the path to store on the record
 async function saveUpload(file, kind, userId) {
   if (!(await hasFileTable())) throw migrationRequired();
+  // make a random 32-character id for the file
   const publicId = crypto.randomBytes(16).toString('hex');
   await pool.execute(
     `INSERT INTO uploaded_files (public_id, kind, mime_type, size_bytes, original_name, data, uploaded_by)
@@ -30,6 +33,7 @@ async function saveUpload(file, kind, userId) {
   return `${PATH_PREFIX}${publicId}`;
 }
 
+// delete btn - remove a stored file
 async function deleteUpload(storedPath) {
   const publicId = publicIdOf(storedPath);
   if (!publicId) return;
@@ -45,6 +49,7 @@ async function sendUpload(res, storedPath, kind) {
       [publicId, kind]
     );
     if (!rows[0]) throw ApiError.notFound('File not found.');
+    // send the file with safe headers - the browser may show it, never run it
     res.setHeader('Content-Type', rows[0].mime_type);
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox");
     res.setHeader('Cache-Control', kind === 'PROFILE_PICTURE' ? 'public, max-age=86400' : 'private, no-store');

@@ -9,14 +9,17 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../components/layout/navItems';
 import TutorPicker from '../../../../../shared/client/src/components/common/TutorPicker';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
 const EMPTY_PAYOUT_FORM = { amount: '', note: '', periodLabel: '' };
 
+// pay tutors - each tutor's bank account, a Pay btn, the bank file and the payment history
 function PayTutorsPage() {
   const [tutors, setTutors] = useState([]);
   const [payouts, setPayouts] = useState([]);
@@ -48,6 +51,7 @@ function PayTutorsPage() {
       setLoadError(error.message);
     } finally {
       setIsLoading(false);
+    // fail silently, not critical
     }
   }, []);
 
@@ -110,6 +114,7 @@ function PayTutorsPage() {
           <Alert type="error" message={loadError} />
           <Alert type="success" message={successMessage} />
 
+          {/* a spinner, or the page content */}
           {isLoading ? (
             <LoadingSpinner label="Loading tutors..." />
           ) : (
@@ -206,6 +211,7 @@ function PayTutorsPage() {
               )}
             </div>
 
+            {/* payout form - amount, month, note and how it is paid */}
             <form onSubmit={handleSubmit} noValidate>
               <div className="card-field-row">
                 <div className="form-field">

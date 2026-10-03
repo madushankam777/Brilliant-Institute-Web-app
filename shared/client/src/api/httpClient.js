@@ -4,26 +4,32 @@ import axios from 'axios';
 // API base URL (relative - the dev server proxies /api)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+// the shared axios instance - cookies are sent, 15 second timeout
 const httpClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
   timeout: 15000,
 });
 
+// methods that change data - they get the header the server's csrf guard checks
 const STATE_CHANGING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
 // how many requests are running - drives the top loading bar
 let activeRequests = 0;
+// who wants to know when requests start or finish
 const activityListeners = new Set();
+// add or remove a running request and tell the listeners
 function setActive(change) {
   activeRequests = Math.max(0, activeRequests + change);
   activityListeners.forEach((listener) => listener(activeRequests));
 }
+// subscribe to request activity (the loading bar uses it); returns an unsubscribe function
 export function onRequestActivity(listener) {
   activityListeners.add(listener);
   return () => activityListeners.delete(listener);
 }
 
+// before every request - count it and mark the ones that change data
 httpClient.interceptors.request.use((requestConfig) => {
   setActive(1);
   const method = (requestConfig.method || 'get').toLowerCase();
@@ -35,6 +41,7 @@ httpClient.interceptors.request.use((requestConfig) => {
 
 // Lets AuthContext react to session expiry (e.g. redirect to /login) in one place.
 let onSessionExpired = () => {};
+// AuthContext sets this to run when a 401 comes back
 export function setSessionExpiredHandler(handler) {
   onSessionExpired = handler;
 }
@@ -55,6 +62,7 @@ async function readErrorBody(error) {
   return data || {};
 }
 
+// after every response - handle a 401, and turn an error into { message, status, details }
 httpClient.interceptors.response.use(
   (response) => {
     setActive(-1);

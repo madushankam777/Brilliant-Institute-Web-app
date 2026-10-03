@@ -14,16 +14,19 @@ import ExtraClassModal from './ExtraClassModal';
 import CancelClassDayModal from './CancelClassDayModal';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// manage classes - a tutor's own classes (an admin sees all) with attendance, extra class, cancel and edit
 function ManageClassesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const NAV_ITEMS = getNavItems(user.role);
   const isAdmin = user.role === 'ADMIN';
 
+  // the classes and the page state
   const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -34,6 +37,7 @@ function ManageClassesPage() {
   // { type: 'extra' | 'cancelDay', classItem } while a dialog is open
   const [dialog, setDialog] = useState(null);
 
+  // load the classes
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -47,10 +51,12 @@ function ManageClassesPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // cancel class btn - cancel the whole class, then reload the list
   async function handleCancel(classId) {
     setCancellingId(classId);
     setErrorMessage('');
@@ -65,11 +71,13 @@ function ManageClassesPage() {
     }
   }
 
+  // after a pop-up saves - close it and show the message
   function handleDialogSaved(message) {
     setDialog(null);
     setSuccessMessage(`${message} Enrolled students have been notified.`);
   }
 
+  // mark attendance btn - open today's attendance sheet for the class
   async function handleMarkAttendance(classId) {
     setOpeningAttendanceId(classId);
     setErrorMessage('');
@@ -83,6 +91,7 @@ function ManageClassesPage() {
     }
   }
 
+  // the page - header, messages, the classes table and the two pop-ups
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -95,6 +104,7 @@ function ManageClassesPage() {
                 : 'Manage the classes you teach - edit details, add extra classes or cancel a date.'}
             </p>
           </div>
+          {/* admin only - class report and create class buttons */}
           {isAdmin && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <ReportLink type="classes" label="Class report" />
@@ -105,9 +115,11 @@ function ManageClassesPage() {
           )}
         </div>
 
+        {/* error and success messages */}
         <Alert type="error" message={errorMessage} />
         <Alert type="success" message={successMessage} />
 
+        {/* a spinner, an empty message, or the classes table */}
         {isLoading ? (
           <LoadingSpinner label="Loading your classes..." />
         ) : classes.length === 0 ? (
@@ -160,8 +172,10 @@ function ManageClassesPage() {
                         </span>
                       </td>
                       <td>
+                        {/* row buttons - only for active classes */}
                         {classItem.status === 'ACTIVE' && (
                           <div className="class-row-actions">
+                            {/* mark attendance btn - opens today's attendance sheet */}
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
@@ -171,6 +185,7 @@ function ManageClassesPage() {
                               <Icon name="calendar" size={14} />{' '}
                               {openingAttendanceId === classItem.id ? 'Opening...' : 'Mark Attendance'}
                             </button>
+                            {/* extra class btn - opens the extra class pop-up */}
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"
@@ -181,6 +196,7 @@ function ManageClassesPage() {
                             >
                               <Icon name="plus" size={14} /> Extra class
                             </button>
+                            {/* cancel a date btn - opens the cancel a date pop-up */}
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"
@@ -191,6 +207,7 @@ function ManageClassesPage() {
                             >
                               <Icon name="calendarDays" size={14} /> Cancel a date
                             </button>
+                            {/* edit btn - goes to the edit class page */}
                             <Link
                               to={`/courses/manage/${classItem.id}/edit`}
                               className="btn btn-secondary btn-sm"
@@ -198,6 +215,7 @@ function ManageClassesPage() {
                             >
                               <Icon name="edit" size={14} />
                             </Link>
+                            {/* cancel class btn - asks Confirm or Keep first */}
                             {confirmCancelId === classItem.id ? (
                               <>
                                 <button
@@ -239,9 +257,11 @@ function ManageClassesPage() {
         )}
       </div>
 
+      {/* extra class pop-up */}
       {dialog && dialog.type === 'extra' && (
         <ExtraClassModal classItem={dialog.classItem} onClose={() => setDialog(null)} onSaved={handleDialogSaved} />
       )}
+      {/* cancel a date pop-up */}
       {dialog && dialog.type === 'cancelDay' && (
         <CancelClassDayModal classItem={dialog.classItem} onClose={() => setDialog(null)} onSaved={handleDialogSaved} />
       )}

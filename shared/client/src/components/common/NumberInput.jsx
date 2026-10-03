@@ -8,6 +8,7 @@ function cleanNumber(raw, decimals) {
   return text;
 }
 
+// the text box that only lets digits through
 function NumberInput({ value, onChange, decimals = 0, className = '', ...props }) {
   return (
     <input

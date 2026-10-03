@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 import { INSTITUTE } from '../../../../shared/client/src/constants/institute';
 
+// the side menu for a student
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
 // checkout tab names - the admin chooses which ones show
@@ -29,6 +30,7 @@ const METHOD_LABELS = {
   MCASH: 'mCash',
   BANK_TRANSFER: 'Bank Transfer',
 };
+// the checkout tabs as value + label pairs
 const PAYMENT_METHODS = ['CARD', 'EZ_CASH', 'MCASH'].map((value) => ({ value, label: METHOD_LABELS[value] }));
 
 // wallet phone number format
@@ -40,6 +42,7 @@ const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 // Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
@@ -61,6 +64,7 @@ function luhnCheck(digits) {
   return sum % 10 === 0;
 }
 
+// the card brand from the first digits
 function detectCardBrand(digits) {
   if (/^4/.test(digits)) return 'Visa';
   if (/^(5[1-5]|2[2-7])/.test(digits)) return 'Mastercard';
@@ -90,17 +94,21 @@ function formatExpiryInput(rawValue, previousFormatted) {
   return digits;
 }
 
+// a blank card form
 const emptyCardDetails = { cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' };
 
+// fees & payments - what I owe per class, and the checkout for card, wallet, bank transfer or online
 function FeeBalancePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const autoStartedRef = useRef(false);
+  // the balances and the page state
   const [balances, setBalances] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // the checkout - the class being paid and the payment form fields
   const [activeEnrollment, setActiveEnrollment] = useState(null);
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER');
@@ -113,12 +121,14 @@ function FeeBalancePage() {
   const [payError, setPayError] = useState('');
   const [outcome, setOutcome] = useState(null); // { status: 'SUCCESSFUL' | 'FAILED' | 'PENDING' | 'AWAITING_VERIFICATION', payment? }
 
+  // bank transfer open or closed, and the payment settings from the server
   const [bankTransferAvailable, setBankTransferAvailable] = useState(true);
   const [bankTransferClosedMessage, setBankTransferClosedMessage] = useState('');
   const [paymentSettings, setPaymentSettings] = useState(null);
 
   // gateway / simulator switches from the server
   const methodKey = ((paymentSettings && paymentSettings.checkoutMethods) || []).join(',');
+  // the checkout tabs the admin switched on
   const methodTabs = useMemo(
     () => methodKey.split(',').filter(Boolean).map((value) => ({ value, label: METHOD_LABELS[value] || value })),
     [methodKey]
@@ -126,6 +136,7 @@ function FeeBalancePage() {
   const defaultMethod = methodTabs.length > 0 ? methodTabs[0].value : '';
   const hasBankDetails = Boolean(paymentSettings && paymentSettings.bankAccountNumber);
 
+  // load what I owe for each class
   const loadBalances = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -139,6 +150,7 @@ function FeeBalancePage() {
     }
   }, []);
 
+  // on open - load the balances, whether bank transfer is open, and the payment settings
   useEffect(() => {
     loadBalances();
     fetchBankTransferAvailability()
@@ -161,6 +173,7 @@ function FeeBalancePage() {
     setPaymentMethod((current) => (methodTabs.some((tab) => tab.value === current) ? current : defaultMethod));
   }, [methodTabs, defaultMethod]);
 
+  // pay btn - open the checkout for a class with a blank form
   function startPayment(enrollment) {
     setActiveEnrollment(enrollment);
     setAmount(String(enrollment.balance));
@@ -185,10 +198,12 @@ function FeeBalancePage() {
     }
   }, [location.state, balances]);
 
+  // change one card form field
   function updateCardField(field, value) {
     setCardDetails((previous) => ({ ...previous, [field]: value }));
   }
 
+  // check the card, wallet or bank transfer fields before paying
   function validatePaymentFields() {
     const errors = {};
 
@@ -236,6 +251,7 @@ function FeeBalancePage() {
     return errors;
   }
 
+  // the details sent to the server - only the last 4 card digits, never the full card
   function buildPaymentDetailsPayload() {
     if (paymentMethod === 'CARD') {
       const digits = cardDetails.cardNumber.replace(/\D/g, '');
@@ -254,6 +270,7 @@ function FeeBalancePage() {
     return {};
   }
 
+  // pay btn - check the amount, then pay online, by card, wallet or bank transfer
   async function handlePaySubmit(event) {
     event.preventDefault();
     setPayError('');
@@ -328,12 +345,15 @@ function FeeBalancePage() {
     }
   }
 
+  // the total I still owe
   const totalOutstanding = balances.reduce((sum, b) => sum + Number(b.balance), 0);
   const inCheckout = Boolean(activeEnrollment);
 
+  // the page - breadcrumb, title, balance card, payment result, bills table and checkout
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
+        {/* breadcrumb - Dashboard / Fees & Payments / Checkout */}
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link to="/">Dashboard</Link>
           <span className="breadcrumb-sep">/</span>
@@ -352,6 +372,7 @@ function FeeBalancePage() {
           )}
         </nav>
 
+        {/* page title - changes while in the checkout */}
         <div className="page-header">
           {inCheckout ? (
             <>
@@ -368,10 +389,12 @@ function FeeBalancePage() {
 
         <Alert type="error" message={loadError} />
 
+        {/* a spinner, or the page content */}
         {isLoading ? (
           <LoadingSpinner label="Loading your fee balance..." />
         ) : (
           <>
+            {/* total outstanding card with the Pay Bill Now btn */}
             {!inCheckout && (
               <div
                 className="card"
@@ -403,6 +426,7 @@ function FeeBalancePage() {
               </div>
             )}
 
+            {/* payment result - successful */}
             {outcome && outcome.status === 'SUCCESSFUL' && (
               <div className="card auth-result">
                 <div className="auth-result-icon">
@@ -433,6 +457,7 @@ function FeeBalancePage() {
               </div>
             )}
 
+            {/* payment result - declined */}
             {outcome && outcome.status === 'FAILED' && (
               <div className="card auth-result">
                 <div className="auth-result-icon" style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}>
@@ -458,6 +483,7 @@ function FeeBalancePage() {
               </div>
             )}
 
+            {/* payment result - the gateway did not answer in time */}
             {outcome && outcome.status === 'PENDING' && (
               <Alert
                 type="warning"
@@ -465,6 +491,7 @@ function FeeBalancePage() {
               />
             )}
 
+            {/* payment result - bank transfer waiting for the office to check the receipt */}
             {outcome && outcome.status === 'AWAITING_VERIFICATION' && (
               <div className="card auth-result">
                 <div className="auth-result-icon" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
@@ -487,6 +514,7 @@ function FeeBalancePage() {
               </div>
             )}
 
+            {/* active bills - a message when there are none, else the bills table */}
             {!inCheckout && (balances.length === 0 ? (
               <p className="muted">You have no active enrollments yet.</p>
             ) : (
@@ -510,6 +538,7 @@ function FeeBalancePage() {
                           </td>
                           <td>{formatCurrency(enrollment.balance)}</td>
                           <td>
+                            {/* pay btn - only while something is owed */}
                             {enrollment.balance > 0 && (
                               <button
                                 type="button"
@@ -528,8 +557,10 @@ function FeeBalancePage() {
               </div>
             ))}
 
+            {/* checkout - order summary and the payment form */}
             {activeEnrollment && (
               <div className="checkout-grid">
+                {/* order summary */}
                 <div className="card">
                   <div className="flex-between" style={{ marginBottom: '4px' }}>
                     <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Order Summary</h3>
@@ -548,6 +579,7 @@ function FeeBalancePage() {
                   </div>
                 </div>
 
+                {/* payment details - method tabs, the fields and the pay btn */}
                 <div className="card">
                   <h3 style={{ fontSize: '0.95rem', marginTop: 0 }}>Payment Details</h3>
                   <Alert type="error" message={payError} />
@@ -560,6 +592,7 @@ function FeeBalancePage() {
                     </div>
                   ) : (
                   <form onSubmit={handlePaySubmit} noValidate>
+                    {/* method tabs - a closed method is disabled */}
                     <div className="payment-tabs">
                       {methodTabs.map((method) => {
                         const isDisabled = method.value === 'BANK_TRANSFER' && !bankTransferAvailable;
@@ -582,6 +615,7 @@ function FeeBalancePage() {
                       })}
                     </div>
 
+                    {/* online - the student finishes on the PayHere page */}
                     {paymentMethod === 'ONLINE' && (
                       <div className="callout" style={{ marginBottom: '16px' }}>
                         <span>
@@ -593,10 +627,12 @@ function FeeBalancePage() {
                       </div>
                     )}
 
+                    {/* bank transfer is closed - show why */}
                     {paymentMethod === 'BANK_TRANSFER' && !bankTransferAvailable && (
                       <Alert type="warning" message={bankTransferClosedMessage} />
                     )}
 
+                    {/* card fields - name, number, expiry and CVV */}
                     {paymentMethod === 'CARD' && (
                       <>
                         <div className="form-field">
@@ -664,6 +700,7 @@ function FeeBalancePage() {
                       </>
                     )}
 
+                    {/* wallet fields - our number to send to and my mobile number */}
                     {(paymentMethod === 'EZ_CASH' || paymentMethod === 'MCASH') && (
                       <>
                         {(paymentMethod === 'EZ_CASH' ? paymentSettings?.ezCashNumber : paymentSettings?.mcashNumber) && (
@@ -698,6 +735,7 @@ function FeeBalancePage() {
                       </>
                     )}
 
+                    {/* bank transfer - the institute's bank details, my reference and the receipt photo */}
                     {paymentMethod === 'BANK_TRANSFER' && (
                       <>
                         {/* slip note - name and registration number */}
@@ -770,6 +808,7 @@ function FeeBalancePage() {
                       </>
                     )}
 
+                    {/* amount to pay */}
                     <div className="form-field">
                       <label htmlFor="amount">Amount (LKR)</label>
                       <NumberInput
@@ -782,6 +821,7 @@ function FeeBalancePage() {
                       <p className="field-help">Up to {formatCurrency(activeEnrollment.balance)}.</p>
                     </div>
 
+                    {/* pay btn - Submit for Verification for a bank transfer */}
                     <button type="submit" className="btn btn-primary btn-block" disabled={isPaying}>
                       {isPaying && <span className="btn-spinner" aria-hidden="true" />}
                       {isPaying
@@ -792,6 +832,7 @@ function FeeBalancePage() {
                           ? 'Submit for Verification'
                           : `Pay ${formatCurrency(amount || 0)}`}
                     </button>
+                    {/* cancel btn - back to the bills */}
                     <button
                       type="button"
                       className="btn btn-secondary btn-block"
@@ -800,6 +841,7 @@ function FeeBalancePage() {
                     >
                       Cancel
                     </button>
+                    {/* privacy note */}
                     <p className="secure-note">
                       {paymentMethod === 'BANK_TRANSFER'
                         ? 'Your receipt is only ever visible to you and to Administrators reviewing your transfer.'

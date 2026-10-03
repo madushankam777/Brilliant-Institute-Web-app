@@ -1,3 +1,4 @@
+// the svg path of every icon, by name
 const PATHS = {
   home: 'M4 11.5 12 4l8 7.5M6 9.5V20h12V9.5',
   calendar:
@@ -54,6 +55,7 @@ const PATHS = {
   inbox: 'M4 13.5 6.5 5h11l2.5 8.5M4 13.5V19h16v-5.5M4 13.5h5a3 3 0 0 0 6 0h5',
 };
 
+// icon - draws one of the icons above (nothing if the name is unknown)
 function Icon({ name, size = 20, strokeWidth = 1.8, className = '' }) {
   const d = PATHS[name];
   if (!d) return null;

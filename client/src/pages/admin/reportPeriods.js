@@ -12,6 +12,7 @@ export const PRESETS = [
   { value: 'custom', label: 'Custom dates' },
 ];
 
+// a date as 2026-10-03
 export function toKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }

@@ -1,3 +1,4 @@
+// top bar - logo, search, notification bell, profile chip and log out (or the public menu)
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +27,7 @@ function writeVersionMap(key, versionMap) {
   }
 }
 
+// a time as 5m ago, 2h ago, 3d ago
 function timeAgo(isoDate) {
   const seconds = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
   if (seconds < 60) return 'Just now';
@@ -50,17 +52,23 @@ const NOTIFICATION_STYLES = {
   PAYOUT_RECORDED: { icon: 'bank', badge: null, tone: '' },
 };
 
+// icon for announcements
 const ANNOUNCEMENT_STYLE = { icon: 'megaphone', badge: null, tone: '' };
+// icon for any other notification
 const DEFAULT_STYLE = { icon: 'bell', badge: null, tone: '' };
 
+// pick the icon and badge for a bell item
 function styleFor(item) {
   if (item.kind !== 'notification') return ANNOUNCEMENT_STYLE;
   return NOTIFICATION_STYLES[item.type] || DEFAULT_STYLE;
 }
 
+// check for new notifications every minute
 const POLL_MS = 60 * 1000;
+// a pop-up notice stays for 8 seconds
 const TOAST_MS = 8000;
 
+// the top bar - for a logged-in user, or for a visitor
 function Navbar() {
   const { user, isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
@@ -122,6 +130,7 @@ function Navbar() {
     };
   }, [isLoggedIn, loadNotifications]);
 
+  // when the user logs in, restore what they last saw and dismissed, then load the bell
   useEffect(() => {
     if (!isLoggedIn) return;
     if (lastSeenKey) {
@@ -137,6 +146,7 @@ function Navbar() {
     loadNotifications();
   }, [isLoggedIn, lastSeenKey, dismissedKey, loadNotifications]);
 
+  // close the notification panel when you click outside it
   useEffect(() => {
     function handleClickOutside(event) {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
@@ -180,6 +190,7 @@ function Navbar() {
     ? visibleItems.filter((item) => new Date(item.effectiveDate) > new Date(lastSeenAt)).length
     : visibleItems.length;
 
+  // bell btn - open or close the panel, and mark everything as seen
   function toggleNotifications() {
     const opening = !isNotifOpen;
     setIsNotifOpen(opening);
@@ -197,6 +208,7 @@ function Navbar() {
     }
   }
 
+  // clear btn - hide one notification (until it changes)
   function dismissNotification(item) {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
@@ -206,6 +218,7 @@ function Navbar() {
     });
   }
 
+  // clear all btn - hide every notification
   function clearAllNotifications() {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
@@ -225,6 +238,7 @@ function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchRef = useRef(null);
 
+  // close the search panel when you click outside it
   useEffect(() => {
     function handleClickOutsideSearch(event) {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -235,6 +249,7 @@ function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutsideSearch);
   }, []);
 
+  // search as you type - classes for everyone, people too for an admin
   useEffect(() => {
     const term = searchTerm.trim();
     if (!isLoggedIn || term.length < 2) {
@@ -265,6 +280,7 @@ function Navbar() {
     };
   }, [searchTerm, isLoggedIn, user]);
 
+  // open a search result and clear the search box
   function goToSearchResult(path) {
     setIsSearchOpen(false);
     setSearchTerm('');
@@ -279,11 +295,13 @@ function Navbar() {
     goToSearchResult(`/courses/classes?search=${encodeURIComponent(term)}`);
   }
 
+  // log out btn - end the session and go to the login page
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
   }
 
+  // top bar for a logged-in user
   if (isLoggedIn) {
     return (
       <header className="navbar">
@@ -471,6 +489,7 @@ function Navbar() {
     );
   }
 
+  // top bar for a visitor - Home, About, Classes, Contact, Log in and Register
   return (
     <header className="navbar">
       <div className="navbar-brand">

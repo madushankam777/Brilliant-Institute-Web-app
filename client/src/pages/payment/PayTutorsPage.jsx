@@ -21,8 +21,10 @@ import PayTutorModal from './PayTutorModal';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// payout status words and badge colours
 const STATUS_LABELS = {
   RECORDED: { label: 'Recorded', badge: 'badge-neutral' },
   QUEUED: { label: 'In bank file', badge: 'badge-warning' },
@@ -30,10 +32,12 @@ const STATUS_LABELS = {
   FAILED: { label: 'Failed', badge: 'badge-danger' },
 };
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// a date as, for example, 12 Oct 2026
 function formatDate(value) {
   if (!value) return '-';
   return new Date(String(value).replace(' ', 'T')).toLocaleDateString('en-GB', {
@@ -50,6 +54,7 @@ function MarkPaidModal({ payout, onClose, onDone }) {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // save btn - record the bank reference and the transfer date
   async function handleSubmit(event) {
     event.preventDefault();
     if (reference.trim().length < 3) {
@@ -66,6 +71,7 @@ function MarkPaidModal({ payout, onClose, onDone }) {
     }
   }
 
+  // the pop-up - reference, transfer date and buttons
   return (
     <div className="modal-overlay" onClick={() => !isSaving && onClose()}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
@@ -121,6 +127,7 @@ function MarkFailedModal({ payout, onClose, onDone }) {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // save btn - record why the bank rejected the transfer
   async function handleSubmit(event) {
     event.preventDefault();
     if (!reason.trim()) {
@@ -137,6 +144,7 @@ function MarkFailedModal({ payout, onClose, onDone }) {
     }
   }
 
+  // the pop-up - the reason and buttons
   return (
     <div className="modal-overlay" onClick={() => !isSaving && onClose()}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
@@ -175,7 +183,9 @@ function MarkFailedModal({ payout, onClose, onDone }) {
   );
 }
 
+// pay tutors - each tutor's bank account, a Pay btn, the bank file and the payment history
 function PayTutorsPage() {
+  // the tutors, payouts, bank file and the page state
   const [tutors, setTutors] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [summaryByTutor, setSummaryByTutor] = useState({});
@@ -187,11 +197,13 @@ function PayTutorsPage() {
   const [actionError, setActionError] = useState('');
   const [search, setSearch] = useState('');
 
+  // which pop-up is open - pay, mark paid or failed
   const [payingTutor, setPayingTutor] = useState(null);
   const [settleTarget, setSettleTarget] = useState(null);
   const [failTarget, setFailTarget] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // load tutors, payouts, pay options and the bank file together
   const load = useCallback(async () => {
     setLoadError('');
     // loaded independently, so one failing request doesn't empty the rest
@@ -213,10 +225,12 @@ function PayTutorsPage() {
     setIsLoading(false);
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // after a pop-up saves - close it, show the message and reload
   function finishAction(message) {
     setPayingTutor(null);
     setSettleTarget(null);
@@ -232,6 +246,7 @@ function PayTutorsPage() {
     setTutors((previous) => previous.map((tutor) => (tutor.id === tutorId ? { ...tutor, ...saved } : tutor)));
   }
 
+  // download bank file btn - save the file to upload to online banking, then reload
   async function handleExportFile() {
     setActionError('');
     setSuccessMessage('');
@@ -258,16 +273,19 @@ function PayTutorsPage() {
     }
   }
 
+  // tutors matching the search box
   const term = search.trim().toLowerCase();
   const visibleTutors = tutors.filter((tutor) =>
     [tutor.fullName, tutor.email, tutor.bankName].filter(Boolean).some((value) => value.toLowerCase().includes(term))
   );
+  // numbers for the stat cards
   const summaries = Object.values(summaryByTutor);
   const paidThisMonth = summaries.reduce((sum, item) => sum + item.paidThisMonth, 0);
   const tutorsPaidThisMonth = summaries.filter((item) => item.paidThisMonth > 0).length;
   const missingBankDetails = tutors.filter((tutor) => !tutor.hasBankDetails).length;
   const waitingCount = batch ? batch.count : 0;
 
+  // the page - stat cards, tutors table, bank file waiting list, payment history and pop-ups
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -285,14 +303,17 @@ function PayTutorsPage() {
           </div>
         </div>
 
+        {/* error and success messages */}
         <Alert type="error" message={loadError} />
         <Alert type="error" message={actionError} />
         <Alert type="success" message={successMessage} />
 
+        {/* a spinner, or the page content */}
         {isLoading ? (
           <LoadingSpinner label="Loading tutors..." />
         ) : (
           <>
+            {/* stat cards - paid this month, tutors paid, waiting in the bank file, missing bank details */}
             <div className="stat-grid">
               <StatCard icon="wallet" label="Paid This Month" value={formatCurrency(paidThisMonth)} tone="success" />
               <StatCard icon="users" label="Tutors Paid This Month" value={`${tutorsPaidThisMonth} of ${tutors.length}`} />
@@ -310,6 +331,7 @@ function PayTutorsPage() {
               />
             </div>
 
+            {/* tutors table - search and a Pay btn on each tutor */}
             <div className="card">
               <div className="flex-between" style={{ marginBottom: '12px' }}>
                 <h2 style={{ margin: 0 }}>Tutors</h2>
@@ -387,6 +409,7 @@ function PayTutorsPage() {
               )}
             </div>
 
+            {/* payouts waiting in the bank file - Download bank file, Mark paid or Failed */}
             {batch && batch.count > 0 && (
               <div className="card">
                 <div className="flex-between" style={{ marginBottom: '8px' }}>
@@ -441,6 +464,7 @@ function PayTutorsPage() {
               </div>
             )}
 
+            {/* payment history - every payout and its status */}
             <div className="card">
               <h2>Payment history</h2>
               {payouts.length === 0 ? (
@@ -496,6 +520,7 @@ function PayTutorsPage() {
         )}
       </div>
 
+      {/* pay a tutor pop-up */}
       {payingTutor && (
         <PayTutorModal
           tutor={payingTutor}
@@ -505,9 +530,11 @@ function PayTutorsPage() {
           onBankSaved={handleBankSaved}
         />
       )}
+      {/* mark paid pop-up */}
       {settleTarget && (
         <MarkPaidModal payout={settleTarget} onClose={() => setSettleTarget(null)} onDone={finishAction} />
       )}
+      {/* mark failed pop-up */}
       {failTarget && <MarkFailedModal payout={failTarget} onClose={() => setFailTarget(null)} onDone={finishAction} />}
     </PortalShell>
   );

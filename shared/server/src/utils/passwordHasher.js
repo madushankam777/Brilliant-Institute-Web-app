@@ -11,6 +11,7 @@ function compareNow(password, hash) {
   return bcrypt.compareSync(password, hash);
 }
 
+// hash or compare a password on a worker thread - use these two in the API
 const hashPassword = (password, rounds) => runInWorker(__filename, 'hashNow', [password, rounds]);
 const comparePassword = (password, hash) => runInWorker(__filename, 'compareNow', [password, hash]);
 

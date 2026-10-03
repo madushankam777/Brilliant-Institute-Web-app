@@ -5,7 +5,9 @@ const data = require('../reportData');
 
 const { num, percent, kpi, table, bars, columnChart, section, rows, one } = parts;
 
+// attendance report - sessions held, rates by class and week, and students below the target
 async function build(params, { period, threshold }) {
+  // which class (or all classes)
   let className = 'All classes';
   if (params.classId) {
     const cls = await one('SELECT subject FROM classes WHERE id = ?', [params.classId]);
@@ -15,6 +17,7 @@ async function build(params, { period, threshold }) {
   const classFilter = params.classId ? 'AND cs.class_id = ?' : '';
   const classParams = params.classId ? [params.classId] : [];
 
+  // sessions and present, late and absent marks in the period
   const totals = await one(
     `SELECT COUNT(DISTINCT cs.id) AS sessions, COUNT(ar.id) AS marks, SUM(ar.status = 'PRESENT') AS present,
             SUM(ar.status = 'LATE') AS late, SUM(ar.status = 'ABSENT') AS absent
@@ -39,14 +42,18 @@ async function build(params, { period, threshold }) {
     [period.from, period.to, ...classParams]
   );
 
+  // each class with its attendance rate
   const classes = await data.getClasses({ classId: params.classId });
   const byClass = await data.getAttendanceByClass(period);
+  // classes that had marks, lowest rate first
   const classRows = classes
     .filter((item) => byClass.get(item.id))
     .map((item) => ({ subject: item.subject, tutor: item.tutor_name, ...byClass.get(item.id) }))
     .sort((a, b) => (a.rate ?? 101) - (b.rate ?? 101));
 
+  // students below the attendance target
   const low = await data.getLowAttendance(period, threshold, params.classId);
+  // students who were never late or absent (at least 4 marks)
   const perfect = await rows(
     `SELECT u.full_name, u.student_code, COUNT(*) AS marks
      FROM attendance_records ar JOIN class_sessions cs ON cs.id = ar.session_id JOIN users u ON u.id = ar.student_id
@@ -56,6 +63,7 @@ async function build(params, { period, threshold }) {
      ORDER BY marks DESC, u.full_name`,
     [period.from, period.to, ...classParams]
   );
+  // the log of every session held
   const sessions = await rows(
     `SELECT cs.session_date, c.subject, COUNT(ar.id) AS marks, SUM(ar.status = 'PRESENT') AS present,
             SUM(ar.status = 'LATE') AS late, SUM(ar.status = 'ABSENT') AS absent
@@ -67,6 +75,7 @@ async function build(params, { period, threshold }) {
     [period.from, period.to, ...classParams]
   );
 
+  // the key findings
   const highlights = [];
   if (marks === 0) {
     highlights.push('No attendance was marked in this period.');
@@ -81,6 +90,7 @@ async function build(params, { period, threshold }) {
     if (perfect.length > 0) highlights.push(`${perfect.length} student(s) never missed or were late for a class.`);
   }
 
+  // the report - title, filters, key figures, key findings and sections
   return {
     title: 'Attendance Report',
     subtitle: `${className} - sessions held and attendance`,

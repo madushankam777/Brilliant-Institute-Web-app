@@ -5,6 +5,7 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import { parseDateKey } from '../../../../shared/client/src/utils/schedule';
 
+// the period tabs - daily, monthly, yearly and the last 5 years
 const PERIODS = [
   { value: 'daily', label: 'Daily', headline: 'Today', chartTitle: 'Last 30 days' },
   { value: 'monthly', label: 'Monthly', headline: 'This month', chartTitle: 'Last 12 months' },
@@ -15,10 +16,12 @@ const PERIODS = [
 // the chart is drawn in real pixels, so text stays readable on a phone
 const PAD = { top: 26, right: 8, bottom: 30, left: 48 };
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// a short number, like 1.2K
 function formatCompact(amount) {
   return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(amount);
 }
@@ -80,6 +83,7 @@ function useElementWidth(ref) {
   return width;
 }
 
+// the revenue bar chart, drawn as svg - hover, tap or focus a bar to see it
 function RevenueChart({ points, bucket, title }) {
   const containerRef = useRef(null);
   const width = Math.max(useElementWidth(containerRef), 280);
@@ -93,6 +97,7 @@ function RevenueChart({ points, bucket, title }) {
   const ticks = [0, step, step * 2, step * 3, step * 4];
   const band = plotWidth / points.length;
   const barWidth = Math.max(2, Math.min(24, band - 2));
+  // how high a value sits on the chart
   const yFor = (value) => PAD.top + plotHeight - (value / top) * plotHeight;
   const maxIndex = maxValue > 0 ? points.findIndex((point) => point.total === maxValue) : -1;
 
@@ -107,9 +112,11 @@ function RevenueChart({ points, bucket, title }) {
   if (activeX > width * 0.8) tooltipShift = 'calc(-100% + 16px)';
   if (activeX < width * 0.2) tooltipShift = '-16px';
 
+  // the chart - axis lines, one bar per period, and a tooltip for the active bar
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Revenue, ${title}`}>
+        {/* axis lines and their amounts */}
         {ticks.map((tick) => (
           <g key={tick}>
             <line
@@ -133,6 +140,7 @@ function RevenueChart({ points, bucket, title }) {
           </g>
         ))}
 
+        {/* one bar per period, with its label */}
         {points.map((point, index) => {
           const x = PAD.left + band * index + (band - barWidth) / 2;
           const barTop = yFor(point.total);
@@ -174,6 +182,7 @@ function RevenueChart({ points, bucket, title }) {
         })}
       </svg>
 
+      {/* tooltip for the bar being pointed at */}
       {active && (
         <div
           className="chart-tooltip"
@@ -187,13 +196,16 @@ function RevenueChart({ points, bucket, title }) {
   );
 }
 
+// revenue card - the money received, as a chart or a table for the chosen period
 function RevenueCard() {
+  // the period, the revenue report and the page state
   const [period, setPeriod] = useState('monthly');
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showTable, setShowTable] = useState(false);
 
+  // load the revenue when the period changes
   useEffect(() => {
     let isCurrent = true;
     setIsLoading(true);
@@ -213,11 +225,14 @@ function RevenueCard() {
     };
   }, [period]);
 
+  // the words for the chosen period, and whether anything was received
   const periodInfo = PERIODS.find((item) => item.value === period);
   const hasRevenue = report && report.points.some((point) => point.total > 0);
 
+  // the card - title and period tabs, the total, then the chart or the table
   return (
     <div className="card">
+      {/* title and period tabs */}
       <div className="flex-between">
         <h2 style={{ margin: 0 }}>Revenue</h2>
         <div className="period-tabs" role="tablist" aria-label="Revenue period">
@@ -238,10 +253,12 @@ function RevenueCard() {
 
       <Alert type="error" message={error} />
 
+      {/* a spinner on the first load, or the total with the chart */}
       {!report ? (
         isLoading && <LoadingSpinner label="Loading revenue..." />
       ) : (
         <div className={isLoading ? 'revenue-chart is-loading' : 'revenue-chart'}>
+          {/* the total and the Show as table btn */}
           <div className="revenue-head" style={{ marginTop: 0 }}>
             <div>
               <div className="revenue-figure">{formatCurrency(report.total)}</div>
@@ -260,6 +277,7 @@ function RevenueCard() {
             {periodInfo.chartTitle}
           </p>
 
+          {/* nothing received, the table, or the chart */}
           {!hasRevenue ? (
             <p className="muted" style={{ marginTop: '8px' }}>
               No payments were received in this period.

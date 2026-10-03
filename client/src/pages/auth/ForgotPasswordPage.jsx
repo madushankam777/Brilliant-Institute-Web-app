@@ -8,13 +8,18 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import PasswordStrength from '../../../../shared/client/src/components/common/PasswordStrength';
 import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
 
+// a simple email check
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+// 8-72 characters with upper case, lower case and a number
 const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/;
+// wait 60 seconds before asking for another code
 const RESEND_SECONDS = 60;
 
+// forgot password - step 1 asks for the email, step 2 takes the emailed 6-digit code and a new password
 function ForgotPasswordPage() {
   const navigate = useNavigate();
   const { refreshProfile } = useAuth();
+  // which step is shown - email or code
   const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -33,6 +38,7 @@ function ForgotPasswordPage() {
     return () => clearTimeout(timer);
   }, [resendIn]);
 
+  // show the server's field errors, or its message
   function showServerErrors(error) {
     const details = Array.isArray(error.details) ? error.details : [];
     const mapped = {};
@@ -90,6 +96,7 @@ function ForgotPasswordPage() {
     }
   }
 
+  // step 2 - type the emailed code and a new password
   if (step === 'code') {
     return (
       <AuthLayout backTo="/login" backLabel="Back to Login">
@@ -102,6 +109,7 @@ function ForgotPasswordPage() {
         <Alert type="success" message={notice} />
         <Alert type="error" message={errorMessage} />
 
+        {/* reset form - code, new password and confirmation */}
         <form onSubmit={handleReset} noValidate>
           <div className="form-field">
             <label htmlFor="reset-code">6-digit code</label>
@@ -175,6 +183,7 @@ function ForgotPasswordPage() {
     );
   }
 
+  // step 1 - ask for the email address
   return (
     <AuthLayout backTo="/login" backLabel="Back to Login">
       <h1>Forgot Password?</h1>
@@ -182,6 +191,7 @@ function ForgotPasswordPage() {
 
       <Alert type="error" message={errorMessage} />
 
+      {/* email form */}
       <form onSubmit={sendCode} noValidate>
         <FormField
           id="email"

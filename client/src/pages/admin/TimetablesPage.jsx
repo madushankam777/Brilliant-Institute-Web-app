@@ -14,29 +14,36 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// the two tabs - tutors and students
 const GROUPS = [
   { value: 'TUTOR', label: 'Tutors' },
   { value: 'STUDENT_PARENT', label: 'Students' },
 ];
 
+// timetables - an admin looks up the weekly timetable of any tutor or student
 function TimetablesPage() {
+  // the chosen person (from the address)
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedId = Number(searchParams.get('user')) || null;
 
+  // the people lists, the tab and the search text
   const [people, setPeople] = useState({ TUTOR: [], STUDENT_PARENT: [] });
   const [group, setGroup] = useState('TUTOR');
   const [search, setSearch] = useState('');
   const [isLoadingPeople, setIsLoadingPeople] = useState(true);
   const [error, setError] = useState('');
 
+  // the chosen person's timetable and its state
   const [timetable, setTimetable] = useState(null);
   const [isLoadingTimetable, setIsLoadingTimetable] = useState(false);
   const timetableRef = useRef(null);
   const holidays = useUpcomingHolidays();
   const events = useUpcomingClassEvents();
 
+  // load every active tutor and student for the lists
   useEffect(() => {
     Promise.all([
       fetchUsers({ role: 'TUTOR', status: 'ACTIVE' }),
@@ -47,6 +54,7 @@ function TimetablesPage() {
       .finally(() => setIsLoadingPeople(false));
   }, []);
 
+  // load the timetable of the chosen person
   useEffect(() => {
     if (!selectedId) {
       setTimetable(null);
@@ -73,6 +81,7 @@ function TimetablesPage() {
     };
   }, [selectedId]);
 
+  // click a person - show their timetable
   function selectPerson(personId) {
     setSearchParams({ user: String(personId) });
     // on a phone the timetable is below the list
@@ -81,6 +90,7 @@ function TimetablesPage() {
     }
   }
 
+  // people matching the search box
   const term = search.trim().toLowerCase();
   const list = people[group].filter((person) =>
     [person.fullName, person.email, person.grade, person.studentCode]
@@ -90,6 +100,7 @@ function TimetablesPage() {
 
   const person = timetable ? timetable.person : null;
 
+  // the page - title, the people list on the left and the timetable on the right
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -103,7 +114,9 @@ function TimetablesPage() {
 
         <Alert type="error" message={error} />
 
+        {/* two columns - the people list, and the chosen timetable */}
         <div className="split-view">
+          {/* the people list - tabs, search and one button per person */}
           <div className="card">
             <div className="period-tabs" role="tablist" aria-label="People" style={{ marginBottom: '12px' }}>
               {GROUPS.map((item) => (
@@ -133,6 +146,7 @@ function TimetablesPage() {
               />
             </div>
 
+            {/* a spinner, an empty message, or one button per person */}
             {isLoadingPeople ? (
               <LoadingSpinner label="Loading..." />
             ) : list.length === 0 ? (
@@ -160,7 +174,9 @@ function TimetablesPage() {
             )}
           </div>
 
+          {/* the chosen person's weekly timetable */}
           <div className="card" ref={timetableRef} style={{ scrollMarginTop: '84px' }}>
+            {/* a hint, a spinner, or the timetable */}
             {!selectedId ? (
               <div className="center-text" style={{ padding: '40px 10px' }}>
                 <div className="feature-icon-box" style={{ margin: '0 auto 12px' }}>

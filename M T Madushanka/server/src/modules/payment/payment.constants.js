@@ -6,6 +6,7 @@ const PAYMENT_STATUS = Object.freeze({
   REFUNDED: 'REFUNDED',
 });
 
+// every payment method
 const PAYMENT_METHODS = Object.freeze(['CARD', 'EZ_CASH', 'MCASH', 'BANK_TRANSFER']);
 
 // instant methods (bank transfer has its own route)

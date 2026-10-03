@@ -1,3 +1,4 @@
+// my students page - the students in my classes, with suspend and reactivate
 import { useCallback, useEffect, useState } from 'react';
 import { fetchMyStudents, suspendUser, activateUser } from '../../api/adminApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
@@ -7,15 +8,19 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
+// the side menu for a tutor
 const NAV_ITEMS = getNavItems('TUTOR');
 
+// badge colour for Active, Suspended or other
 function statusBadgeClass(status) {
   if (status === 'ACTIVE') return 'badge badge-success';
   if (status === 'SUSPENDED') return 'badge badge-danger';
   return 'badge badge-neutral';
 }
 
+// my students - everyone in my classes; a tutor can suspend or reactivate them
 function MyStudentsPage() {
+  // the students and the page state
   const [students, setStudents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -25,6 +30,7 @@ function MyStudentsPage() {
   const [confirmNameInput, setConfirmNameInput] = useState('');
   const [confirmError, setConfirmError] = useState('');
 
+  // load my students
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -38,16 +44,19 @@ function MyStudentsPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // close the confirm pop-up and clear it
   function closeConfirmModal() {
     setConfirmTarget(null);
     setConfirmNameInput('');
     setConfirmError('');
   }
 
+  // confirm btn - suspend (the name must be typed) or reactivate the student
   async function handleConfirm() {
     if (!confirmTarget) return;
     setIsConfirming(true);
@@ -67,6 +76,7 @@ function MyStudentsPage() {
     }
   }
 
+  // the page - the students table and the confirm pop-up
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -80,6 +90,7 @@ function MyStudentsPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* a spinner, or the students table */}
         {isLoading ? (
           <LoadingSpinner label="Loading your students..." />
         ) : (
@@ -118,6 +129,7 @@ function MyStudentsPage() {
                         <span className={statusBadgeClass(student.status)}>{student.status}</span>
                       </td>
                       <td>
+                        {/* suspend btn for active students, reactivate btn for the others */}
                         {student.status === 'ACTIVE' ? (
                           <button
                             type="button"
@@ -156,6 +168,7 @@ function MyStudentsPage() {
         )}
       </div>
 
+      {/* confirm pop-up - a suspension needs the student's name typed in capitals */}
       {confirmTarget && (
         <div className="modal-overlay" onClick={() => !isConfirming && closeConfirmModal()}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
@@ -170,6 +183,7 @@ function MyStudentsPage() {
 
             <Alert type="error" message={confirmError} />
 
+            {/* name check - only for a suspension */}
             {confirmTarget.action === 'suspend' && (
               <div className="form-field">
                 <label htmlFor="confirmSuspendName">

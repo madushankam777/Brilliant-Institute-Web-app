@@ -1,4 +1,5 @@
 // Maps DB rows to safe API response shapes
+// one user without the password hash
 function toSafeUser(userRow) {
   if (!userRow) return null;
   return {
@@ -16,6 +17,7 @@ function toSafeUser(userRow) {
   };
 }
 
+// one attendance mark
 function toSafeAttendanceRecord(row) {
   if (!row) return null;
   return {
@@ -33,6 +35,7 @@ function toSafeAttendanceRecord(row) {
   };
 }
 
+// one payment - amounts as numbers, never card details
 function toSafePayment(row) {
   if (!row) return null;
   return {
@@ -57,6 +60,7 @@ function toSafePayment(row) {
   };
 }
 
+// a user plus the login info only admins see
 function toSafeUserForAdmin(userRow) {
   if (!userRow) return null;
   return {
@@ -67,6 +71,7 @@ function toSafeUserForAdmin(userRow) {
   };
 }
 
+// one class with its tutor, timetable, fee and spots left
 function toSafeClass(row) {
   if (!row) return null;
   return {
@@ -96,6 +101,7 @@ function toSafeClass(row) {
   };
 }
 
+// one feedback or complaint ticket
 function toSafeFeedback(row) {
   if (!row) return null;
   return {
@@ -120,6 +126,7 @@ function toSafeFeedback(row) {
   };
 }
 
+// one announcement
 function toSafeAnnouncement(row) {
   if (!row) return null;
   return {
@@ -143,6 +150,7 @@ function toSafeAnnouncement(row) {
   };
 }
 
+// one tutor enrollment key - the code itself is shown only when asked for
 function toSafeTutorKey(row, { includeCode = false } = {}) {
   if (!row) return null;
   const certificatePaths =
@@ -166,6 +174,7 @@ function toSafeTutorKey(row, { includeCode = false } = {}) {
   };
 }
 
+// friendly titles for the notification types
 const NOTIFICATION_TYPE_LABELS = {
   FEE_DUE: 'Fee Reminder',
   LOW_ATTENDANCE: 'Attendance Alert',
@@ -195,6 +204,7 @@ function toSafeNotification(row) {
   };
 }
 
+// a tutor's public profile - name, bio and photo
 function toSafeTutorProfile(row) {
   if (!row) return null;
   return {

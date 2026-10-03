@@ -1,8 +1,11 @@
+-- the database and every table - safe to run again (IF NOT EXISTS)
 CREATE DATABASE IF NOT EXISTS brilliant_institute
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- everything below goes into this database
 USE brilliant_institute;
 
+-- users - every account: admin, tutor and student / parent
 CREATE TABLE IF NOT EXISTS users (
   id                    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   student_code          VARCHAR(12)   NULL,
@@ -30,6 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uq_users_student_code (student_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- tutor_enrollment_keys - the one-time keys an admin gives a tutor so they can register
 CREATE TABLE IF NOT EXISTS tutor_enrollment_keys (
   id                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   key_code           VARCHAR(20)  NOT NULL,
@@ -48,6 +52,7 @@ CREATE TABLE IF NOT EXISTS tutor_enrollment_keys (
   CONSTRAINT fk_tutor_key_used_by FOREIGN KEY (used_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- password_reset_tokens - reset codes and links, stored as hashes, each used once
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id     INT UNSIGNED NOT NULL,
@@ -60,6 +65,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- classes - the classes tutors teach, with day, time, venue, seats and fee
 CREATE TABLE IF NOT EXISTS classes (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   subject       VARCHAR(150)   NOT NULL,
@@ -82,6 +88,7 @@ CREATE TABLE IF NOT EXISTS classes (
   CONSTRAINT fk_classes_tutor FOREIGN KEY (tutor_id) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- class_sessions - one row per class meeting; holds the 6-digit attendance key
 CREATE TABLE IF NOT EXISTS class_sessions (
   id                       INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   class_id                 INT UNSIGNED NOT NULL,
@@ -97,6 +104,7 @@ CREATE TABLE IF NOT EXISTS class_sessions (
   CONSTRAINT fk_sessions_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- enrollments - which student is in which class, with the balance owed
 CREATE TABLE IF NOT EXISTS enrollments (
   id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   student_id      INT UNSIGNED NOT NULL,
@@ -112,6 +120,7 @@ CREATE TABLE IF NOT EXISTS enrollments (
   CONSTRAINT fk_enrollments_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- attendance_records - one mark (present, late or absent) per student per session
 CREATE TABLE IF NOT EXISTS attendance_records (
   id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   session_id   INT UNSIGNED NOT NULL,
@@ -128,6 +137,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   CONSTRAINT fk_attendance_marked_by FOREIGN KEY (marked_by) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- payments - every fee payment a student makes or an admin records
 CREATE TABLE IF NOT EXISTS payments (
   id                     INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   student_id             INT UNSIGNED NOT NULL,
@@ -148,6 +158,7 @@ CREATE TABLE IF NOT EXISTS payments (
   CONSTRAINT fk_payments_enrollment FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- receipts - one receipt number for each successful payment
 CREATE TABLE IF NOT EXISTS receipts (
   id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   payment_id      INT UNSIGNED NOT NULL,
@@ -158,6 +169,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   CONSTRAINT fk_receipts_payment FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- audit_log - who did what and when
 CREATE TABLE IF NOT EXISTS audit_log (
   id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   actor_id     INT UNSIGNED NULL,
@@ -170,6 +182,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
   KEY idx_audit_entity (entity_type, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- feedback_complaints - tickets from students and tutors, with the replies
 CREATE TABLE IF NOT EXISTS feedback_complaints (
   id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   ticket_number       VARCHAR(20)  NOT NULL,
@@ -195,6 +208,7 @@ CREATE TABLE IF NOT EXISTS feedback_complaints (
   CONSTRAINT fk_feedback_recipient_tutor FOREIGN KEY (recipient_tutor_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- announcements - broadcast messages from the admin
 CREATE TABLE IF NOT EXISTS announcements (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title            VARCHAR(200) NOT NULL,
@@ -214,6 +228,7 @@ CREATE TABLE IF NOT EXISTS announcements (
   CONSTRAINT fk_announcements_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- tutor_payouts - money paid to tutors, with the bank reference
 CREATE TABLE IF NOT EXISTS tutor_payouts (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   tutor_id      INT UNSIGNED NOT NULL,
@@ -337,6 +352,7 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
   CONSTRAINT fk_uploaded_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- notification_log - the bell notifications and reminders sent to users
 CREATE TABLE IF NOT EXISTS notification_log (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   recipient_id  INT UNSIGNED NOT NULL,

@@ -23,6 +23,7 @@ import PaymentVerificationPage from './pages/payment/PaymentVerificationPage';
 import PayTutorsPage from './pages/payment/PayTutorsPage';
 import PaymentSettingsPage from './pages/payment/PaymentSettingsPage';
 
+// the whole website - the top bar, then the page that matches the address
 function App() {
   return (
     <AuthProvider>

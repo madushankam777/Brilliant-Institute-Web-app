@@ -1,3 +1,4 @@
+// this module's own small API (admin, reports and analytics routes) - the combined site uses server/src/app.js
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -15,11 +16,15 @@ const adminRoutes = require('./modules/admin/admin.routes');
 const reportRoutes = require('./modules/reports/reports.routes');
 const analyticsRoutes = require('./modules/reports/analytics.routes');
 
+// create the web server
 const app = express();
 
+// behind a proxy or tunnel, trust it for the real visitor address
 app.set('trust proxy', config.trustProxy);
+// standard security headers
 app.use(helmet());
 
+// CORS - only our own website may call the API (with cookies)
 app.use(
   cors({
     // CLIENT_ORIGIN can list more than one allowed origin
@@ -39,13 +44,17 @@ app.use(
   })
 );
 
+// read JSON request bodies (max 100 KB) and cookies
 app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
+// log every request
 app.use(morgan(config.isProduction ? 'combined' : 'dev'));
 
+// rate limit and CSRF check for every request below this line
 app.use(apiLimiter);
 app.use(csrfGuard);
 
+// health check - is the API up? (returns no data)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'API is running.' });
 });
@@ -55,6 +64,7 @@ app.use('/api/admin/reports', reportRoutes); // reports + PDF / Excel downloads
 app.use('/api/admin/analytics', analyticsRoutes); // analytics dashboard data
 app.use('/api', adminRoutes); // /api/admin/* + /api/announcements
 
+// unknown address gives a 404, any other error gives a JSON error reply
 app.use(notFoundHandler);
 app.use(errorHandler);
 

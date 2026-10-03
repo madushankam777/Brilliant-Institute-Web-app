@@ -1,3 +1,4 @@
+// home page - the public landing page, or the student or tutor dashboard when logged in
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +24,7 @@ import {
 import heroMediaImg from '../../../shared/client/src/assets/hero-media.webp';
 import ModalClose from '../../../shared/client/src/components/common/ModalClose';
 
+// the four feature cards on the public page
 const FEATURES = [
   {
     icon: 'user',
@@ -50,6 +52,7 @@ const FEATURES = [
   },
 ];
 
+// the two quotes on the public page
 const TESTIMONIALS = [
   {
     quote:
@@ -65,6 +68,7 @@ const TESTIMONIALS = [
   },
 ];
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
@@ -84,6 +88,7 @@ function NextClassCard({ classes, holidays, events }) {
   );
 }
 
+// student dashboard - attendance rate, fee balance, next class, timetable and shortcuts
 function StudentDashboard({ user }) {
   const [summaryByClass, setSummaryByClass] = useState([]);
   const [balances, setBalances] = useState([]);
@@ -92,6 +97,7 @@ function StudentDashboard({ user }) {
   const holidays = useUpcomingHolidays();
   const events = useUpcomingClassEvents();
 
+  // load attendance, fees and the timetable together (one failing does not blank the page)
   useEffect(() => {
     let isMounted = true;
     // loaded independently - one failure doesn't blank the whole dashboard
@@ -109,11 +115,13 @@ function StudentDashboard({ user }) {
     };
   }, []);
 
+  // attendance rate over all classes, and the fees still owed
   const totalAttended = summaryByClass.reduce((sum, s) => sum + s.attendedSessions, 0);
   const totalSessions = summaryByClass.reduce((sum, s) => sum + s.totalSessions, 0);
   const overallRate = totalSessions > 0 ? Math.round((totalAttended / totalSessions) * 100) : null;
   const pendingFees = balances.reduce((sum, b) => sum + Number(b.balance), 0);
 
+  // the dashboard - welcome, stat cards, the timetable and shortcut cards
   return (
     <div className="page">
       <div className="page-header">
@@ -132,6 +140,7 @@ function StudentDashboard({ user }) {
         <LoadingSpinner label="Loading your dashboard..." />
       ) : (
         <>
+          {/* stat cards - attendance, fees and next class */}
           <div className="stat-grid">
             <StatCard
               icon="book"
@@ -157,6 +166,7 @@ function StudentDashboard({ user }) {
             <NextClassCard classes={classes} holidays={holidays} events={events} />
           </div>
 
+          {/* weekly timetable */}
           <div className="card">
             <div className="flex-between" style={{ marginBottom: '12px' }}>
               <h2 style={{ margin: 0 }}>My Weekly Timetable</h2>
@@ -234,6 +244,7 @@ function StudentDashboard({ user }) {
 function useBankDetailsPrompt() {
   const [needsBankDetails, setNeedsBankDetails] = useState(false);
 
+  // check once per visit whether the tutor has saved bank details
   useEffect(() => {
     let isMounted = true;
     const dismissKey = 'brilliant_bank_prompt_dismissed';
@@ -259,6 +270,7 @@ function useBankDetailsPrompt() {
     };
   }, []);
 
+  // remember (for this visit) that the prompt was closed
   function dismiss() {
     try {
       window.sessionStorage.setItem('brilliant_bank_prompt_dismissed', 'true');
@@ -271,6 +283,7 @@ function useBankDetailsPrompt() {
   return { needsBankDetails, dismiss };
 }
 
+// pop-up asking a new tutor to add their banking details
 function BankDetailsPrompt({ onDismiss }) {
   return (
     <div className="modal-overlay" onClick={onDismiss}>
@@ -294,6 +307,7 @@ function BankDetailsPrompt({ onDismiss }) {
   );
 }
 
+// a reminder time as, for example, Mon 12 Oct, 3:30 PM
 function formatReminderTime(sendAt) {
   return new Date(sendAt.replace(' ', 'T')).toLocaleString('en-GB', {
     weekday: 'short',
@@ -304,6 +318,7 @@ function formatReminderTime(sendAt) {
   });
 }
 
+// tutor dashboard - classes today, students, reminders, timetable and shortcuts
 function TutorDashboard({ user }) {
   const { needsBankDetails, dismiss } = useBankDetailsPrompt();
   const [classes, setClasses] = useState([]);
@@ -313,6 +328,7 @@ function TutorDashboard({ user }) {
   const holidays = useUpcomingHolidays();
   const events = useUpcomingClassEvents();
 
+  // load the timetable, students and reminders together
   useEffect(() => {
     let isMounted = true;
     Promise.allSettled([fetchMyTimetable(), fetchMyStudents(), fetchMyReminders()]).then(
@@ -331,6 +347,7 @@ function TutorDashboard({ user }) {
     };
   }, []);
 
+  // how many classes the tutor has today (none on a public holiday)
   const today = todayKey();
   const todayHoliday = holidays[today];
   const classesToday = todayHoliday
@@ -339,6 +356,7 @@ function TutorDashboard({ user }) {
   let classesTodayNote = classesToday > 0 ? 'Mark attendance when you start' : 'No classes today';
   if (todayHoliday) classesTodayNote = `Public holiday - ${todayHoliday}`;
 
+  // the dashboard - greeting, stat cards, timetable, upcoming reminders and shortcut cards
   return (
     <div className="page">
       {needsBankDetails && <BankDetailsPrompt onDismiss={dismiss} />}
@@ -351,6 +369,7 @@ function TutorDashboard({ user }) {
         <LoadingSpinner label="Loading your dashboard..." />
       ) : (
         <>
+          {/* stat cards - classes today, students and more */}
           <div className="stat-grid">
             <StatCard icon="book" label="My Classes" value={classes.length} to="/courses/manage" />
             <StatCard icon="users" label="My Students" value={studentCount} to="/students/mine" />
@@ -365,6 +384,7 @@ function TutorDashboard({ user }) {
             <NextClassCard classes={classes} holidays={holidays} events={events} />
           </div>
 
+          {/* weekly timetable */}
           <div className="card">
             <div className="flex-between" style={{ marginBottom: '12px' }}>
               <h2 style={{ margin: 0 }}>My Weekly Timetable</h2>
@@ -379,6 +399,7 @@ function TutorDashboard({ user }) {
               emptyMessage="No classes have been assigned to you yet." />
           </div>
 
+          {/* upcoming reminders */}
           <div className="card">
             <div className="flex-between" style={{ marginBottom: '8px' }}>
               <h2 style={{ margin: 0 }}>Upcoming Reminders</h2>
@@ -462,6 +483,7 @@ function TutorDashboard({ user }) {
   );
 }
 
+// home page - admins go to their dashboard, students and tutors see theirs, visitors see the landing page
 function HomePage() {
   const { user, isLoggedIn } = useAuth();
 
@@ -476,8 +498,10 @@ function HomePage() {
     );
   }
 
+  // the public landing page - hero, features and testimonials
   return (
     <>
+      {/* hero - headline and sign-up buttons */}
       <section className="container hero">
         <div className="hero-copy">
           <span className="eyebrow">Revolutionizing EdTech Operations</span>
@@ -504,6 +528,7 @@ function HomePage() {
         </div>
       </section>
 
+      {/* features */}
       <section id="features" className="section section-bg-soft">
         <div className="container">
           <div className="section-heading">
@@ -524,6 +549,7 @@ function HomePage() {
         </div>
       </section>
 
+      {/* testimonials */}
       <section className="section">
         <div className="container">
           <div className="section-heading">

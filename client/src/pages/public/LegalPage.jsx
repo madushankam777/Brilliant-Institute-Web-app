@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import Footer from '../../../../shared/client/src/components/layout/Footer';
 import { INSTITUTE } from '../../../../shared/client/src/constants/institute';
 
+// date the pages were last updated
 const UPDATED = '25 September 2026';
 
+// the text of the privacy policy and of the terms of service
 const PAGES = {
   privacy: {
     title: 'Privacy Policy',
@@ -112,8 +114,10 @@ const PAGES = {
   },
 };
 
+// privacy policy or terms page, chosen by the type
 function LegalPage({ type }) {
   const page = PAGES[type];
+  // the page - title, intro, each section and the contact box
   return (
     <>
       <article className="container legal-page">

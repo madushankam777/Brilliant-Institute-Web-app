@@ -2,12 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import * as sessionApi from '../api/sessionApi';
 import { setSessionExpiredHandler } from '../../../../shared/client/src/api/httpClient';
 
+// shared login state - who is logged in
 const AuthContext = createContext(null);
 
+// gives every page the logged-in user and the login, logout and refresh functions
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
+  // when the website opens, ask the server if the session is still valid
   useEffect(() => {
     let isMounted = true;
 

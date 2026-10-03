@@ -4,12 +4,15 @@ import { createPasswordResetLink } from '../../api/adminApi';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 
+// password reset card - make a one-time link for a user who forgot their password
 function ResetLinkCard({ user }) {
+  // the link and the page state
   const [link, setLink] = useState(null);
   const [error, setError] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // create reset link btn - make a one-time link (older links stop working)
   async function makeLink() {
     setIsBusy(true);
     setError('');
@@ -24,6 +27,7 @@ function ResetLinkCard({ user }) {
     }
   }
 
+  // copy btn - copy the link
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(link.url);
@@ -33,6 +37,7 @@ function ResetLinkCard({ user }) {
     }
   }
 
+  // the card - an explanation, then the link box or the create btn
   return (
     <div className="card">
       <h2>Password reset</h2>
@@ -42,6 +47,7 @@ function ResetLinkCard({ user }) {
       </p>
       <Alert type="error" message={error} />
 
+      {/* the link with a copy btn, or the create btn */}
       {link ? (
         <div className="reset-link-box">
           <input readOnly value={link.url} aria-label="Password reset link" onFocus={(e) => e.target.select()} />

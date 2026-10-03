@@ -1,5 +1,7 @@
+-- update an existing database - run once as root in MySQL Workbench; safe to run again
 USE brilliant_institute;
 
+-- student_reregistration_keys - one-time keys that let a returning student confirm next year's place
 CREATE TABLE IF NOT EXISTS student_reregistration_keys (
   id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   key_code        VARCHAR(24)  NOT NULL,
@@ -19,6 +21,7 @@ CREATE TABLE IF NOT EXISTS student_reregistration_keys (
   CONSTRAINT fk_rereg_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- yearly_rollover_log - one row per academic year, so the January roll-over never runs twice
 CREATE TABLE IF NOT EXISTS yearly_rollover_log (
   id                 INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   academic_year      SMALLINT UNSIGNED NOT NULL,
@@ -82,12 +85,14 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
 -- New columns. MySQL 8 has no "ADD COLUMN IF NOT EXISTS", so each one checks
 -- information_schema first and runs a harmless SELECT if it already exists.
 
+-- users.reregistered_for_year - the year the student confirmed their place
 SET @ddl = (SELECT IF(COUNT(*) = 0,
   'ALTER TABLE users ADD COLUMN reregistered_for_year SMALLINT UNSIGNED NULL AFTER grade', 'SELECT 1')
   FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'reregistered_for_year');
 PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- users.left_at - when the student left the institute
 SET @ddl = (SELECT IF(COUNT(*) = 0,
   'ALTER TABLE users ADD COLUMN left_at DATETIME NULL AFTER reregistered_for_year', 'SELECT 1')
   FROM information_schema.COLUMNS
@@ -111,6 +116,7 @@ SET @ddl = (SELECT IF(COUNT(*) = 0,
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tutor_payouts' AND COLUMN_NAME = 'status');
 PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- classes.start_date - the first class date
 SET @ddl = (SELECT IF(COUNT(*) = 0,
   'ALTER TABLE classes ADD COLUMN start_date DATE NULL AFTER end_time', 'SELECT 1')
   FROM information_schema.COLUMNS
@@ -125,9 +131,11 @@ ALTER TABLE users
 ALTER TABLE notification_log
   MODIFY COLUMN channel ENUM('EMAIL', 'SMS', 'IN_APP') NOT NULL;
 
+-- allow the notification types added by the newer features
 ALTER TABLE notification_log
   MODIFY COLUMN type ENUM('CLASS_REMINDER', 'FEE_DUE', 'LOW_ATTENDANCE', 'ANNOUNCEMENT',
                           'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_SUBMITTED', 'PAYOUT_RECORDED',
                           'REREGISTRATION', 'ACCOUNT_CLOSED') NOT NULL;
 
+-- shows that the script finished
 SELECT 'database update complete' AS result;

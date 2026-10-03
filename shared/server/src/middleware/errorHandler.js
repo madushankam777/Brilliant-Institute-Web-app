@@ -1,6 +1,7 @@
 // Central 404 + error handler
 const ApiError = require('../utils/ApiError');
 
+// unknown address gives a 404
 function notFoundHandler(req, res) {
   res.status(404).json({
     success: false,
@@ -8,6 +9,7 @@ function notFoundHandler(req, res) {
   });
 }
 
+// any error becomes a clean JSON reply - no stack traces reach the user
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   // bad JSON, a body that is too big, etc. - the client's mistake, not a crash
@@ -17,6 +19,7 @@ function errorHandler(err, req, res, next) {
     return res.status(err.status).json({ success: false, message });
   }
 
+  // our own errors keep their message and status, anything else is a 500
   const isKnownError = err instanceof ApiError;
   const statusCode = isKnownError ? err.statusCode : 500;
 
@@ -33,6 +36,7 @@ function errorHandler(err, req, res, next) {
     console.warn('[setup] Run sql/update_database.sql once as root in MySQL Workbench.');
   }
 
+  // build the reply
   const responseBody = {
     success: false,
     message: isKnownError

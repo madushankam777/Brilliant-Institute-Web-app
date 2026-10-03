@@ -33,17 +33,20 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 
+// subject areas to pick from
 const SUBJECT_AREAS = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Other'];
 
 // classes can be booked in 15-minute steps between 6:00 AM and 10:00 PM
 const DAY_START = 6 * 60;
 const DAY_END = 22 * 60;
 const SLOT_MINUTES = 15;
+// every time choice for the pickers
 const TIME_SLOTS = [];
 for (let minutes = DAY_START; minutes <= DAY_END; minutes += SLOT_MINUTES) {
   TIME_SLOTS.push(fromMinutes(minutes));
 }
 
+// a blank class form
 const emptyForm = {
   subject: '',
   subjectArea: 'Mathematics',
@@ -67,6 +70,7 @@ function nextDateOn(dayOfWeek) {
   return todayKey();
 }
 
+// does the chosen time overlap a class that is already booked
 function overlaps(startTime, endTime, busy) {
   return toMinutes(startTime) < toMinutes(busy.endTime) && toMinutes(endTime) > toMinutes(busy.startTime);
 }
@@ -76,6 +80,7 @@ function withValue(options, value) {
   return options.includes(value) ? options : [...options, value].sort();
 }
 
+// the class length as text, like 1h 30m
 function computeDuration(startTime, endTime) {
   const minutes = toMinutes(endTime) - toMinutes(startTime);
   if (minutes <= 0) return '-';
@@ -119,6 +124,7 @@ function validateClassForm(form, { requireTutor, requireDate, selectedDate, holi
   };
 }
 
+// create / edit class - pick the tutor (admin), the first day, a free time, venue, seats and fee
 function CreateEditClassPage() {
   const { classId } = useParams();
   const isEditMode = Boolean(classId);
@@ -127,6 +133,7 @@ function CreateEditClassPage() {
   const NAV_ITEMS = getNavItems(user.role);
   const isAdmin = user.role === 'ADMIN';
 
+  // the form and the page state
   const [form, setForm] = useState(emptyForm);
   const [selectedDate, setSelectedDate] = useState(null);
   const [isLoading, setIsLoading] = useState(isEditMode);
@@ -140,6 +147,7 @@ function CreateEditClassPage() {
   const [tutorClasses, setTutorClasses] = useState([]);
   const holidays = useYearOfHolidays();
 
+  // edit mode - load the class into the form
   const loadExisting = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -166,10 +174,12 @@ function CreateEditClassPage() {
     }
   }, [classId]);
 
+  // edit mode - load the class when the page opens
   useEffect(() => {
     if (isEditMode) loadExisting();
   }, [isEditMode, loadExisting]);
 
+  // admin - load the tutors to choose from
   useEffect(() => {
     if (!isAdmin) return;
     fetchAllTutors()
@@ -203,14 +213,17 @@ function CreateEditClassPage() {
   }, [isAdmin, form.tutorId, classId]);
 
   const selectedDay = selectedDate ? dayNameOf(selectedDate) : null;
+  // this tutor's classes on the chosen day
   const busySlots = useMemo(
     () => sortByStartTime(tutorClasses.filter((item) => item.dayOfWeek === selectedDay)),
     [tutorClasses, selectedDay]
   );
+  // the chosen times overlap one of them
   const clash = busySlots.find((busy) => overlaps(form.startTime, form.endTime, busy)) || null;
 
   const now = new Date();
   const startsToday = !isEditMode && selectedDate === todayKey();
+  // start time choices - taken ones are disabled
   const startOptions = withValue(TIME_SLOTS.slice(0, -1), form.startTime).map((time) => ({
     time,
     // a start time inside another class is taken, and today's passed times too
@@ -218,15 +231,18 @@ function CreateEditClassPage() {
       busySlots.some((busy) => toMinutes(time) >= toMinutes(busy.startTime) && toMinutes(time) < toMinutes(busy.endTime)) ||
       (startsToday && toMinutes(time) <= now.getHours() * 60 + now.getMinutes()),
   }));
+  // end time choices - booked ones are disabled
   const endOptions = withValue(TIME_SLOTS, form.endTime)
     .filter((time) => toMinutes(time) > toMinutes(form.startTime))
     .map((time) => ({ time, taken: busySlots.some((busy) => overlaps(form.startTime, time, busy)) }));
 
+  // change one field and clear its error
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
     clearFieldError(field);
   }
 
+  // start time changed - move the end time if it no longer fits
   function handleStartChange(startTime) {
     setForm((previous) => {
       const endStillFits =
@@ -244,6 +260,7 @@ function CreateEditClassPage() {
     clearFieldError('endTime');
   }
 
+  // publish / save btn - check the form, then create or update the class
   async function handleSubmit(event) {
     event.preventDefault();
     setSuccessMessage('');
@@ -289,6 +306,7 @@ function CreateEditClassPage() {
     }
   }
 
+  // a spinner while loading the class
   if (isLoading) {
     return (
       <PortalShell navItems={NAV_ITEMS}>
@@ -299,9 +317,11 @@ function CreateEditClassPage() {
     );
   }
 
+  // the tutor the admin picked
   const selectedTutor = tutors.find((tutor) => tutor.id === form.tutorId);
   const needsTutorFirst = isAdmin && !isEditMode && !form.tutorId;
 
+  // the page - schedule card, class details card and the save buttons
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
@@ -314,14 +334,17 @@ function CreateEditClassPage() {
           </p>
         </div>
 
+        {/* error and success messages */}
         <Alert type="error" message={loadError} />
         <Alert type="success" message={successMessage} />
         <Alert type="error" message={formError} />
 
         <form onSubmit={handleSubmit} noValidate>
+          {/* schedule card - tutor, first day, time and venue */}
           <div className="card">
             <h2>Schedule</h2>
 
+            {/* tutor picker - admin only, when creating */}
             {isAdmin && !isEditMode && (
               <div className="form-field">
                 <label htmlFor="tutorSearch">Tutor</label>
@@ -341,8 +364,10 @@ function CreateEditClassPage() {
               </div>
             )}
 
+            {/* calendar on the left, the day's bookings and times on the right */}
             <div className="schedule-picker">
               <div>
+                {/* calendar - pick the first class day (a red dot = the tutor already teaches) */}
                 <MonthCalendar
                   selectedDate={selectedDate}
                   onSelectDate={(dateKey) => {
@@ -359,6 +384,7 @@ function CreateEditClassPage() {
               </div>
 
               <div>
+                {/* what is already booked on the chosen day */}
                 <div className="day-agenda">
                   {!selectedDate ? (
                     <p className="muted" style={{ margin: 0 }}>
@@ -395,6 +421,7 @@ function CreateEditClassPage() {
                   )}
                 </div>
 
+                {/* start and end time */}
                 <div className="card-field-row" style={{ marginTop: '16px' }}>
                   <div className="form-field">
                     <label htmlFor="startTime">Start time</label>
@@ -424,6 +451,7 @@ function CreateEditClassPage() {
                     </select>
                   </div>
                 </div>
+                {/* overlap warning, end time error, or the class length */}
                 {clash ? (
                   <p className="field-error" style={{ marginTop: '-10px' }}>
                     This time overlaps &quot;{clash.subject}&quot; ({formatTimeRange(clash.startTime, clash.endTime)}). Pick a
@@ -440,6 +468,7 @@ function CreateEditClassPage() {
               </div>
             </div>
 
+            {/* venue */}
             <div className="form-field">
               <label htmlFor="venue">Venue / Classroom</label>
               <input
@@ -455,6 +484,7 @@ function CreateEditClassPage() {
             </div>
           </div>
 
+          {/* class details card - subject, grade, area, description, seats and fee */}
           <div className="card">
             <h2>Class details</h2>
             <div className="card-field-row">
@@ -540,6 +570,7 @@ function CreateEditClassPage() {
             </div>
           </div>
 
+          {/* cancel and save btns */}
           <div className="flex-between">
             <button type="button" className="btn btn-secondary" onClick={() => navigate('/courses/manage')}>
               Cancel

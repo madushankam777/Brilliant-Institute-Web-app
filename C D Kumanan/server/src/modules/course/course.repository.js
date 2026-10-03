@@ -2,6 +2,7 @@
 const { pool } = require('../../../../../shared/server/src/config/db');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
+// a class with its tutor's name and photo and how many students are enrolled - reused by the class lists
 const ACTIVE_CLASS_WITH_TUTOR_SELECT = `
   SELECT c.*, t.full_name AS tutor_name, t.profile_picture_path AS tutor_profile_picture,
          (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id AND e.status = 'ACTIVE') AS enrolled_count
@@ -9,8 +10,10 @@ const ACTIVE_CLASS_WITH_TUTOR_SELECT = `
   JOIN users t ON t.id = c.tutor_id
 `;
 
+// sort classes Monday to Sunday
 const WEEK_ORDER = `FIELD(c.day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')`;
 
+// search page - active classes filtered by text, subject area, level and day
 async function listActiveClasses({ search, subjectArea, level, dayOfWeek }) {
   const clauses = [`c.status = 'ACTIVE'`];
   const params = [];
@@ -41,6 +44,7 @@ async function listActiveClasses({ search, subjectArea, level, dayOfWeek }) {
 
 // --- Tutor profile (view a tutor's public info + the classes they teach) ---
 
+// a tutor's public details
 async function findTutorProfile(tutorId) {
   const [rows] = await pool.execute(
     `SELECT id, full_name, bio, profile_picture_path, created_at FROM users WHERE id = ? AND role = 'TUTOR' AND status != 'DELETED' LIMIT 1`,
@@ -49,6 +53,7 @@ async function findTutorProfile(tutorId) {
   return rows[0] || null;
 }
 
+// all active tutors
 async function listAllTutors() {
   const [rows] = await pool.execute(
     `SELECT id, full_name, email, profile_picture_path
@@ -59,6 +64,7 @@ async function listAllTutors() {
   return rows;
 }
 
+// one active tutor by id
 async function findActiveTutorById(tutorId) {
   const [rows] = await pool.execute(
     `SELECT id, full_name FROM users WHERE id = ? AND role = 'TUTOR' AND status = 'ACTIVE' LIMIT 1`,
@@ -67,6 +73,7 @@ async function findActiveTutorById(tutorId) {
   return rows[0] || null;
 }
 
+// the active classes one tutor teaches
 async function listActiveClassesByTutor(tutorId) {
   const [rows] = await pool.execute(
     `${ACTIVE_CLASS_WITH_TUTOR_SELECT} WHERE c.status = 'ACTIVE' AND c.tutor_id = ? ORDER BY c.created_at DESC`,
@@ -75,6 +82,7 @@ async function listActiveClassesByTutor(tutorId) {
   return rows;
 }
 
+// one class with its tutor and enrolled count
 async function findClassWithTutorAndCount(classId) {
   const [rows] = await pool.execute(`${ACTIVE_CLASS_WITH_TUTOR_SELECT} WHERE c.id = ? LIMIT 1`, [
     classId,
@@ -82,11 +90,13 @@ async function findClassWithTutorAndCount(classId) {
   return rows[0] || null;
 }
 
+// one class by id
 async function findClassById(classId) {
   const [rows] = await pool.execute(`SELECT * FROM classes WHERE id = ? LIMIT 1`, [classId]);
   return rows[0] || null;
 }
 
+// a tutor's classes (not cancelled), newest first
 async function listClassesByTutor(tutorId) {
   const [rows] = await pool.execute(
     `${ACTIVE_CLASS_WITH_TUTOR_SELECT} WHERE c.tutor_id = ? AND c.status != 'CANCELLED' ORDER BY c.created_at DESC`,
@@ -103,6 +113,7 @@ async function listAllClasses() {
   return rows;
 }
 
+// save a new class - the start date is saved only when the database update has been run
 async function createClass(data) {
   // start_date only exists once the database update has been run
   if (await schema.hasClassStartDate()) {
@@ -151,6 +162,7 @@ async function createClass(data) {
   return result.insertId;
 }
 
+// save the edited class details
 async function updateClass(classId, data) {
   await pool.execute(
     `UPDATE classes
@@ -185,6 +197,7 @@ async function listActiveStudentIdsForClass(classId) {
   return rows.map((row) => row.student_id);
 }
 
+// save a notification for a student
 async function createNotification({ recipientId, type, message, sentBy }) {
   await pool.execute(
     `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
@@ -193,6 +206,7 @@ async function createNotification({ recipientId, type, message, sentBy }) {
   );
 }
 
+// mark a class CANCELLED
 async function cancelClass(classId) {
   await pool.execute(`UPDATE classes SET status = 'CANCELLED', updated_at = NOW() WHERE id = ?`, [
     classId,
@@ -212,6 +226,7 @@ async function findConflictingVenueClass({ venue, dayOfWeek, startTime, endTime,
   return rows[0] || null;
 }
 
+// a class by the same tutor at an overlapping time on that day
 async function findConflictingTutorClass({ tutorId, dayOfWeek, startTime, endTime, excludeClassId }) {
   const [rows] = await pool.execute(
     `SELECT c.id, c.subject, c.venue, c.start_time, c.end_time, t.full_name AS tutor_name
@@ -242,6 +257,7 @@ async function listPublicTutors() {
 
 // --- Cancelled days and extra classes (class_events) ---
 
+// a cancelled day or extra class with its class, tutor and who created it
 const EVENT_SELECT = `
   SELECT ev.id, ev.class_id, ev.event_date, ev.type, ev.start_time, ev.end_time, ev.venue, ev.note,
          ev.created_at, c.subject, c.level, c.tutor_id, c.venue AS class_venue,
@@ -271,11 +287,13 @@ async function listClassEvents({ fromDate, toDate, studentId }) {
   return rows;
 }
 
+// one cancelled day or extra class
 async function findClassEvent(eventId) {
   const [rows] = await pool.execute(`${EVENT_SELECT} WHERE ev.id = ? LIMIT 1`, [eventId]);
   return rows[0] || null;
 }
 
+// is this class already cancelled on that date?
 async function findCancelledDay(classId, eventDate) {
   const [rows] = await pool.execute(
     `SELECT id FROM class_events WHERE class_id = ? AND event_date = ? AND type = 'CANCELLED' LIMIT 1`,
@@ -284,6 +302,7 @@ async function findCancelledDay(classId, eventDate) {
   return rows[0] || null;
 }
 
+// save a cancelled day or an extra class
 async function createClassEvent({ classId, eventDate, type, startTime, endTime, venue, note, createdBy }) {
   const [result] = await pool.execute(
     `INSERT INTO class_events (class_id, event_date, type, start_time, end_time, venue, note, created_by, created_at)
@@ -293,6 +312,7 @@ async function createClassEvent({ classId, eventDate, type, startTime, endTime, 
   return result.insertId;
 }
 
+// remove a cancelled day or an extra class
 async function deleteClassEvent(eventId) {
   await pool.execute(`DELETE FROM class_events WHERE id = ?`, [eventId]);
 }
@@ -334,6 +354,7 @@ async function findBusyExtraClass({ eventDate, startTime, endTime, venue, tutorI
 
 // --- Timetables ---
 
+// the person whose timetable is shown
 async function findPersonForTimetable(userId) {
   const [rows] = await pool.execute(
     `SELECT id, full_name, role, grade FROM users WHERE id = ? AND status != 'DELETED' LIMIT 1`,
@@ -342,6 +363,7 @@ async function findPersonForTimetable(userId) {
   return rows[0] || null;
 }
 
+// the classes a tutor teaches, Monday to Sunday
 async function listTimetableForTutor(tutorId) {
   const [rows] = await pool.execute(
     `${ACTIVE_CLASS_WITH_TUTOR_SELECT}
@@ -352,6 +374,7 @@ async function listTimetableForTutor(tutorId) {
   return rows;
 }
 
+// the active classes a student is enrolled in, Monday to Sunday
 async function listTimetableForStudent(studentId) {
   const [rows] = await pool.execute(
     `${ACTIVE_CLASS_WITH_TUTOR_SELECT}
@@ -363,6 +386,7 @@ async function listTimetableForStudent(studentId) {
   return rows;
 }
 
+// a student's enrolment in a class, if any
 async function findEnrollment(studentId, classId) {
   const [rows] = await pool.execute(
     `SELECT * FROM enrollments WHERE student_id = ? AND class_id = ? LIMIT 1`,
@@ -371,6 +395,7 @@ async function findEnrollment(studentId, classId) {
   return rows[0] || null;
 }
 
+// enrol a student - the balance starts as the class fee
 async function createEnrollment(studentId, classId, balance) {
   const [result] = await pool.execute(
     `INSERT INTO enrollments (student_id, class_id, status, balance, enrolled_at)
@@ -390,6 +415,7 @@ async function reactivateEnrollment(enrollmentId, balance) {
   );
 }
 
+// mark an enrolment DROPPED and note the date
 async function dropEnrollment(enrollmentId) {
   await pool.execute(
     `UPDATE enrollments SET status = 'DROPPED', drop_date = NOW() WHERE id = ?`,
@@ -402,6 +428,7 @@ async function removeEnrollmentRecord(enrollmentId) {
   await pool.execute(`UPDATE enrollments SET status = 'REMOVED' WHERE id = ?`, [enrollmentId]);
 }
 
+// how many students are enrolled in a class
 async function countActiveEnrollments(classId) {
   const [rows] = await pool.execute(
     `SELECT COUNT(*) AS total FROM enrollments WHERE class_id = ? AND status = 'ACTIVE'`,
@@ -410,6 +437,7 @@ async function countActiveEnrollments(classId) {
   return Number(rows[0].total);
 }
 
+// a student's enrolments with the class and tutor (removed ones are hidden)
 async function listMyEnrollments(studentId) {
   const [rows] = await pool.execute(
     `SELECT e.id AS enrollment_id, e.status AS enrollment_status, e.balance, e.enrolled_at, e.drop_date,
