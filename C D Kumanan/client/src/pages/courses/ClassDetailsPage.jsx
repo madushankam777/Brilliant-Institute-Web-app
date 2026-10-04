@@ -10,11 +10,13 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
 
+// class details - schedule, fee, spots left and the tutor; a student can enrol
 function ClassDetailsPage() {
   const { classId } = useParams();
   const navigate = useNavigate();
@@ -27,6 +29,7 @@ function ClassDetailsPage() {
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollError, setEnrollError] = useState('');
 
+  // load the class
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -40,10 +43,12 @@ function ClassDetailsPage() {
     }
   }, [classId]);
 
+  // load it when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // enrol now btn - join the class, then go to Fees & Payments
   async function handleEnroll() {
     setEnrollError('');
     setIsEnrolling(true);
@@ -67,6 +72,7 @@ function ClassDetailsPage() {
     );
   }
 
+  // the class could not be loaded
   if (loadError || !classData) {
     return (
       <PortalShell navItems={NAV_ITEMS}>
@@ -80,6 +86,7 @@ function ClassDetailsPage() {
     );
   }
 
+  // no spots left, cancelled, and how full the class is
   const isFull = classData.spotsLeft <= 0;
   const isCancelled = classData.status === 'CANCELLED';
   const capacityPercent = Math.min(
@@ -107,6 +114,7 @@ function ClassDetailsPage() {
             <h1>{classData.subject}</h1>
             <p className="muted">{classData.description || 'No description provided yet.'}</p>
 
+            {/* schedule */}
             <div className="card">
               <h2>Intake Schedule</h2>
               <div className="table-scroll">
@@ -131,6 +139,7 @@ function ClassDetailsPage() {
               </div>
             </div>
 
+            {/* fee breakdown */}
             <div className="card">
               <h2>Fee Breakdown</h2>
               <div className="order-line">
@@ -141,6 +150,7 @@ function ClassDetailsPage() {
           </div>
 
           <div>
+            {/* capacity and the Enrol Now button */}
             <div className="card">
               <div className="flex-between" style={{ marginBottom: '6px' }}>
                 <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Class Capacity</span>
@@ -186,6 +196,7 @@ function ClassDetailsPage() {
               )}
             </div>
 
+            {/* about the tutor */}
             <div className="card">
               <h3 style={{ fontSize: '0.95rem', marginTop: 0 }}>About the Tutor</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>

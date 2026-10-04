@@ -12,6 +12,7 @@ import PlaceholderLoginPage from './pages/PlaceholderLoginPage';
 import SubmitFeedbackPage from './pages/feedback/SubmitFeedbackPage';
 import StaffFeedbackPage from './pages/feedback/StaffFeedbackPage';
 
+// the whole website - the top bar, then the page that matches the address
 function App() {
   return (
     <AuthProvider>
@@ -32,6 +33,7 @@ function App() {
             <Route path="/admin/feedback" element={<StaffFeedbackPage />} />
           </Route>
 
+          {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

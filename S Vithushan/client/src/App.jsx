@@ -14,6 +14,7 @@ import ManageUsersPage from './pages/admin/ManageUsersPage';
 import UserProfilePage from './pages/admin/UserProfilePage';
 import AnnouncementsPage from './pages/admin/AnnouncementsPage';
 
+// the whole website - the top bar, then the page that matches the address
 function App() {
   return (
     <AuthProvider>
@@ -32,6 +33,7 @@ function App() {
             <Route path="/admin/announcements" element={<AnnouncementsPage />} />
           </Route>
 
+          {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

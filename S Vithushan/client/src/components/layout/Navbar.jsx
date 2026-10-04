@@ -1,3 +1,4 @@
+// top bar - logo, search, notification bell, profile chip and log out (or the public menu)
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -25,6 +26,7 @@ function writeVersionMap(key, versionMap) {
   }
 }
 
+// a time as 5m ago, 2h ago, 3d ago
 function timeAgo(isoDate) {
   const seconds = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
   if (seconds < 60) return 'Just now';
@@ -37,6 +39,7 @@ function timeAgo(isoDate) {
   return new Date(isoDate).toLocaleDateString();
 }
 
+// the top bar - for a logged-in user, or for a visitor
 function Navbar() {
   const { user, isLoggedIn, logout } = useAuth();
   const navigate = useNavigate();
@@ -66,6 +69,7 @@ function Navbar() {
     }
   }, []);
 
+  // when the user logs in, restore what they last saw and dismissed, then load the bell
   useEffect(() => {
     if (!isLoggedIn) return;
     if (lastSeenKey) {
@@ -81,7 +85,9 @@ function Navbar() {
     loadNotifications();
   }, [isLoggedIn, lastSeenKey, dismissedKey, loadNotifications]);
 
+  // close the notification panel when you click outside it
   useEffect(() => {
+    // a click outside the menu closes it
     function handleClickOutside(event) {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
@@ -123,6 +129,7 @@ function Navbar() {
     ? visibleItems.filter((item) => new Date(item.effectiveDate) > new Date(lastSeenAt)).length
     : visibleItems.length;
 
+  // bell btn - open or close the panel, and mark everything as seen
   function toggleNotifications() {
     const opening = !isNotifOpen;
     setIsNotifOpen(opening);
@@ -140,6 +147,7 @@ function Navbar() {
     }
   }
 
+  // clear btn - hide one notification (until it changes)
   function dismissNotification(item) {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
@@ -149,6 +157,7 @@ function Navbar() {
     });
   }
 
+  // clear all btn - hide every notification
   function clearAllNotifications() {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
@@ -161,12 +170,15 @@ function Navbar() {
     });
   }
 
+  // log out btn - end the session and go to the login page
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
   }
 
+  // top bar for a logged-in user
   if (isLoggedIn) {
+    // top bar for a visitor - Home, About, Classes, Contact, Log in and Register
     return (
       <header className="navbar">
         <div className="navbar-brand">
@@ -248,6 +260,7 @@ function Navbar() {
     );
   }
 
+  // top bar for a visitor - Home, About, Classes, Contact, Log in and Register
   return (
     <header className="navbar">
       <div className="navbar-brand">

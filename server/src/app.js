@@ -47,7 +47,13 @@ app.use(
         'connect-src': ["'self'"],
         // the Contact page shows a Google Map
         'frame-src': ['https://www.google.com', 'https://maps.google.com'],
-        'form-action': ["'self'", 'https://sandbox.payhere.lk', 'https://www.payhere.lk'],
+        'form-action': [
+          "'self'",
+          'https://sandbox.payhere.lk',
+          'https://www.payhere.lk',
+          'https://www.sandbox.paypal.com',
+          'https://www.paypal.com',
+        ],
         'frame-ancestors': ["'none'"],
         'upgrade-insecure-requests': null,
       },
@@ -128,6 +134,10 @@ app.post(
   express.urlencoded({ extended: false, limit: '32kb' }),
   paymentController.handlePayHereNotification
 );
+
+// where PayPal sends the payer back (a browser redirect, not an API call)
+app.get('/api/payments/paypal/return', paymentController.payPalReturn);
+app.get('/api/payments/paypal/cancel', paymentController.payPalCancel);
 
 // rate limit and CSRF check for every request below this line
 app.use(apiLimiter);

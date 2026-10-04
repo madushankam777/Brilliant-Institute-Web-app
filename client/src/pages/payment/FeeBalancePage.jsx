@@ -8,6 +8,7 @@ import {
   fetchBankTransferAvailability,
   fetchPaymentSettings,
   startOnlineCheckout,
+  startPayPalCheckout,
   redirectToGateway,
 } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
@@ -28,6 +29,7 @@ const METHOD_LABELS = {
   CARD: 'Card',
   EZ_CASH: 'eZ Cash',
   MCASH: 'mCash',
+  PAYPAL: 'PayPal',
   BANK_TRANSFER: 'Bank Transfer',
 };
 // the checkout tabs as value + label pairs
@@ -301,6 +303,22 @@ function FeeBalancePage() {
       return;
     }
 
+    // PayPal - the student approves on PayPal, then comes straight back here
+    if (paymentMethod === 'PAYPAL') {
+      setIsPaying(true);
+      try {
+        const checkout = await startPayPalCheckout({
+          enrollmentId: activeEnrollment.enrollmentId,
+          amount: parsedAmount,
+        });
+        window.location.assign(checkout.approveUrl);
+      } catch (error) {
+        setPayError(error.message);
+        setIsPaying(false);
+      }
+      return;
+    }
+
     const errors = validatePaymentFields();
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -346,6 +364,14 @@ function FeeBalancePage() {
   }
 
   // the total I still owe
+  // PayPal charges in another currency, so the student is shown what it becomes
+  const paypalAmount =
+    paymentSettings && paymentSettings.paypalCurrency && paymentSettings.paypalCurrency !== 'LKR'
+      ? paymentSettings.paypalCurrency +
+        ' ' +
+        (Number(amount || 0) / (Number(paymentSettings.paypalLkrRate) || 300)).toFixed(2)
+      : null;
+
   const totalOutstanding = balances.reduce((sum, b) => sum + Number(b.balance), 0);
   const inCheckout = Boolean(activeEnrollment);
 
@@ -627,6 +653,24 @@ function FeeBalancePage() {
                       </div>
                     )}
 
+                    {/* paypal - the student approves on PayPal, then comes back */}
+                    {paymentMethod === 'PAYPAL' && (
+                      <div className="callout" style={{ marginBottom: '16px' }}>
+                        <span>
+                          <strong>You&apos;ll finish this payment on PayPal.</strong> Tap Pay and we
+                          hand you over to PayPal, where you can use your PayPal balance or a card.
+                          Brilliant Institute never sees your card number.
+                          {paypalAmount && (
+                            <>
+                              {' '}
+                              PayPal does not accept rupees, so this is charged as{' '}
+                              <strong>{paypalAmount}</strong>.
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )}
+
                     {/* bank transfer is closed - show why */}
                     {paymentMethod === 'BANK_TRANSFER' && !bankTransferAvailable && (
                       <Alert type="warning" message={bankTransferClosedMessage} />
@@ -827,7 +871,9 @@ function FeeBalancePage() {
                       {isPaying
                         ? paymentMethod === 'ONLINE'
                           ? 'Redirecting to PayHere...'
-                          : 'Submitting...'
+                          : paymentMethod === 'PAYPAL'
+                            ? 'Redirecting to PayPal...'
+                            : 'Submitting...'
                         : paymentMethod === 'BANK_TRANSFER'
                           ? 'Submit for Verification'
                           : `Pay ${formatCurrency(amount || 0)}`}

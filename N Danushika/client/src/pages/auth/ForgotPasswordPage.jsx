@@ -1,3 +1,4 @@
+// forgot password page - ask for a reset link by email
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../../api/authApi';
@@ -6,6 +7,7 @@ import Alert from '../../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../../shared/client/src/components/common/Icon';
 import AuthLayout from '../../../../../shared/client/src/components/layout/AuthLayout';
 
+// forgot password - type the email, then a reset link is sent
 function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -13,6 +15,7 @@ function ForgotPasswordPage() {
   const [devOnlyResetToken, setDevOnlyResetToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // send btn - ask the server for a reset link
   async function handleSubmit(event) {
     event.preventDefault();
     setErrorMessage('');
@@ -73,6 +76,7 @@ function ForgotPasswordPage() {
     );
   }
 
+  // step 1 - ask for the email address
   return (
     <AuthLayout backTo="/login" backLabel="Back to Login">
       <h1>Forgot Password?</h1>
@@ -82,6 +86,7 @@ function ForgotPasswordPage() {
 
       <Alert type="error" message={errorMessage} />
 
+      {/* login form - email, password and the forgot password link */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="email"

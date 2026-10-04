@@ -15,6 +15,7 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// message categories
 const CATEGORIES = [
   'Class Scheduling Issue',
   'Class Quality & Tutor Feedback',
@@ -23,58 +24,70 @@ const CATEGORIES = [
   'Other',
 ];
 
+// who a message can be sent to
 const RECIPIENT_OPTIONS = [
   { value: 'ADMIN', label: 'Admin' },
   { value: 'ADMIN_TUTOR', label: 'Admin & Tutor' },
   { value: 'TUTOR', label: 'Tutor' },
 ];
 
+// badge colour for Resolved, In Progress or Pending
 function statusBadgeClass(status) {
   if (status === 'RESOLVED') return 'badge badge-success';
   if (status === 'IN_PROGRESS') return 'badge badge-warning';
   return 'badge badge-neutral';
 }
 
+// the status words
 function statusLabel(status) {
   if (status === 'IN_PROGRESS') return 'In Progress';
   if (status === 'RESOLVED') return 'Resolved';
   return 'Pending';
 }
 
+// who a ticket was sent to, as text
 function recipientLabel(ticket) {
   if (ticket.recipientType === 'ADMIN') return 'To: Admin';
   if (ticket.recipientType === 'TUTOR') return `To: ${ticket.recipientTutorName || 'Tutor'}`;
   return `To: Admin & ${ticket.recipientTutorName || 'Tutor'}`;
 }
 
+// a date and time as, for example, 12 Oct 2026, 3:30 PM
 function formatTime(isoDate) {
   return new Date(isoDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+// a blank message form
 const emptyForm = { category: CATEGORIES[1], recipientType: 'ADMIN', recipientTutorId: null, subject: '', message: '' };
 
+// feedback & support - send a message to the admin and/or a tutor, and chat with their replies
 function SubmitFeedbackPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
+  // the new message form
   const [form, setForm] = useState(emptyForm);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // the tutors to choose from
   const [tutors, setTutors] = useState([]);
 
+  // my conversations
   const [tickets, setTickets] = useState([]);
   const [isLoadingTickets, setIsLoadingTickets] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // the open conversation and the reply box
   const [openTicket, setOpenTicket] = useState(null);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
   const [replyError, setReplyError] = useState('');
 
+  // load my conversations
   const loadTickets = useCallback(async () => {
     setIsLoadingTickets(true);
     setLoadError('');
@@ -85,9 +98,11 @@ function SubmitFeedbackPage() {
       setLoadError(error.message);
     } finally {
       setIsLoadingTickets(false);
+    // fail silently, not critical
     }
   }, []);
 
+  // load my conversations and the tutors when the page opens
   useEffect(() => {
     loadTickets();
     fetchAllTutors()
@@ -97,10 +112,12 @@ function SubmitFeedbackPage() {
       });
   }, [loadTickets]);
 
+  // change one form field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // send message btn - check the form, then send the message
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitError('');
@@ -128,6 +145,7 @@ function SubmitFeedbackPage() {
     }
   }
 
+  // click a conversation - load it with its replies
   async function openThread(ticketId) {
     setOpenTicket(null);
     setReplyError('');
@@ -143,6 +161,7 @@ function SubmitFeedbackPage() {
     }
   }
 
+  // send btn - add my reply to the open conversation
   async function handleReplySubmit(event) {
     event.preventDefault();
     if (!openTicket || !replyText.trim()) return;
@@ -168,13 +187,16 @@ function SubmitFeedbackPage() {
           <p className="muted">Message Admin, a Tutor, or both - and keep the conversation going like a chat.</p>
         </div>
 
+        {/* two columns - a new message, and my conversations */}
         <div className="checkout-grid">
+          {/* send a new message */}
           <div className="card">
             <h2>Send a New Message</h2>
             <Alert type="success" message={submitSuccess} />
             <Alert type="error" message={submitError} />
 
             <form onSubmit={handleSubmit} noValidate>
+              {/* category */}
               <div className="form-field">
                 <label htmlFor="category">Subject Category</label>
                 <select id="category" value={form.category} onChange={(e) => updateField('category', e.target.value)}>
@@ -186,6 +208,7 @@ function SubmitFeedbackPage() {
                 </select>
               </div>
 
+              {/* who to send it to - admin, tutor or both */}
               <div className="form-field">
                 <label>Send To</label>
                 <div className="segmented">
@@ -208,6 +231,7 @@ function SubmitFeedbackPage() {
                 </div>
               </div>
 
+              {/* tutor picker - needed when a tutor is included */}
               {form.recipientType !== 'ADMIN' && (
                 <div className="form-field">
                   <label htmlFor="recipientTutorId">Which Tutor?</label>
@@ -220,6 +244,7 @@ function SubmitFeedbackPage() {
                 </div>
               )}
 
+              {/* subject */}
               <div className="form-field">
                 <label htmlFor="subject">Subject</label>
                 <input
@@ -232,6 +257,7 @@ function SubmitFeedbackPage() {
                 {fieldErrors.subject && <p className="field-error">{fieldErrors.subject}</p>}
               </div>
 
+              {/* message */}
               <div className="form-field">
                 <label htmlFor="message">Message</label>
                 <textarea
@@ -244,15 +270,18 @@ function SubmitFeedbackPage() {
                 {fieldErrors.message && <p className="field-error">{fieldErrors.message}</p>}
               </div>
 
+              {/* send btn */}
               <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
                 {isSubmitting ? 'Sending...' : 'Send Message'}
               </button>
             </form>
           </div>
 
+          {/* my conversations - the list, and the open conversation with a reply box */}
           <div className="card">
             <h2>My Conversations</h2>
             <Alert type="error" message={loadError} />
+            {/* a spinner, an empty message, or one button per conversation */}
             {isLoadingTickets ? (
               <LoadingSpinner label="Loading your tickets..." />
             ) : tickets.length === 0 ? (
@@ -287,13 +316,16 @@ function SubmitFeedbackPage() {
               </div>
             )}
 
+            {/* a spinner while the conversation loads */}
             {isLoadingThread && <LoadingSpinner label="Loading conversation..." />}
 
+            {/* the open conversation - the messages and a reply box */}
             {openTicket && !isLoadingThread && (
               <div style={{ marginTop: '18px', borderTop: '1px solid var(--color-border)', paddingTop: '14px' }}>
                 <h3 style={{ fontSize: '0.95rem', marginTop: 0 }}>
                   {openTicket.subject} <span className="muted">({recipientLabel(openTicket)})</span>
                 </h3>
+                {/* the messages */}
                 <div className="chat-thread">
                   <div className="chat-bubble-row own">
                     <Avatar name={user.fullName} pictureUrl={user.profilePictureUrl} size={28} />
@@ -321,6 +353,7 @@ function SubmitFeedbackPage() {
                 </div>
 
                 <Alert type="error" message={replyError} />
+                {/* reply form */}
                 <form onSubmit={handleReplySubmit} style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                   <input
                     type="text"

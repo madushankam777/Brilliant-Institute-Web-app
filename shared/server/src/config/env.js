@@ -167,6 +167,22 @@ const config = {
     notifyUrlOverride: process.env.PAYHERE_NOTIFY_URL || '',
   },
 
+  // PayPal - card and PayPal wallet payments (sandbox for testing, live for real money)
+  paypal: {
+    clientId: process.env.PAYPAL_CLIENT_ID || '',
+    secret: process.env.PAYPAL_SECRET || '',
+    // 'sandbox' until you switch to a live PayPal app
+    mode: process.env.PAYPAL_MODE === 'live' ? 'live' : 'sandbox',
+    // PayPal does not accept LKR, so fees are converted before they are sent
+    currency: (process.env.PAYPAL_CURRENCY || 'USD').toUpperCase(),
+    // how many rupees make one unit of that currency
+    lkrPerUnit: Number(process.env.PAYPAL_LKR_RATE) > 0 ? Number(process.env.PAYPAL_LKR_RATE) : 300,
+    // where PayPal sends the payer back (the website address)
+    publicBaseUrl: (process.env.PUBLIC_BASE_URL || String(process.env.CLIENT_ORIGIN || '').split(',')[0] || '')
+      .trim()
+      .replace(/\/+$/, ''),
+  },
+
   // paying tutors out (PayHere only collects)
   payouts: {
     // 'BANK_FILE' or 'API'
@@ -181,6 +197,11 @@ const config = {
 // PayHere is ready only when the merchant id, secret and public address are all set
 config.payhere.isConfigured = Boolean(
   config.payhere.merchantId && config.payhere.merchantSecret && config.payhere.publicBaseUrl
+);
+
+// PayPal is ready once the app keys and the website address are set
+config.paypal.isConfigured = Boolean(
+  config.paypal.clientId && config.paypal.secret && config.paypal.publicBaseUrl
 );
 
 module.exports = config;

@@ -524,7 +524,14 @@ function HomePage() {
           </div>
         </div>
         <div className="hero-media">
-          <img src={heroMediaImg} alt="Students collaborating in a Brilliant Institute classroom" />
+          <img
+            src={heroMediaImg}
+            alt="Students collaborating in a Brilliant Institute classroom"
+            width="640"
+            height="440"
+            decoding="async"
+            fetchPriority="high"
+          />
         </div>
       </section>
 

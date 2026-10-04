@@ -10,12 +10,15 @@ import StatCard from '../../../../../shared/client/src/components/common/StatCar
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// a number as LKR money (no cents)
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(amount);
 }
 
+// a month as, for example, Oct 2026
 function monthLabel(yyyyMm) {
   const [year, month] = yyyyMm.split('-');
   return new Date(Number(year), Number(month) - 1, 1).toLocaleString('en-US', { month: 'short' });
@@ -32,6 +35,7 @@ function RevenueTrendChart({ points }) {
   const maxValue = Math.max(...points.map((p) => p.total), 1);
   const stepX = (width - padding * 2) / Math.max(points.length - 1, 1);
 
+  // the points of the revenue line, as percentages of the box
   const coords = points.map((point, index) => ({
     x: padding + index * stepX,
     y: height - padding - (point.total / maxValue) * (height - padding * 2),
@@ -54,6 +58,7 @@ function RevenueTrendChart({ points }) {
   );
 }
 
+// the words shown for one activity
 function activityLabel(entry) {
   const map = {
     USER_REGISTERED: 'New user registered',
@@ -72,12 +77,14 @@ function activityLabel(entry) {
   return map[entry.action] || entry.action;
 }
 
+// badge colour for each payment status
 const PAYMENT_STATUS_BADGE = {
   SUCCESSFUL: 'badge-success',
   PENDING: 'badge-warning',
   FAILED: 'badge-danger',
 };
 
+// the words shown for each payment method
 const PAYMENT_METHOD_LABEL = {
   CARD: 'Card',
   EZ_CASH: 'eZ Cash',
@@ -85,15 +92,19 @@ const PAYMENT_METHOD_LABEL = {
   BANK_TRANSFER: 'Bank Transfer',
 };
 
+// operations dashboard - stat cards, revenue, recent payments and the live audit activity
 function AdminDashboardPage() {
+  // the dashboard numbers and the page state
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // the recent payments and their state
   const [recentPayments, setRecentPayments] = useState([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const [paymentsError, setPaymentsError] = useState('');
 
+  // load the dashboard numbers
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -104,13 +115,16 @@ function AdminDashboardPage() {
       setErrorMessage(error.message);
     } finally {
       setIsLoading(false);
+    // fail silently, not critical
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // load the recent payments
   useEffect(() => {
     let isMounted = true;
     fetchRecentPayments()
@@ -148,10 +162,12 @@ function AdminDashboardPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* a spinner, or the dashboard */}
         {isLoading || !stats ? (
           <LoadingSpinner label="Loading dashboard..." />
         ) : (
           <>
+            {/* stat cards - users, classes, revenue this month and open complaints */}
             <div className="stat-grid">
               <StatCard icon="users" label="Total Users" value={stats.totalUsers} to="/admin/users" />
               <StatCard icon="book" label="Active Classes" value={stats.activeClasses} to="/courses/manage" />
@@ -177,6 +193,7 @@ function AdminDashboardPage() {
                 <RevenueTrendChart points={stats.revenueTrend} />
               </div>
 
+              {/* live audit activity - who did what and when */}
               <div className="card">
                 <h2>Live Audit Activity</h2>
                 {stats.recentActivity.length === 0 ? (

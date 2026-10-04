@@ -167,8 +167,10 @@ const bankDetailsRules = [
 
 // Admin-only: the institute's own receiving details shown to students
 const paymentSettingsRules = [
-  body('enabledMethods').optional().isArray({ max: 4 }).withMessage('Invalid payment methods.'),
-  body('enabledMethods.*').isIn(['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH']).withMessage('Invalid payment method.'),
+  body('enabledMethods').optional().isArray({ max: 5 }).withMessage('Invalid payment methods.'),
+  body('enabledMethods.*')
+    .isIn(['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH', 'PAYPAL'])
+    .withMessage('Invalid payment method.'),
   body('confirmText').optional().isString().isLength({ max: 20 }),
   body('bankName').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bank name is too long.'),
   body('bankAccountName')

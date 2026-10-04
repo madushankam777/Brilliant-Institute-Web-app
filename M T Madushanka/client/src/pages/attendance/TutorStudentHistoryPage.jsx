@@ -32,8 +32,10 @@ function TutorStudentHistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // load the history for this student and class
   useEffect(() => {
     let isMounted = true;
+    // fetch the history and the summary
     async function load() {
       try {
         const data = await fetchStudentAttendanceHistory(studentId, classId);

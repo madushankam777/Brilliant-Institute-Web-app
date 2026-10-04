@@ -1,3 +1,4 @@
+// login state - who is logged in, shared with every page
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as sessionApi from '../api/sessionApi';
 import { setSessionExpiredHandler } from '../../../../shared/client/src/api/httpClient';
@@ -14,6 +15,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let isMounted = true;
 
+    // ask the server whether the session is still valid
     async function loadSession() {
       try {
         const currentUser = await sessionApi.fetchCurrentSession();
@@ -31,22 +33,26 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // log out by itself when the session expires
   useEffect(() => {
     setSessionExpiredHandler(() => setUser(null));
   }, []);
 
+  // login - save the logged-in user
   const login = useCallback(async (credentials) => {
     const loggedInUser = await sessionApi.login(credentials);
     setUser(loggedInUser);
     return loggedInUser;
   }, []);
 
+  // register - save the new account as the logged-in user
   const register = useCallback(async (details) => {
     const newUser = await sessionApi.register(details);
     setUser(newUser);
     return newUser;
   }, []);
 
+  // logout - end the session, then forget the user
   const logout = useCallback(async () => {
     try {
       await sessionApi.logout();
@@ -55,6 +61,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // what every page can read from the login state
   const value = useMemo(
     () => ({ user, isLoggedIn: Boolean(user), isCheckingSession, login, register, logout }),
     [user, isCheckingSession, login, register, logout]
@@ -63,6 +70,7 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// useAuth hook - the logged-in user, login and logout
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

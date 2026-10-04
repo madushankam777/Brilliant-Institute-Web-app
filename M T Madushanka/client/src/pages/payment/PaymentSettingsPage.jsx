@@ -7,6 +7,7 @@ import FormField from '../../../../../shared/client/src/components/common/FormFi
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
 // Digits, spaces, and dashes only
@@ -25,6 +26,7 @@ const EMPTY_FORM = {
   mcashNumber: '',
 };
 
+// payment settings - the institute's bank and wallet details shown at checkout
 function PaymentSettingsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,10 +63,12 @@ function PaymentSettingsPage() {
     };
   }, []);
 
+  // change one field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // check the bank and wallet fields before saving
   function validate() {
     const errors = {};
     if (form.bankAccountNumber.trim() && !ACCOUNT_NUMBER_REGEX.test(form.bankAccountNumber.trim())) {
@@ -79,6 +83,7 @@ function PaymentSettingsPage() {
     return errors;
   }
 
+  // save btn - save the payment settings
   async function handleSubmit(event) {
     event.preventDefault();
     setSaveError('');

@@ -29,6 +29,7 @@ function PaymentVerificationPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
 
+  // load the bank slips waiting for verification
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -43,15 +44,18 @@ function PaymentVerificationPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // close the confirm pop-up
   function closeConfirmModal() {
     setConfirmTarget(null);
     setConfirmError('');
   }
 
+  // confirm btn - approve or reject the bank slip
   async function handleConfirm() {
     if (!confirmTarget) return;
     setIsConfirming(true);

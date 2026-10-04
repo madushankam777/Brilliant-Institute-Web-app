@@ -1,3 +1,4 @@
+// payment api calls - balances, payments and tutor payouts
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
 // what I still owe on each class
@@ -110,6 +111,7 @@ export async function fetchRecentPayments() {
   return response.data.data.payments;
 }
 
+// verify btn - approve a student's bank slip
 export async function approveBankTransfer(paymentId) {
   const response = await httpClient.patch(`/payments/admin/${paymentId}/approve`);
   return response.data.data.payment;
@@ -127,6 +129,7 @@ export async function fetchTutorPayouts() {
   return response.data.data;
 }
 
+// pay btn - record a payout to a tutor
 export async function payTutor({ tutorId, amount, note, periodLabel }) {
   const response = await httpClient.post('/payments/admin/tutor-payouts', {
     tutorId,

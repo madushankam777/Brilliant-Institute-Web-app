@@ -11,6 +11,7 @@ import Alert from '../../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
+// the side menu for a student
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
 // Letters, numbers, spaces, hyphens, and slashes

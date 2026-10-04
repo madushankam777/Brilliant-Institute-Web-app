@@ -7,17 +7,21 @@ import Alert from '../../../../../shared/client/src/components/common/Alert';
 import PasswordStrength from '../../../../../shared/client/src/components/common/PasswordStrength';
 import AuthLayout from '../../../../../shared/client/src/components/layout/AuthLayout';
 
+// what a strong password needs
 const PASSWORD_RULE_MESSAGE =
   'Password must be at least 8 characters long and include an uppercase letter, ' +
   'a lowercase letter, and a number.';
 
+// 8-72 characters with upper case, lower case and a number
 function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
+// reset page - set a new password with the link an admin gave
 function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // the token comes from the link (?token=...)
   const tokenFromLink = searchParams.get('token') || '';
 
   const [token, setToken] = useState(tokenFromLink);
@@ -27,6 +31,7 @@ function ResetPasswordPage() {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // reset btn - set the new password, then go to the login page
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -50,6 +55,7 @@ function ResetPasswordPage() {
     }
   }
 
+  // the page - the reset form
   return (
     <AuthLayout backTo="/login" backLabel="Back to Login">
       <h1>Reset Your Password</h1>
@@ -57,6 +63,7 @@ function ResetPasswordPage() {
 
       <Alert type="error" message={formError} />
 
+      {/* reset form - token, new password and confirmation */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="token"

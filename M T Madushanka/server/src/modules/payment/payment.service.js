@@ -6,6 +6,7 @@ const { toSafePayment } = require('../../../../../shared/server/src/utils/saniti
 const { PAYMENT_STATUS } = require('./payment.constants');
 const gateway = require('./paymentGateway');
 const payhere = require('./payhereGateway');
+const paypal = require('./paypalGateway');
 const repository = require('./payment.repository');
 const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const payoutGateway = require('./payoutGateway');
@@ -281,23 +282,25 @@ async function finalizePendingPayment(studentUser, paymentId) {
 }
 
 // payment methods - the admin switches them on and off in Payment Settings
-const PAYMENT_METHOD_KEYS = ['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH'];
+const PAYMENT_METHOD_KEYS = ['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH', 'PAYPAL'];
 
 // switched-on methods (bank transfer only until the admin changes it)
 async function loadEnabledMethods() {
   const saved = await repository.findEnabledMethods();
-  if (!saved) return ['BANK_TRANSFER'];
+  if (!saved) return ['BANK_TRANSFER', 'PAYPAL'];
   return PAYMENT_METHOD_KEYS.filter((method) => saved.includes(method));
 }
 
 // checkout tabs a student gets - card/wallets go through PayHere once it is set up
 function checkoutMethodsFor(enabled) {
-  const online = enabled.filter((method) => method !== 'BANK_TRANSFER');
+  const online = enabled.filter((method) => method !== 'BANK_TRANSFER' && method !== 'PAYPAL');
   const tabs = [];
   if (online.length > 0) {
     if (payhere.isConfigured()) tabs.push('ONLINE');
     else tabs.push(...online);
   }
+  // PayPal is its own tab once the admin switches it on and the keys are set
+  if (enabled.includes('PAYPAL') && paypal.isConfigured()) tabs.push('PAYPAL');
   if (enabled.includes('BANK_TRANSFER')) tabs.push('BANK_TRANSFER');
   return tabs;
 }
@@ -712,6 +715,11 @@ async function getPaymentSettings() {
     enabledMethods,
     checkoutMethods: checkoutMethodsFor(enabledMethods),
     onlinePaymentsEnabled: payhere.isConfigured(),
+    // PayPal charges in another currency, so the student is shown the rate
+    paypalEnabled: checkoutMethodsFor(enabledMethods).includes('PAYPAL'),
+    paypalCurrency: config.paypal.currency,
+    paypalLkrRate: config.paypal.lkrPerUnit,
+    paypalConfigured: paypal.isConfigured(),
   };
 }
 
@@ -1315,6 +1323,206 @@ async function handlePayHereNotification(body) {
   return { handled: true, ...outcome };
 }
 
+// PayPal - card and PayPal wallet payments
+
+// the PayPal order id saved against a payment, if it is a PayPal one
+function payPalOrderIdOf(payment) {
+  const details =
+    typeof payment.payment_details === 'string'
+      ? JSON.parse(payment.payment_details || '{}')
+      : payment.payment_details || {};
+  return details.provider === 'paypal' && details.orderId ? String(details.orderId) : null;
+}
+
+// Step 1 of a PayPal payment - reserve a PENDING payment and make the PayPal order
+async function startPayPalCheckout(studentUser, { enrollmentId, amount }, baseUrl) {
+  if (!paypal.isConfigured()) {
+    throw ApiError.badRequest(
+      'PayPal is not switched on yet. Please use Bank Transfer, or ask an Administrator to finish the PayPal setup.'
+    );
+  }
+  await assertMethodAllowed('PAYPAL');
+
+  // same ownership and balance checks as every other payment
+  const paymentId = await createPendingPaymentRecord(studentUser, {
+    enrollmentId,
+    amount,
+    paymentMethod: 'ONLINE',
+    paymentDetails: { provider: 'paypal' },
+  });
+
+  const enrollment = await repository.findEnrollmentById(enrollmentId);
+
+  let order;
+  try {
+    order = await paypal.createOrder({
+      paymentId,
+      amount,
+      description: `Tuition fee - ${enrollment ? enrollment.subject : 'Brilliant Institute'}`,
+      baseUrl,
+    });
+  } catch (error) {
+    // PayPal refused or could not be reached - do not leave the payment hanging
+    await repository.markPaymentFailed(paymentId, { gatewayTransactionId: null });
+    throw ApiError.badRequest(`PayPal could not start this payment. ${error.message}`);
+  }
+
+  // remember the order so the return page can finish it
+  await repository.updatePaymentMethodAndDetails(paymentId, {
+    paymentMethod: 'ONLINE',
+    paymentDetails: {
+      provider: 'paypal',
+      orderId: order.orderId,
+      providerAmount: order.providerAmount,
+      providerCurrency: order.providerCurrency,
+    },
+  });
+
+  await recordAuditEvent({
+    actorId: studentUser.id,
+    action: 'PAYMENT_CHECKOUT_STARTED',
+    entityType: 'payment',
+    entityId: paymentId,
+    details: { provider: 'paypal', amount, orderId: order.orderId },
+  });
+
+  return {
+    paymentId,
+    approveUrl: order.approveUrl,
+    providerAmount: order.providerAmount,
+    providerCurrency: order.providerCurrency,
+  };
+}
+
+// Step 2 - PayPal sends the payer back, so take the money and update the payment
+async function completePayPalCheckout(paymentId) {
+  if (!paypal.isConfigured()) {
+    return { handled: false, reason: 'PayPal is not configured.' };
+  }
+
+  const payment = await repository.findPaymentWithDetailsById(paymentId);
+  if (!payment) {
+    return { handled: false, reason: 'Unknown payment.' };
+  }
+  if (payment.status === PAYMENT_STATUS.SUCCESSFUL) {
+    return { handled: true, status: 'already-successful' };
+  }
+  if (payment.status !== PAYMENT_STATUS.PENDING) {
+    return { handled: false, reason: 'This payment is not waiting for PayPal.' };
+  }
+
+  const orderId = payPalOrderIdOf(payment);
+  if (!orderId) {
+    return { handled: false, reason: 'No PayPal order for this payment.' };
+  }
+
+  // PayPal itself is asked - nothing that came back in the browser is trusted
+  let capture;
+  try {
+    capture = await paypal.captureOrder(orderId);
+  } catch (error) {
+    return { handled: false, reason: error.message };
+  }
+  if (!capture.completed) {
+    return { handled: false, reason: capture.reason || `PayPal order is ${capture.orderStatus}.` };
+  }
+
+  // PayPal must have taken exactly what we asked for
+  const expected = paypal.toProviderAmount(payment.amount);
+  if (Number(capture.amount).toFixed(2) !== expected || capture.currency !== config.paypal.currency) {
+    await repository.markPaymentFailed(payment.id, { gatewayTransactionId: capture.captureId });
+    return { handled: false, reason: 'The amount PayPal took does not match this payment.' };
+  }
+
+  // update the payment in one transaction - safe even if the page is opened twice
+  const outcome = await withTransaction(async (connection) => {
+    const locked = await repository.findPaymentByIdForUpdate(payment.id, connection);
+    if (!locked) {
+      return { status: 'unknown-payment' };
+    }
+    if (locked.status === PAYMENT_STATUS.SUCCESSFUL) {
+      return { status: 'already-successful' };
+    }
+    if (locked.status !== PAYMENT_STATUS.PENDING) {
+      return { status: 'not-pending' };
+    }
+
+    const storedDetails = {
+      provider: 'paypal',
+      orderId,
+      captureId: capture.captureId,
+      providerAmount: capture.amount,
+      providerCurrency: capture.currency,
+      payerEmail: capture.payerEmail,
+      payerName: capture.payerName,
+    };
+
+    // successful - mark it SUCCESSFUL, lower the class balance and make the receipt
+    const enrollment = await repository.findEnrollmentByIdForUpdate(locked.enrollment_id, connection);
+    const balanceAfter = Number(enrollment.balance) - Number(locked.amount);
+
+    await repository.markPaymentSuccessful(
+      locked.id,
+      { gatewayTransactionId: capture.captureId, balanceAfter },
+      connection
+    );
+    await repository.updatePaymentMethodAndDetails(
+      locked.id,
+      { paymentMethod: 'ONLINE', paymentDetails: storedDetails },
+      connection
+    );
+    await repository.updateEnrollmentBalance(locked.enrollment_id, balanceAfter, connection);
+
+    const receiptNumber = buildReceiptNumber(locked.id);
+    await repository.createReceipt(locked.id, receiptNumber, connection);
+
+    return {
+      status: 'successful',
+      studentId: locked.student_id,
+      amount: Number(locked.amount),
+      subject: enrollment.subject,
+      receiptNumber,
+    };
+  });
+
+  // audit log and a notification for the student
+  if (outcome.status === 'successful') {
+    await recordAuditEvent({
+      actorId: outcome.studentId,
+      action: 'PAYMENT_SUCCESSFUL',
+      entityType: 'payment',
+      entityId: payment.id,
+      details: { provider: 'paypal', receiptNumber: outcome.receiptNumber },
+    });
+    await repository.createNotification({
+      recipientId: outcome.studentId,
+      type: 'PAYMENT_APPROVED',
+      message: `Your PayPal payment of LKR ${outcome.amount.toFixed(2)} for ${outcome.subject} was received. Receipt: ${outcome.receiptNumber}.`,
+      sentBy: null,
+    });
+  }
+
+  return { handled: true, ...outcome };
+}
+
+// the payer pressed Cancel on PayPal - close the payment off
+async function cancelPayPalCheckout(paymentId) {
+  const payment = await repository.findPaymentWithDetailsById(paymentId);
+  if (!payment || payment.status !== PAYMENT_STATUS.PENDING || !payPalOrderIdOf(payment)) {
+    return { handled: false };
+  }
+
+  await repository.markPaymentFailed(payment.id, { gatewayTransactionId: null });
+  await recordAuditEvent({
+    actorId: payment.student_id,
+    action: 'PAYMENT_FAILED',
+    entityType: 'payment',
+    entityId: payment.id,
+    details: { provider: 'paypal', reason: 'Cancelled on PayPal.' },
+  });
+  return { handled: true };
+}
+
 // Polled by the return page after PayHere sends the payer back
 async function getMyPaymentStatus(studentUser, paymentId) {
   const payment = await repository.findPaymentWithDetailsById(paymentId);
@@ -1324,6 +1532,14 @@ async function getMyPaymentStatus(studentUser, paymentId) {
   if (payment.student_id !== studentUser.id) {
     throw ApiError.forbidden('You can only view your own payments.');
   }
+
+  // a PayPal payment that was approved but never came back - finish it now
+  if (payment.status === PAYMENT_STATUS.PENDING && payPalOrderIdOf(payment)) {
+    await completePayPalCheckout(payment.id).catch(() => null);
+    const latest = await repository.findPaymentWithDetailsById(paymentId);
+    if (latest) return toSafePayment(latest);
+  }
+
   return toSafePayment(payment);
 }
 
@@ -1335,6 +1551,9 @@ module.exports = {
   retryPendingPayment,
   startOnlineCheckout,
   handlePayHereNotification,
+  startPayPalCheckout,
+  completePayPalCheckout,
+  cancelPayPalCheckout,
   getMyPaymentStatus,
   getBankTransferAvailability,
   submitBankTransferPayment,

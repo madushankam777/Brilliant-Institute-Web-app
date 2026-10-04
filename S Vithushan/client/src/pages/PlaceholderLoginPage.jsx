@@ -1,3 +1,4 @@
+// simple login page used while this module was built on its own
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -5,6 +6,7 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import FormField from '../../../../shared/client/src/components/common/FormField';
 import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
 
+// login page - email and password
 function PlaceholderLoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -13,6 +15,7 @@ function PlaceholderLoginPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // login btn - sign in, then go to the dashboard
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -41,6 +44,7 @@ function PlaceholderLoginPage() {
 
       {error && <Alert type="error" message={error} />}
 
+      {/* login form - email, password and the forgot password link */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="email"

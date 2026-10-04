@@ -65,6 +65,12 @@ app.post(
   paymentController.handlePayHereNotification
 );
 
+// where PayPal sends the payer back (a browser redirect, not an API call).
+// Public for the same reason as above - it carries no session cookie. What
+// makes it safe is that the money is confirmed by asking PayPal directly.
+app.get('/api/payments/paypal/return', paymentController.payPalReturn);
+app.get('/api/payments/paypal/cancel', paymentController.payPalCancel);
+
 // rate limit and CSRF check for every request below this line
 app.use(apiLimiter);
 app.use(csrfGuard);

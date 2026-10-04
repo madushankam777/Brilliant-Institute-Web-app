@@ -12,7 +12,7 @@ A full-stack web application designed to digitize and centralize the day-to-day 
 - Secure registration & role-based login (Student/Parent, Tutor, Admin)
 - Course & class management: browse/search/filter, enrol/drop, tutor CRUD with conflict-free scheduling (CRS-05)
 - Digital attendance marking and low-attendance alerts
-- Online fee payment with digital receipts
+- Online fee payment with digital receipts (PayHere, PayPal, bank transfer, or cash at the office - see [PAYPAL-SETUP.md](PAYPAL-SETUP.md))
 - Feedback & complaint portal with a staff triage queue
 - Admin dashboard (users/classes/revenue/complaints), user management, announcements, and automated fee/attendance reminders
 - Reports centre for admins: 13 reports (institute summary, students, tutors, accounts, classes & timetable, attendance, fees & payments, tutor payouts, feedback, enquiries, announcements, re-registration, audit trail), shown on screen and downloadable as branded PDFs. Tutor and student reports include everything each person did on the site (activity log, attendance registers, messages, payments), and can be downloaded as one PDF per person in a ZIP. Every report also downloads as a formatted Excel workbook (ExcelJS)

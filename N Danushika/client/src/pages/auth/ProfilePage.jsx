@@ -13,32 +13,40 @@ import Avatar from '../../../../../shared/client/src/components/common/Avatar';
 import PasswordStrength from '../../../../../shared/client/src/components/common/PasswordStrength';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 
+// a profile picture can be up to 3 MB
 const MAX_PICTURE_BYTES = 3 * 1024 * 1024;
 
+// what a strong password needs
 const PASSWORD_RULE_MESSAGE =
   'New password must be at least 8 characters long and include an uppercase letter, ' +
   'a lowercase letter, and a number.';
 
+// 8-72 characters with upper case, lower case and a number
 function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
 // Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+// the message shown when the name has odd characters
 const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
 
 // Digits plus the punctuation real phone numbers are written with.
 const PHONE_REGEX = /^[0-9+\-\s()]+$/;
+// the message shown when the phone number has odd characters
 const PHONE_ERROR = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
 
+// the side menu
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/profile', label: 'My Profile', icon: 'user' },
 ];
 
+// my profile page - picture, account details and change password
 function ProfilePage() {
   const { user, refreshProfile } = useAuth();
 
+  // account details form
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone || '');
   const [bio, setBio] = useState(user.bio || '');
@@ -47,6 +55,7 @@ function ProfilePage() {
   const [profileError, setProfileError] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // profile picture
   const pictureInputRef = useRef(null);
   const [pictureError, setPictureError] = useState('');
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
@@ -66,6 +75,7 @@ function ProfilePage() {
     }
   }
 
+  // upload btn - check the file, then upload the picture
   async function handlePictureSelected(event) {
     const file = event.target.files && event.target.files[0];
     event.target.value = '';
@@ -92,12 +102,14 @@ function ProfilePage() {
     }
   }
 
+  // refresh the form when the profile changes
   useEffect(() => {
     setFullName(user.fullName);
     setPhone(user.phone || '');
     setBio(user.bio || '');
   }, [user]);
 
+  // save details btn - name, phone and bio
   async function handleProfileSubmit(event) {
     event.preventDefault();
     setProfileError('');
@@ -127,6 +139,7 @@ function ProfilePage() {
     }
   }
 
+  // change password form
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -135,6 +148,7 @@ function ProfilePage() {
   const [passwordError, setPasswordError] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
+  // change password btn - needs the current password and a strong new one
   async function handlePasswordSubmit(event) {
     event.preventDefault();
     setPasswordError('');
@@ -169,6 +183,7 @@ function ProfilePage() {
           <p className="muted">Update your account details or change your password.</p>
         </div>
 
+        {/* profile picture */}
         <div className="card">
           <h2>Profile picture</h2>
           <Alert type="error" message={pictureError} />
@@ -213,6 +228,7 @@ function ProfilePage() {
           </div>
         </div>
 
+        {/* account details */}
         <div className="card">
           <h2>Account details</h2>
           <Alert type="success" message={profileMessage} />
@@ -263,6 +279,7 @@ function ProfilePage() {
           </form>
         </div>
 
+        {/* change password */}
         <div className="card">
           <h2>Change password</h2>
           <Alert type="success" message={passwordMessage} />

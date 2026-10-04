@@ -14,6 +14,7 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import ProfilePage from './pages/auth/ProfilePage';
 
+// the whole website - the top bar, then the page that matches the address
 function App() {
   return (
     <AuthProvider>

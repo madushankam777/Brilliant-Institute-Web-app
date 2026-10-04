@@ -66,6 +66,14 @@ router.post(
   validateRequest,
   controller.startOnlineCheckout
 );
+// pay with PayPal btn - makes the PayPal order, the browser then goes to PayPal
+router.post(
+  '/checkout/paypal',
+  authorize(ROLES.STUDENT_PARENT),
+  onlineCheckoutRules,
+  validateRequest,
+  controller.startPayPalCheckout
+);
 // student - status of one payment (the return page checks it after PayHere)
 router.get(
   '/:paymentId/status',

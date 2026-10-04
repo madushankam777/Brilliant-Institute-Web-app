@@ -1,3 +1,4 @@
+// my students page - everyone in my classes, with suspend and reactivate
 import { useCallback, useEffect, useState } from 'react';
 import { fetchMyStudents, suspendUser, activateUser } from '../../api/adminApi';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
@@ -6,15 +7,19 @@ import Avatar from '../../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 
+// the side menu for a tutor
 const NAV_ITEMS = getNavItems('TUTOR');
 
+// badge colour for Active, Suspended or other
 function statusBadgeClass(status) {
   if (status === 'ACTIVE') return 'badge badge-success';
   if (status === 'SUSPENDED') return 'badge badge-danger';
   return 'badge badge-neutral';
 }
 
+// my students - everyone in my classes; a tutor can suspend or reactivate them
 function MyStudentsPage() {
+  // the students and the page state
   const [students, setStudents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -24,6 +29,7 @@ function MyStudentsPage() {
   const [confirmNameInput, setConfirmNameInput] = useState('');
   const [confirmError, setConfirmError] = useState('');
 
+  // load my students
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -34,19 +40,23 @@ function MyStudentsPage() {
       setErrorMessage(error.message);
     } finally {
       setIsLoading(false);
+    // fail silently, not critical
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // close the confirm pop-up and clear it
   function closeConfirmModal() {
     setConfirmTarget(null);
     setConfirmNameInput('');
     setConfirmError('');
   }
 
+  // confirm btn - suspend or reactivate the student
   async function handleConfirm() {
     if (!confirmTarget) return;
     setIsConfirming(true);
@@ -79,6 +89,7 @@ function MyStudentsPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* a spinner, or the students table */}
         {isLoading ? (
           <LoadingSpinner label="Loading your students..." />
         ) : (
@@ -109,6 +120,7 @@ function MyStudentsPage() {
                         <span className={statusBadgeClass(student.status)}>{student.status}</span>
                       </td>
                       <td>
+                        {/* suspend btn for active students, reactivate btn for the others */}
                         {student.status === 'ACTIVE' ? (
                           <button
                             type="button"
@@ -160,6 +172,7 @@ function MyStudentsPage() {
 
             <Alert type="error" message={confirmError} />
 
+            {/* name check - only for a suspension */}
             {confirmTarget.action === 'suspend' && (
               <div className="form-field">
                 <label htmlFor="confirmSuspendName">

@@ -8,21 +8,26 @@ import Avatar from '../../../../../shared/client/src/components/common/Avatar';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 
+// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
+// badge colour for Active, Suspended or other
 function statusBadgeClass(status) {
   if (status === 'ACTIVE') return 'badge badge-success';
   if (status === 'SUSPENDED') return 'badge badge-danger';
   return 'badge badge-neutral';
 }
 
+// user profile - an admin's read-only view of one account, with a reset link, timetable and tutor documents
 function UserProfilePage() {
   const { userId } = useParams();
 
+  // the user, the timetable and the page state
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // load the user
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -36,6 +41,7 @@ function UserProfilePage() {
     }
   }, [userId]);
 
+  // load it when the page opens
   useEffect(() => {
     load();
   }, [load]);
@@ -50,6 +56,7 @@ function UserProfilePage() {
     );
   }
 
+  // the user could not be loaded
   if (loadError || !user) {
     return (
       <PortalShell navItems={NAV_ITEMS}>
@@ -66,12 +73,14 @@ function UserProfilePage() {
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
+        {/* breadcrumb back to Manage Users */}
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link to="/admin/users">Manage Users</Link>
           <span className="breadcrumb-sep">/</span>
           <span className="breadcrumb-current">{user.fullName}</span>
         </nav>
 
+        {/* profile - picture, name, role, status, contact details and bio */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '18px' }}>
             <Avatar name={user.fullName} pictureUrl={user.profilePictureUrl} size={64} />
@@ -84,6 +93,7 @@ function UserProfilePage() {
             </div>
           </div>
 
+          {/* contact details and dates */}
           <div className="feature-grid">
             <div>
               <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>Email</p>
@@ -115,6 +125,7 @@ function UserProfilePage() {
             </div>
           </div>
 
+          {/* bio */}
           {user.bio && (
             <div style={{ marginTop: '18px' }}>
               <p className="muted" style={{ marginBottom: '2px', fontSize: '0.8rem' }}>Bio</p>

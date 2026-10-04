@@ -1,6 +1,7 @@
 // All the API calls for login/register/profile live here
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
+// register btn - create a student or tutor account
 export async function registerAccount({
   fullName,
   email,
@@ -30,6 +31,7 @@ export async function login({ email, password }) {
   return response.data.data.user;
 }
 
+// POST /auth/logout - end the session
 export async function logout() {
   await httpClient.post('/auth/logout');
 }

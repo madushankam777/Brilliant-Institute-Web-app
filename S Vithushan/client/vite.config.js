@@ -1,7 +1,9 @@
+// website build and dev server settings (Vite)
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// make shared/ files use this app's copy of react, axios and the router
 const sharedPackageAliases = ['react', 'react-dom', 'react/jsx-runtime', 'react-router-dom', 'axios'].reduce(
   (aliases, pkg) => {
     aliases[pkg] = path.resolve(__dirname, 'node_modules', pkg);

@@ -19,6 +19,11 @@ const METHOD_OPTIONS = [
   { value: 'CARD', label: 'Card', help: 'Visa / Mastercard at checkout.' },
   { value: 'EZ_CASH', label: 'eZ Cash', help: 'Dialog eZ Cash mobile wallet.' },
   { value: 'MCASH', label: 'mCash', help: 'Mobitel mCash mobile wallet.' },
+  {
+    value: 'PAYPAL',
+    label: 'PayPal',
+    help: 'PayPal balance or card. Needs PAYPAL_CLIENT_ID and PAYPAL_SECRET in server/.env.',
+  },
 ];
 
 // a blank settings form

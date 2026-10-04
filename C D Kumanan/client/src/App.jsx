@@ -17,6 +17,7 @@ import ManageClassesPage from './pages/courses/ManageClassesPage';
 import CreateEditClassPage from './pages/courses/CreateEditClassPage';
 import MyStudentsPage from './pages/courses/MyStudentsPage';
 
+// the whole website - the top bar, then the page that matches the address
 function App() {
   return (
     <AuthProvider>

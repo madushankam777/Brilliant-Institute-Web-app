@@ -1,12 +1,13 @@
 // logo - the crest and the institute name
-import logoImg from '../../assets/logo.jpeg';
+// small WebP for the website - the reports still use the full-size logo.jpeg
+import logoImg from '../../assets/logo-small.webp';
 
 // Crest mark + wordmark used in every navbar/footer/auth panel
 function Logo({ tagline, dark = false }) {
   return (
     <span className="brand">
       <span className="brand-mark">
-        <img src={logoImg} alt="Brilliant Institute" className="brand-mark-img" />
+        <img src={logoImg} alt="Brilliant Institute" className="brand-mark-img" width="96" height="96" />
       </span>
       <span>
         <span className="brand-name" style={dark ? { color: '#fff' } : undefined}>

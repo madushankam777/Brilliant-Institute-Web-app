@@ -10,10 +10,12 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// manage classes - a tutor's own classes (an admin sees all) with attendance, extra class, cancel and edit
 function ManageClassesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -27,6 +29,7 @@ function ManageClassesPage() {
   const [confirmCancelId, setConfirmCancelId] = useState(null);
   const [openingAttendanceId, setOpeningAttendanceId] = useState(null);
 
+  // load the classes
   const load = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage('');
@@ -37,13 +40,16 @@ function ManageClassesPage() {
       setErrorMessage(error.message);
     } finally {
       setIsLoading(false);
+    // fail silently, not critical
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // cancel class btn - cancel the whole class, then reload the list
   async function handleCancel(classId) {
     setCancellingId(classId);
     setErrorMessage('');
@@ -58,6 +64,7 @@ function ManageClassesPage() {
     }
   }
 
+  // mark attendance btn - open today's attendance sheet for the class
   async function handleMarkAttendance(classId) {
     setOpeningAttendanceId(classId);
     setErrorMessage('');
@@ -90,6 +97,7 @@ function ManageClassesPage() {
 
         <Alert type="error" message={errorMessage} />
 
+        {/* a spinner, an empty message, or the classes table */}
         {isLoading ? (
           <LoadingSpinner label="Loading your classes..." />
         ) : classes.length === 0 ? (
@@ -134,6 +142,7 @@ function ManageClassesPage() {
                       <td>
                         {classItem.status === 'ACTIVE' && (
                           <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            {/* mark attendance btn - opens today's attendance sheet */}
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
@@ -146,8 +155,10 @@ function ManageClassesPage() {
                             <Link to={`/courses/manage/${classItem.id}/edit`} className="btn btn-secondary btn-sm">
                               <Icon name="edit" size={14} />
                             </Link>
+                            {/* cancel class btn - asks Confirm or Keep first */}
                             {confirmCancelId === classItem.id ? (
                               <>
+                                {/* delete key btn - asks to confirm */}
                                 <button
                                   type="button"
                                   className="btn btn-danger btn-sm"

@@ -1,3 +1,4 @@
+// attendance api calls - sessions, marking and check-in
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
 // GET - the sessions of a class

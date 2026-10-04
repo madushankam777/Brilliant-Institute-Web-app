@@ -5,6 +5,7 @@ import Icon from '../../../../shared/client/src/components/common/Icon';
 import Footer from '../../../../shared/client/src/components/layout/Footer';
 import heroMediaImg from '../../../../shared/client/src/assets/hero-media.png';
 
+// the four feature cards on the public page
 const FEATURES = [
   {
     icon: 'user',
@@ -26,6 +27,7 @@ const FEATURES = [
   },
 ];
 
+// the two quotes on the public page
 const TESTIMONIALS = [
   {
     quote:
@@ -41,10 +43,12 @@ const TESTIMONIALS = [
   },
 ];
 
+// home page - admins go to their dashboard, students and tutors see theirs, visitors see the landing page
 function HomePage() {
   const { user, isLoggedIn } = useAuth();
 
   if (isLoggedIn) {
+    // the dashboard - welcome, stat cards, the timetable and shortcut cards
     return (
       <div className="page">
         <div className="page-header">
@@ -67,6 +71,7 @@ function HomePage() {
 
   return (
     <>
+      {/* hero - headline and sign-up buttons */}
       <section className="container hero">
         <div className="hero-copy">
           <span className="eyebrow">Revolutionizing EdTech Operations</span>
@@ -113,6 +118,7 @@ function HomePage() {
         </div>
       </section>
 
+      {/* testimonials */}
       <section className="section">
         <div className="container">
           <div className="section-heading">

@@ -7,6 +7,7 @@ import StatCard from '../../../../../shared/client/src/components/common/StatCar
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
+// the side menu for a student
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
 // badge colour for Present, Late or Absent
@@ -23,6 +24,7 @@ function AttendanceHistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // load my attendance history when the page opens
   useEffect(() => {
     let isMounted = true;
     // fetch the history and the summary per class

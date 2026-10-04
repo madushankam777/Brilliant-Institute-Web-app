@@ -1,3 +1,4 @@
+// Landing page for this module (Registration & Login only).
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Icon from '../../../../shared/client/src/components/common/Icon';
@@ -6,6 +7,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import heroMediaImg from '../../../../shared/client/src/assets/hero-media.png';
 
+// the feature cards on the public page
 const FEATURES = [
   {
     icon: 'chat',
@@ -24,6 +26,7 @@ const FEATURES = [
   },
 ];
 
+// home page - the landing page, or the dashboard once logged in
 function HomePage() {
   const { user, isLoggedIn } = useAuth();
 

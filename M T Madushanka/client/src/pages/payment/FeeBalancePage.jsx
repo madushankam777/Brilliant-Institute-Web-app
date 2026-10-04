@@ -16,6 +16,7 @@ import Icon from '../../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
+// the side menu for a student
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
 // demo simulator tabs
@@ -87,8 +88,10 @@ function formatExpiryInput(rawValue, previousFormatted) {
   return digits;
 }
 
+// a blank card form
 const emptyCardDetails = { cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' };
 
+// fees & payments - what I owe per class, and the checkout
 function FeeBalancePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -178,6 +181,7 @@ function FeeBalancePage() {
   useEffect(() => {
     const targetEnrollmentId = location.state && location.state.enrollmentId;
     if (!targetEnrollmentId || autoStartedRef.current || balances.length === 0) return;
+    // the class I just enrolled in
     const target = balances.find((b) => b.enrollmentId === targetEnrollmentId);
     if (target) {
       autoStartedRef.current = true;

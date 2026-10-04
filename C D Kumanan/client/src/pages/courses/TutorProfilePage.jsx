@@ -10,20 +10,24 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../../../../shared/client/src/components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
+// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// tutor profile - bio and the classes this tutor teaches
 function TutorProfilePage() {
   const { tutorId } = useParams();
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
   const [tutor, setTutor] = useState(null);
+  // my classes and the page state
   const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  // load the tutor and their classes
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -38,6 +42,7 @@ function TutorProfilePage() {
     }
   }, [tutorId]);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
@@ -52,6 +57,7 @@ function TutorProfilePage() {
     );
   }
 
+  // the tutor could not be loaded
   if (loadError || !tutor) {
     return (
       <PortalShell navItems={NAV_ITEMS}>
@@ -74,6 +80,7 @@ function TutorProfilePage() {
           <span className="breadcrumb-current">{tutor.fullName}</span>
         </nav>
 
+        {/* tutor details */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: tutor.bio ? '18px' : 0 }}>
             <Avatar name={tutor.fullName} pictureUrl={tutor.profilePictureUrl} size={64} />
@@ -85,6 +92,7 @@ function TutorProfilePage() {
           {tutor.bio && <p style={{ marginBottom: 0 }}>{tutor.bio}</p>}
         </div>
 
+        {/* classes taught */}
         <div className="card">
           <h2>Classes Taught</h2>
           {classes.length === 0 ? (

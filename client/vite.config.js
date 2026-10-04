@@ -24,7 +24,7 @@ const SECURITY_HEADERS = {
     "connect-src 'self'",
     // the Contact page shows a Google Map
     "frame-src https://www.google.com https://maps.google.com",
-    "form-action 'self' https://sandbox.payhere.lk https://www.payhere.lk",
+    "form-action 'self' https://sandbox.payhere.lk https://www.payhere.lk https://www.sandbox.paypal.com https://www.paypal.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "object-src 'none'",

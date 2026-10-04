@@ -1,3 +1,4 @@
+// simple register page used while this module was built on its own
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +7,7 @@ import FormField from '../../../../shared/client/src/components/common/FormField
 import AuthLayout from '../../../../shared/client/src/components/layout/AuthLayout';
 import { GRADES } from '../../../../shared/client/src/constants/grades';
 
+// a blank register form
 const initialForm = {
   fullName: '',
   email: '',
@@ -18,12 +20,15 @@ const initialForm = {
 
 // Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
+// the message shown when the name has odd characters
 const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
 
 // Digits plus the punctuation real phone numbers are written with.
 const PHONE_REGEX = /^[0-9+\-\s()]+$/;
+// the message shown when the phone number has odd characters
 const PHONE_ERROR = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
 
+// register page - name, email, phone, role and password
 function PlaceholderRegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +37,7 @@ function PlaceholderRegisterPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // change one form field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
@@ -50,6 +56,7 @@ function PlaceholderRegisterPage() {
     return errors;
   }
 
+  // register btn - check the form, then create the account
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');

@@ -17,6 +17,7 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// a blank payout form
 const EMPTY_PAYOUT_FORM = { amount: '', note: '', periodLabel: '' };
 
 // pay tutors - each tutor's bank account, a Pay btn, the bank file and the payment history
@@ -34,11 +35,13 @@ function PayTutorsPage() {
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // the tutor being paid
   const selectedTutor = useMemo(
     () => tutors.find((tutor) => tutor.id === selectedTutorId) || null,
     [tutors, selectedTutorId]
   );
 
+  // load the tutors and their payouts
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -55,10 +58,12 @@ function PayTutorsPage() {
     }
   }, []);
 
+  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
+  // pay btn - open the payout pop-up
   function openPayModal(tutor) {
     setPayingTutor(tutor);
     setForm(EMPTY_PAYOUT_FORM);
@@ -66,11 +71,13 @@ function PayTutorsPage() {
     setSuccessMessage('');
   }
 
+  // close the payout pop-up
   function closePayModal() {
     if (isSubmitting) return;
     setPayingTutor(null);
   }
 
+  // save btn - record the payout to the tutor
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');

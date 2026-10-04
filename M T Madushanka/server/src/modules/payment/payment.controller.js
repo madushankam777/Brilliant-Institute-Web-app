@@ -1,5 +1,6 @@
 // HTTP layer for payment routes
 const asyncHandler = require('../../../../../shared/server/src/utils/asyncHandler');
+const config = require('../../../../../shared/server/src/config/env');
 const { saveUpload, deleteUpload, sendUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const service = require('./payment.service');
 
@@ -311,6 +312,72 @@ const handlePayHereNotification = asyncHandler(async (req, res) => {
   res.status(200).send('OK');
 });
 
+// a home or office address, never somewhere on the internet
+function isLocalHost(host) {
+  const name = String(host).split(':')[0];
+  return (
+    name === 'localhost' ||
+    name === '127.0.0.1' ||
+    /^10\./.test(name) ||
+    /^192\.168\./.test(name) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(name)
+  );
+}
+
+// the address the student is actually using, so PayPal sends them back to the
+// same place (localhost, the preview port, or a phone on the office wi-fi)
+function siteAddressOf(req) {
+  const origin = req.headers.origin;
+  if (origin && config.clientOrigins.includes(origin)) return origin;
+
+  // same-origin request (the website proxies /api), so the host is the website
+  const host = req.get('host');
+  if (host) {
+    const sameOrigin = `${req.protocol}://${host}`;
+    if (config.clientOrigins.includes(sameOrigin) || isLocalHost(host)) return sameOrigin;
+  }
+
+  return config.paypal.publicBaseUrl;
+}
+
+// POST /checkout/paypal - makes the PayPal order and hands back the link to send the payer to
+const startPayPalCheckout = asyncHandler(async (req, res) => {
+  const { enrollmentId, amount } = req.body;
+  const checkout = await service.startPayPalCheckout(
+    req.user,
+    { enrollmentId, amount: Number(amount) },
+    siteAddressOf(req)
+  );
+  res.status(201).json({ success: true, data: { checkout } });
+});
+
+// where PayPal sends the payer back - public, the money is checked with PayPal itself
+const payPalReturn = asyncHandler(async (req, res) => {
+  const paymentId = Number(req.query.payment);
+  if (!Number.isInteger(paymentId) || paymentId < 1) {
+    return res.redirect(302, '/payments');
+  }
+
+  const outcome = await service.completePayPalCheckout(paymentId);
+  if (!outcome.handled) {
+    // eslint-disable-next-line no-console
+    console.warn('[paypal] payment not completed:', outcome.reason, { paymentId });
+  }
+
+  // the return page then shows the result (same site the payer came from)
+  return res.redirect(302, `/payments/return?payment=${paymentId}`);
+});
+
+// the payer pressed Cancel on PayPal
+const payPalCancel = asyncHandler(async (req, res) => {
+  const paymentId = Number(req.query.payment);
+  if (Number.isInteger(paymentId) && paymentId > 0) {
+    await service.cancelPayPalCheckout(paymentId);
+    return res.redirect(302, `/payments/return?payment=${paymentId}&cancelled=1`);
+  }
+  return res.redirect(302, '/payments');
+});
+
 // GET /:paymentId/status - the return page checks the payment after PayHere
 const getMyPaymentStatus = asyncHandler(async (req, res) => {
   const payment = await service.getMyPaymentStatus(req.user, Number(req.params.paymentId));
@@ -344,6 +411,9 @@ module.exports = {
   retryPendingPayment,
   startOnlineCheckout,
   handlePayHereNotification,
+  startPayPalCheckout,
+  payPalReturn,
+  payPalCancel,
   getMyPaymentStatus,
   getMyPaymentHistory,
   getBankTransferAvailability,

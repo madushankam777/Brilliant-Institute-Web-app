@@ -55,6 +55,9 @@ function paymentMethodSummary(payment) {
   if ((payment.paymentMethod === 'EZ_CASH' || payment.paymentMethod === 'MCASH') && details?.walletPhone) {
     return `${METHOD_LABELS[payment.paymentMethod]} • ${details.walletPhone}`;
   }
+  if (payment.paymentMethod === 'ONLINE' && details?.provider === 'paypal') {
+    return details.payerEmail ? 'PayPal - ' + details.payerEmail : 'PayPal';
+  }
   if (payment.paymentMethod === 'BANK_TRANSFER' && details?.bankReference) {
     return `Bank Transfer • ${details.bankReference}`;
   }

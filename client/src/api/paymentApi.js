@@ -24,6 +24,12 @@ export async function startOnlineCheckout({ enrollmentId, amount }) {
   return response.data.data.checkout;
 }
 
+// pay with PayPal btn - makes the PayPal order and returns the link to approve it
+export async function startPayPalCheckout({ enrollmentId, amount }) {
+  const response = await httpClient.post('/payments/checkout/paypal', { enrollmentId, amount });
+  return response.data.data.checkout;
+}
+
 // Polled on the way back from the gateway
 export async function fetchPaymentStatus(paymentId) {
   const response = await httpClient.get(`/payments/${paymentId}/status`);

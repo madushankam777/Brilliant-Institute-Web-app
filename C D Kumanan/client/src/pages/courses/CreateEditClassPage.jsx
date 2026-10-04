@@ -10,9 +10,12 @@ import { getNavItems } from '../../../../../shared/client/src/components/layout/
 import { GRADES } from '../../../../../shared/client/src/constants/grades';
 import { useAuth } from '../../context/AuthContext';
 
+// subject areas to pick from
 const SUBJECT_AREAS = ['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Other'];
+// the days a class can run on
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+// a blank class form
 const emptyForm = {
   subject: '',
   subjectArea: 'Mathematics',
@@ -27,6 +30,7 @@ const emptyForm = {
   tutorId: null,
 };
 
+// the class length as text, like 1h 30m
 function computeDuration(startTime, endTime) {
   if (!startTime || !endTime) return '-';
   const [sh, sm] = startTime.split(':').map(Number);
@@ -38,6 +42,7 @@ function computeDuration(startTime, endTime) {
   return `${hours > 0 ? `${hours}h ` : ''}${remainder > 0 ? `${remainder}m` : ''}`.trim() || '0m';
 }
 
+// create / edit class - pick the tutor (admin), the first day, a free time, venue, seats and fee
 function CreateEditClassPage() {
   const { classId } = useParams();
   const isEditMode = Boolean(classId);
@@ -58,6 +63,7 @@ function CreateEditClassPage() {
   const [tutors, setTutors] = useState([]);
   const [tutorsError, setTutorsError] = useState('');
 
+  // edit mode - load the class into the form
   const loadExisting = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -83,10 +89,12 @@ function CreateEditClassPage() {
     }
   }, [classId]);
 
+  // edit mode - load the class when the page opens
   useEffect(() => {
     if (isEditMode) loadExisting();
   }, [isEditMode, loadExisting]);
 
+  // admin - load the tutors to choose from
   useEffect(() => {
     if (!isAdmin) return;
     fetchAllTutors()
@@ -94,12 +102,15 @@ function CreateEditClassPage() {
       .catch((error) => setTutorsError(error.message));
   }, [isAdmin]);
 
+  // change one field and clear its error
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // how long the class runs
   const duration = useMemo(() => computeDuration(form.startTime, form.endTime), [form.startTime, form.endTime]);
 
+  // publish btn - check the form, then create or update the class
   async function handleSubmit(event) {
     event.preventDefault();
     setSaveError('');
@@ -165,6 +176,7 @@ function CreateEditClassPage() {
         <Alert type="error" message={saveError} />
 
         <div className="card">
+          {/* payout form - amount, month, note and how it is paid */}
           <form onSubmit={handleSubmit} noValidate>
             <div className="card-field-row">
               <div className="form-field">
@@ -242,6 +254,7 @@ function CreateEditClassPage() {
             </div>
 
             <div className="card-field-row">
+              {/* venue */}
               <div className="form-field">
                 <label htmlFor="venue">Venue / Classroom</label>
                 <input

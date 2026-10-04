@@ -1,3 +1,4 @@
+// home page - the landing page, or the student or tutor dashboard
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +11,7 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../components/layout/navItems';
 import heroMediaImg from '../../../../shared/client/src/assets/hero-media.png';
 
+// the feature cards on the public page
 const FEATURES = [
   {
     icon: 'calendar',
@@ -42,6 +44,7 @@ function StudentDashboard({ user }) {
   const [balances, setBalances] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // load my attendance and fee balance together
   useEffect(() => {
     let isMounted = true;
     Promise.all([fetchMyAttendanceHistory(), fetchMyBalances()])
@@ -63,8 +66,10 @@ function StudentDashboard({ user }) {
 
   // attendance rate over all classes, and the fees still owed
   const totalAttended = summaryByClass.reduce((sum, s) => sum + s.attendedSessions, 0);
+  // my attendance rate over all my classes
   const totalSessions = summaryByClass.reduce((sum, s) => sum + s.totalSessions, 0);
   const overallRate = totalSessions > 0 ? Math.round((totalAttended / totalSessions) * 100) : null;
+  // the fees I still owe
   const pendingFees = balances.reduce((sum, b) => sum + Number(b.balance), 0);
 
   // the dashboard - welcome, stat cards, the timetable and shortcut cards
@@ -121,6 +126,7 @@ function StudentDashboard({ user }) {
   );
 }
 
+// tutor dashboard - shortcuts to attendance and classes
 function TutorDashboard({ user }) {
   const isAdmin = user.role === 'ADMIN';
   // the dashboard - welcome, stat cards, the timetable and shortcut cards
@@ -166,6 +172,7 @@ function TutorDashboard({ user }) {
   );
 }
 
+// home page - shows the right dashboard for the role
 function HomePage() {
   const { user, isLoggedIn } = useAuth();
 

@@ -16,6 +16,7 @@ function SelfCheckInPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState(null); // { success, message }
 
+  // check in btn - send the 6-digit key to the server
   async function handleSubmit(event) {
     event.preventDefault();
     setIsSubmitting(true);
