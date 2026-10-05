@@ -1,5 +1,6 @@
 // Course module - all database queries
 const { pool } = require('../../../../../shared/server/src/config/db');
+const notifications = require('../../../../../shared/server/src/utils/notifications');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
 // a class with its tutor's name and photo and how many students are enrolled - reused by the class lists
@@ -198,12 +199,8 @@ async function listActiveStudentIdsForClass(classId) {
 }
 
 // save a notification for a student
-async function createNotification({ recipientId, type, message, sentBy }) {
-  await pool.execute(
-    `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
-     VALUES (?, 'EMAIL', ?, ?, ?, NOW())`,
-    [recipientId, type, message, sentBy || null]
-  );
+async function createNotification({ recipientId, type, message, sentBy, link }) {
+  await notifications.createNotification({ recipientId, type, message, sentBy: sentBy || null, link, channel: 'EMAIL' });
 }
 
 // mark a class CANCELLED
@@ -428,6 +425,52 @@ async function removeEnrollmentRecord(enrollmentId) {
   await pool.execute(`UPDATE enrollments SET status = 'REMOVED' WHERE id = ?`, [enrollmentId]);
 }
 
+// enrol btn - lock the class row so two students can never take the same last seat
+// returns the enrolment id, or null when the class is full
+async function enrollIfSeatFree(studentId, classId, fee, existingEnrollmentId) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [classes] = await connection.execute(
+      `SELECT capacity FROM classes WHERE id = ? AND status = 'ACTIVE' FOR UPDATE`,
+      [classId]
+    );
+    const [counts] = await connection.execute(
+      `SELECT COUNT(*) AS total FROM enrollments WHERE class_id = ? AND status = 'ACTIVE'`,
+      [classId]
+    );
+    if (!classes[0] || Number(counts[0].total) >= Number(classes[0].capacity)) {
+      await connection.rollback();
+      return null;
+    }
+
+    let enrollmentId = existingEnrollmentId;
+    if (existingEnrollmentId) {
+      // re-add btn - reuse the old row instead of a duplicate
+      await connection.execute(
+        `UPDATE enrollments
+         SET status = 'ACTIVE', balance = ?, payment_status = 'UNPAID', enrolled_at = NOW(), drop_date = NULL
+         WHERE id = ?`,
+        [fee, existingEnrollmentId]
+      );
+    } else {
+      const [result] = await connection.execute(
+        `INSERT INTO enrollments (student_id, class_id, status, balance, enrolled_at)
+         VALUES (?, ?, 'ACTIVE', ?, NOW())`,
+        [studentId, classId, fee]
+      );
+      enrollmentId = result.insertId;
+    }
+    await connection.commit();
+    return enrollmentId;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 // how many students are enrolled in a class
 async function countActiveEnrollments(classId) {
   const [rows] = await pool.execute(
@@ -439,8 +482,11 @@ async function countActiveEnrollments(classId) {
 
 // a student's enrolments with the class and tutor (removed ones are hidden)
 async function listMyEnrollments(studentId) {
+  // the pay-by time only exists after the database update
+  const dueColumn = (await schema.hasPaymentDeadlines()) ? 'e.payment_due_at' : 'NULL';
   const [rows] = await pool.execute(
     `SELECT e.id AS enrollment_id, e.status AS enrollment_status, e.balance, e.enrolled_at, e.drop_date,
+            e.payment_status, ${dueColumn} AS payment_due_at,
             c.id, c.subject, c.subject_area, c.level, c.venue, c.day_of_week, c.start_time, c.end_time,
             c.status, t.full_name AS tutor_name
      FROM enrollments e
@@ -487,5 +533,6 @@ module.exports = {
   dropEnrollment,
   removeEnrollmentRecord,
   countActiveEnrollments,
+  enrollIfSeatFree,
   listMyEnrollments,
 };

@@ -11,6 +11,7 @@ import Alert from '../../../../shared/client/src/components/common/Alert';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import useHighlight from '../../../../shared/client/src/hooks/useHighlight';
 
 // the side menu for a student
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
@@ -69,6 +70,8 @@ function PaymentHistoryPage() {
   // the payments and the page state
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  // the row a notification pointed at (?highlight=ID)
+  const highlightId = useHighlight(!isLoading);
   const [errorMessage, setErrorMessage] = useState('');
   const [retryingId, setRetryingId] = useState(null);
 
@@ -191,7 +194,7 @@ function PaymentHistoryPage() {
                 </thead>
                 <tbody>
                   {payments.map((payment) => (
-                    <tr key={payment.id}>
+                    <tr key={payment.id} className={payment.id === highlightId ? 'row-highlight' : undefined}>
                       <td>{payment.createdAt}</td>
                       <td>{payment.subject}</td>
                       <td>{formatCurrency(payment.amount)}</td>

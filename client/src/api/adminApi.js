@@ -135,6 +135,21 @@ export async function fetchMyNotifications() {
   return response.data.data.notifications;
 }
 
+// clear btn - hide one of my notifications on every device
+export async function dismissMyNotification(notificationId) {
+  await httpClient.post(`/notifications/${notificationId}/dismiss`);
+}
+
+// clear btn on an announcement - it comes back only if the admin edits it
+export async function dismissMyAnnouncement(announcementId, version) {
+  await httpClient.post(`/announcements/${announcementId}/dismiss`, { version });
+}
+
+// clear all btn - empty my whole bell on every device
+export async function clearMyNotifications() {
+  await httpClient.post('/notifications/clear-all');
+}
+
 // every announcement (admin)
 export async function fetchAllAnnouncements() {
   const response = await httpClient.get('/admin/announcements');

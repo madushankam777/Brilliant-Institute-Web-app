@@ -2,7 +2,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const ApiError = require('../utils/ApiError');
-const { passwordVersion, isTokenRevoked } = require('../utils/sessionToken');
+const { passwordVersion, isTokenRevoked, renewIfHalfUsed } = require('../utils/sessionToken');
 const { SESSION_COOKIE_NAME, USER_STATUS } = require('../config/roles');
 const { pool } = require('../config/db');
 
@@ -49,6 +49,9 @@ async function authenticate(req, res, next) {
   if (payload.pwv !== passwordVersion(account.password_hash)) {
     return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
   }
+
+  // still in use - keep the session going (only an idle session runs out)
+  renewIfHalfUsed(res, payload, account);
 
   // role and email always come from the database, not the token
   req.user = {

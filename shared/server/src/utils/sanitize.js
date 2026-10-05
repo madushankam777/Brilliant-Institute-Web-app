@@ -186,6 +186,10 @@ const NOTIFICATION_TYPE_LABELS = {
   PAYOUT_RECORDED: 'Payout',
   REREGISTRATION: 'Re-registration',
   ACCOUNT_CLOSED: 'Account',
+  PAYMENT_DUE: 'Payment Needed',
+  ENROLMENT_AT_RISK: 'Pay To Keep Your Place',
+  ENROLMENT_RELEASED: 'Place Released',
+  SEAT_AVAILABLE: 'Seat Available',
 };
 
 // Scheduled reminders are CLASS_REMINDER rows whose message starts with this.

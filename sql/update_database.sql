@@ -131,11 +131,58 @@ ALTER TABLE users
 ALTER TABLE notification_log
   MODIFY COLUMN channel ENUM('EMAIL', 'SMS', 'IN_APP') NOT NULL;
 
--- allow the notification types added by the newer features
+-- notification kinds are plain text now, so a new kind never needs another update
 ALTER TABLE notification_log
-  MODIFY COLUMN type ENUM('CLASS_REMINDER', 'FEE_DUE', 'LOW_ATTENDANCE', 'ANNOUNCEMENT',
-                          'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_SUBMITTED', 'PAYOUT_RECORDED',
-                          'REREGISTRATION', 'ACCOUNT_CLOSED') NOT NULL;
+  MODIFY COLUMN type VARCHAR(40) NOT NULL;
+
+-- notification bell: where a click takes you, and "cleared" that follows you to every device
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE notification_log ADD COLUMN link VARCHAR(255) NULL AFTER message', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notification_log' AND COLUMN_NAME = 'link');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE notification_log ADD COLUMN dismissed_at DATETIME NULL AFTER sent_at', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notification_log' AND COLUMN_NAME = 'dismissed_at');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- announcements a user cleared (one row per user and announcement; a newer version shows again)
+CREATE TABLE IF NOT EXISTS announcement_dismissals (
+  user_id          INT UNSIGNED NOT NULL,
+  announcement_id  INT UNSIGNED NOT NULL,
+  version          INT UNSIGNED NOT NULL DEFAULT 1,
+  dismissed_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, announcement_id),
+  CONSTRAINT fk_announcement_dismiss_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_announcement_dismiss_item FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- pay-by time for a new enrolment (unpaid places are released then), and when the 2-day warning went out
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE enrollments ADD COLUMN payment_due_at DATETIME NULL AFTER balance', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'enrollments' AND COLUMN_NAME = 'payment_due_at');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE enrollments ADD COLUMN payment_warned_at DATETIME NULL AFTER payment_due_at', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'enrollments' AND COLUMN_NAME = 'payment_warned_at');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- students who tried to join a full class - they are told when a seat frees up
+CREATE TABLE IF NOT EXISTS class_waitlist (
+  class_id     INT UNSIGNED NOT NULL,
+  student_id   INT UNSIGNED NOT NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notified_at  DATETIME NULL,
+  PRIMARY KEY (class_id, student_id),
+  KEY idx_waitlist_student (student_id),
+  CONSTRAINT fk_waitlist_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_waitlist_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- shows that the script finished
 SELECT 'database update complete' AS result;

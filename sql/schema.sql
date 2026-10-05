@@ -112,6 +112,8 @@ CREATE TABLE IF NOT EXISTS enrollments (
   status          ENUM('ACTIVE', 'DROPPED', 'REMOVED') NOT NULL DEFAULT 'ACTIVE',
   payment_status  ENUM('UNPAID', 'PAID') NOT NULL DEFAULT 'UNPAID',
   balance         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  payment_due_at    DATETIME NULL,
+  payment_warned_at DATETIME NULL,
   enrolled_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   drop_date       DATETIME NULL,
   UNIQUE KEY uq_enrollment_student_class (student_id, class_id),
@@ -357,14 +359,37 @@ CREATE TABLE IF NOT EXISTS notification_log (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   recipient_id  INT UNSIGNED NOT NULL,
   channel       ENUM('EMAIL', 'SMS', 'IN_APP') NOT NULL,
-  type          ENUM('CLASS_REMINDER', 'FEE_DUE', 'LOW_ATTENDANCE', 'ANNOUNCEMENT',
-                     'PAYMENT_APPROVED', 'PAYMENT_REJECTED', 'PAYMENT_SUBMITTED', 'PAYOUT_RECORDED',
-                     'REREGISTRATION', 'ACCOUNT_CLOSED') NOT NULL,
+  type          VARCHAR(40) NOT NULL,
   message       VARCHAR(500) NOT NULL,
+  link          VARCHAR(255) NULL,
   sent_by       INT UNSIGNED NULL,
   sent_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  dismissed_at  DATETIME NULL,
   KEY idx_notification_recipient (recipient_id),
   KEY idx_notification_type (type),
   CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notification_sent_by FOREIGN KEY (sent_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- announcement_dismissals - announcements a user cleared (a newer version shows again)
+CREATE TABLE IF NOT EXISTS announcement_dismissals (
+  user_id          INT UNSIGNED NOT NULL,
+  announcement_id  INT UNSIGNED NOT NULL,
+  version          INT UNSIGNED NOT NULL DEFAULT 1,
+  dismissed_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, announcement_id),
+  CONSTRAINT fk_announcement_dismiss_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_announcement_dismiss_item FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- class_waitlist - students who tried to join a full class; they are told when a seat frees up
+CREATE TABLE IF NOT EXISTS class_waitlist (
+  class_id     INT UNSIGNED NOT NULL,
+  student_id   INT UNSIGNED NOT NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notified_at  DATETIME NULL,
+  PRIMARY KEY (class_id, student_id),
+  KEY idx_waitlist_student (student_id),
+  CONSTRAINT fk_waitlist_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_waitlist_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

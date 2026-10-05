@@ -21,8 +21,6 @@ function LoginPage() {
 
   // show a success message when the user has just registered
   const justRegistered = Boolean(location.state && location.state.justRegistered);
-  // the page the user came from, to go back to after login
-  const redirectTo = location.state && location.state.from ? location.state.from.pathname : null;
 
   // check the form before sending it
   function validate() {
@@ -38,7 +36,7 @@ function LoginPage() {
     return errors;
   }
 
-  // login btn - validate, log in, then go back to the page the user came from
+  // login btn - validate, log in, then always open the user's own dashboard first
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -49,9 +47,9 @@ function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      await login({ email, password });
-      // Go back to the page the user came from, or the dashboard.
-      navigate(redirectTo || '/', { replace: true });
+      const loggedIn = await login({ email, password });
+      // every login starts on the dashboard for that role
+      navigate(loggedIn && loggedIn.role === 'ADMIN' ? '/admin/dashboard' : '/', { replace: true });
     } catch (error) {
       const details = Array.isArray(error.details) ? error.details : [];
       if (details.length > 0) {

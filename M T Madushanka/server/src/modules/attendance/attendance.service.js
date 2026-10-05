@@ -120,10 +120,27 @@ async function selfCheckIn(studentUser, code) {
     throw ApiError.forbidden('You can only check in to a class you are enrolled in.');
   }
 
-  // already checked in? then just say so
+  // already present or late? then just say so
   const existing = await repository.findAttendanceRecord(session.id, studentUser.id);
-  if (existing) {
+  if (existing && existing.status !== 'ABSENT') {
     return { alreadyCheckedIn: true, subject: session.subject };
+  }
+
+  // marked absent, but here with the live key - they did come, so mark them present
+  if (existing) {
+    await repository.updateAttendanceRecord(existing.id, {
+      status: 'PRESENT',
+      remarks: 'Checked in with the attendance key after being marked absent',
+      markedBy: studentUser.id,
+    });
+    await recordAuditEvent({
+      actorId: studentUser.id,
+      action: 'ATTENDANCE_CODE_CHECKIN',
+      entityType: 'class_session',
+      entityId: session.id,
+      details: { previousStatus: 'ABSENT' },
+    });
+    return { alreadyCheckedIn: false, subject: session.subject };
   }
 
   // mark the student PRESENT
@@ -220,6 +237,15 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
   for (const record of records) {
     const existing = await repository.findAttendanceRecord(sessionId, record.studentId);
 
+    // nothing changed for this student - leave the record (and the audit log) alone
+    if (
+      existing &&
+      existing.status === record.status &&
+      String(existing.remarks || '') === String(record.remarks || '')
+    ) {
+      continue;
+    }
+
     if (existing) {
       await repository.updateAttendanceRecord(existing.id, {
         status: record.status,
@@ -246,8 +272,8 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     }
   }
 
-  // audit log - one entry for the whole sheet
-  await recordAuditEvent({
+  // audit log - one entry for the whole sheet (only when something changed)
+  if (createdCount + updatedCount > 0) await recordAuditEvent({
     actorId: tutorUser.id,
     action: 'ATTENDANCE_MARKED',
     entityType: 'class_session',

@@ -5,6 +5,7 @@ const { toSafeClass, toSafeTutorProfile } = require('../../../../../shared/serve
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const repository = require('./course.repository');
 const holidayCalendar = require('./holidayCalendar');
+const enrollmentPayments = require('./enrollmentPayments');
 const {
   hasClassEvents,
   migrationRequired,
@@ -193,7 +194,7 @@ function describeClassChanges(existing, data) {
 }
 
 // Tell everyone enrolled that their class moved/changed
-async function notifyEnrolledStudents(classId, message, actorId) {
+async function notifyEnrolledStudents(classId, message, actorId, link = `/courses/classes/${classId}`) {
   try {
     const studentIds = await repository.listActiveStudentIdsForClass(classId);
     for (const studentId of studentIds) {
@@ -202,6 +203,7 @@ async function notifyEnrolledStudents(classId, message, actorId) {
         type: 'CLASS_REMINDER',
         message: message.slice(0, 500),
         sentBy: actorId,
+        link,
       });
     }
     return studentIds.length;
@@ -224,6 +226,14 @@ async function updateClass(tutorUser, classId, data) {
     excludeClassId: classId,
   });
 
+  // the class cannot be made smaller than the students already in it
+  const enrolledNow = await repository.countActiveEnrollments(classId);
+  if (Number(data.capacity) < enrolledNow) {
+    throw ApiError.badRequest(
+      `${enrolledNow} students are already enrolled, so the capacity cannot be lower than ${enrolledNow}.`
+    );
+  }
+
   // what changed that students should hear about
   const changes = describeClassChanges(existing, data);
 
@@ -245,6 +255,11 @@ async function updateClass(tutorUser, classId, data) {
     );
   }
 
+  // more seats than before - the waiting list hears about them
+  if (Number(data.capacity) > Number(existing.capacity)) {
+    await enrollmentPayments.notifyWaitlist(classId).catch(() => 0);
+  }
+
   const updated = await repository.findClassWithTutorAndCount(classId);
   return { classData: toSafeClass(updated), notifiedCount };
 }
@@ -257,7 +272,8 @@ async function cancelClass(tutorUser, classId) {
   const notifiedCount = await notifyEnrolledStudents(
     classId,
     `"${existing.subject}" has been cancelled. Please contact the institute if you have questions.`,
-    tutorUser.id
+    tutorUser.id,
+    '/courses/my-courses'
   );
 
   await repository.cancelClass(classId);
@@ -292,19 +308,22 @@ async function enrollInClass(studentUser, classId) {
     throw ApiError.conflict('You are already enrolled in this class.');
   }
 
-  // is there a free place?
-  const enrolledCount = await repository.countActiveEnrollments(classId);
-  if (enrolledCount >= classRow.capacity) {
-    throw ApiError.conflict('This class is full. Please check back later or choose another class.');
-  }
+  // take a seat if one is free (the class row is locked, so the last seat goes to one student only)
+  const enrollmentId = await repository.enrollIfSeatFree(
+    studentUser.id,
+    classId,
+    classRow.fee,
+    existing ? existing.id : null
+  );
 
-  let enrollmentId;
-  if (existing) {
-    // re-add btn - reuse the old row instead of a duplicate
-    await repository.reactivateEnrollment(existing.id, classRow.fee);
-    enrollmentId = existing.id;
-  } else {
-    enrollmentId = await repository.createEnrollment(studentUser.id, classId, classRow.fee);
+  // full - put them on the waiting list so they hear when a seat frees up
+  if (!enrollmentId) {
+    const waiting = await enrollmentPayments.joinWaitlist(studentUser.id, classId);
+    throw ApiError.conflict(
+      waiting
+        ? 'This class is full. You are on the waiting list - we will notify you and email you as soon as a seat frees up.'
+        : 'This class is full. Please check back later or choose another class.'
+    );
   }
 
   await recordAuditEvent({
@@ -315,7 +334,15 @@ async function enrollInClass(studentUser, classId) {
     details: { classId },
   });
 
-  return { enrollmentId, classId, subject: classRow.subject, fee: Number(classRow.fee) };
+  // in the class now - off the waiting list, and the pay-by time starts
+  await enrollmentPayments.leaveWaitlist(studentUser.id, classId);
+  const paymentDueAt = await enrollmentPayments.startPaymentDeadline({
+    enrollmentId,
+    studentId: studentUser.id,
+    classRow,
+  });
+
+  return { enrollmentId, classId, subject: classRow.subject, fee: Number(classRow.fee), paymentDueAt };
 }
 
 // drop btn - mark the enrolment DROPPED (the payment history stays)
@@ -337,6 +364,10 @@ async function dropClass(studentUser, enrollmentId) {
     entityType: 'enrollment',
     entityId: enrollmentId,
   });
+
+  // a seat is free now - tell the students who were waiting for it
+  // (enrollment.id is the class id in this list)
+  await enrollmentPayments.notifyWaitlist(enrollment.id).catch(() => 0);
 }
 
 // delete btn - only for already-dropped classes
@@ -371,6 +402,17 @@ async function listMyCourses(studentUser) {
     enrollmentId: row.enrollment_id,
     enrollmentStatus: row.enrollment_status,
     balance: Number(row.balance),
+    // fully paid - shown with a green dot, and never released
+    isPaid: row.payment_status === 'PAID' || Number(row.balance) <= 0,
+    // pay by this time or the place is released (only for new, unpaid enrolments)
+    paymentDueAt: row.enrollment_status === 'ACTIVE' && Number(row.balance) > 0 ? row.payment_due_at : null,
+    // dropped by the system because it was not paid in time
+    wasReleased: Boolean(
+      row.enrollment_status === 'DROPPED' &&
+        row.payment_due_at &&
+        row.drop_date &&
+        new Date(row.drop_date) >= new Date(row.payment_due_at)
+    ),
     enrolledAt: row.enrolled_at,
     dropDate: row.drop_date,
     classId: row.id,
@@ -500,7 +542,8 @@ async function cancelClassDay(user, classId, { date, note }) {
   const notifiedCount = await notifyEnrolledStudents(
     classId,
     `"${classRow.subject}" on ${formatDate(date)} is cancelled.${reason}`,
-    user.id
+    user.id,
+    '/calendar'
   );
 
   const event = await repository.findClassEvent(eventId);
@@ -568,7 +611,8 @@ async function addExtraClass(user, classId, { date, startTime, endTime, venue, n
     classId,
     `Extra class for "${classRow.subject}" on ${formatDate(date)}, ` +
       `${formatTime(startTime)} - ${formatTime(endTime)} at ${room}.${note ? ` ${note}` : ''}`,
-    user.id
+    user.id,
+    '/calendar'
   );
 
   const event = await repository.findClassEvent(eventId);
@@ -600,7 +644,7 @@ async function deleteClassEvent(user, eventId) {
   const message = restored
     ? `"${event.subject}" on ${formatDate(event.event_date)} is back on as usual.`
     : `The extra class for "${event.subject}" on ${formatDate(event.event_date)} has been cancelled.`;
-  const notifiedCount = await notifyEnrolledStudents(event.class_id, message, user.id);
+  const notifiedCount = await notifyEnrolledStudents(event.class_id, message, user.id, '/calendar');
 
   return { restored, notifiedCount };
 }

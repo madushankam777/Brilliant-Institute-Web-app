@@ -28,6 +28,8 @@ function ClassDetailsPage() {
   const [loadError, setLoadError] = useState('');
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollError, setEnrollError] = useState('');
+  // a full class - the student was put on the waiting list
+  const [waitlistMessage, setWaitlistMessage] = useState('');
 
   // load the class
   const load = useCallback(async () => {
@@ -56,6 +58,11 @@ function ClassDetailsPage() {
       const enrollment = await enrollInClass(classId);
       navigate('/payments', { state: { enrollmentId: enrollment.enrollmentId } });
     } catch (error) {
+      // full - the server put them on the waiting list, which is good news, not an error
+      if (error.status === 409 && /waiting list/i.test(error.message)) {
+        setWaitlistMessage(error.message);
+        return;
+      }
       setEnrollError(error.message);
     } finally {
       setIsEnrolling(false);
@@ -171,20 +178,21 @@ function ClassDetailsPage() {
                 {isCancelled
                   ? 'This class has been cancelled.'
                   : isFull
-                  ? 'This class is full.'
+                  ? 'This class is full. Join the waiting list and we will tell you as soon as a seat frees up.'
                   : `Only ${classData.spotsLeft} open spot${classData.spotsLeft === 1 ? '' : 's'} remaining.`}
               </p>
 
               <Alert type="error" message={enrollError} />
+              <Alert type="success" message={waitlistMessage} />
 
               {user.role === 'STUDENT_PARENT' ? (
                 <button
                   type="button"
                   className="btn btn-primary btn-block"
-                  disabled={isFull || isCancelled || isEnrolling}
+                  disabled={isCancelled || isEnrolling || Boolean(waitlistMessage)}
                   onClick={handleEnroll}
                 >
-                  {isEnrolling ? 'Enrolling...' : 'Enrol Now'}
+                  {isEnrolling ? 'Please wait...' : isFull ? (waitlistMessage ? 'On the waiting list' : 'Join waiting list') : 'Enrol Now'}
                 </button>
               ) : (
                 (user.role === 'TUTOR' || user.role === 'ADMIN') && (

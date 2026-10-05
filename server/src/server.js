@@ -6,6 +6,9 @@ const { checkMailer } = require('../../shared/server/src/utils/mailer');
 const { warnAboutDemoPasswords } = require('./startup/demoPasswordCheck');
 const { moveUploadsToDb } = require('./startup/moveUploadsToDb');
 const { reportPayPalSetup } = require('./startup/paypalCheck');
+const {
+  startPaymentDeadlineScheduler,
+} = require('../../C D Kumanan/server/src/modules/course/enrollmentPayments');
 const { startRolloverScheduler } = require('../../S Vithushan/server/src/modules/admin/yearlyRollover');
 const app = require('./app');
 
@@ -44,6 +47,8 @@ async function start() {
 
   // checks once shortly after boot, then daily - see yearlyRollover.js
   startRolloverScheduler();
+  // unpaid new enrolments - 2-day warning, then the place is released to the waiting list
+  startPaymentDeadlineScheduler();
 
   // port already in use - say so and stop
   server.on('error', (error) => {

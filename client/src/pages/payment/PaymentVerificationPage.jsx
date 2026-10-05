@@ -13,6 +13,7 @@ import { getNavItems } from '../../../../shared/client/src/components/layout/nav
 import NumberInput from '../../../../shared/client/src/components/common/NumberInput';
 import RecordPaymentCard from './RecordPaymentCard';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import useHighlight from '../../../../shared/client/src/hooks/useHighlight';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
 
 // the side menu for an admin
@@ -38,6 +39,8 @@ function PaymentVerificationPage() {
   // the waiting bank slips and the page state
   const [payments, setPayments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  // the row a notification pointed at (?highlight=ID)
+  const highlightId = useHighlight(!isLoading);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -146,6 +149,15 @@ function PaymentVerificationPage() {
         <h2 className="section-title">Bank slips waiting for verification</h2>
         <Alert type="error" message={errorMessage} />
         <Alert type="success" message={successMessage} />
+        {/* opened from a notification, but that slip was already checked */}
+        <Alert
+          type="info"
+          message={
+            highlightId && !isLoading && !payments.some((item) => item.id === highlightId)
+              ? 'That bank slip has already been checked - it is no longer waiting for verification.'
+              : ''
+          }
+        />
 
         {/* a spinner, an empty message, or the slips table */}
         {isLoading ? (
@@ -170,7 +182,7 @@ function PaymentVerificationPage() {
                 </thead>
                 <tbody>
                   {payments.map((payment) => (
-                    <tr key={payment.id}>
+                    <tr key={payment.id} className={payment.id === highlightId ? 'row-highlight' : undefined}>
                       <td>{formatDateTime(payment.createdAt)}</td>
                       <td>
                         <div className="order-line-title">{payment.studentName}</div>

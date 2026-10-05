@@ -222,6 +222,24 @@ const getReminderCandidates = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { candidates } });
 });
 
+// POST /notifications/:id/dismiss - clear one notification for good
+const dismissMyNotification = asyncHandler(async (req, res) => {
+  const stored = await service.dismissMyNotification(req.user, Number(req.params.notificationId));
+  res.status(200).json({ success: true, data: { stored } });
+});
+
+// POST /announcements/:id/dismiss - clear one announcement (until it is edited again)
+const dismissMyAnnouncement = asyncHandler(async (req, res) => {
+  const stored = await service.dismissMyAnnouncement(req.user, Number(req.params.announcementId), req.body.version);
+  res.status(200).json({ success: true, data: { stored } });
+});
+
+// POST /notifications/clear-all - clear the whole bell
+const clearMyNotifications = asyncHandler(async (req, res) => {
+  const stored = await service.clearMyNotifications(req.user);
+  res.status(200).json({ success: true, data: { stored } });
+});
+
 // GET /notifications/mine - my notification bell
 const listMyNotifications = asyncHandler(async (req, res) => {
   const notifications = await service.listMyNotifications(req.user);
@@ -351,6 +369,9 @@ module.exports = {
   sendReminders,
   getReminderCandidates,
   listMyNotifications,
+  dismissMyNotification,
+  dismissMyAnnouncement,
+  clearMyNotifications,
   listMyClassesForMessaging,
   sendTutorMessage,
 };

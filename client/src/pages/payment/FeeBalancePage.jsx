@@ -44,6 +44,17 @@ const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 // Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
+// a pay-by time as "Fri 9 Oct, 3:30 PM"
+function formatDue(value) {
+  return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 // a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
@@ -191,14 +202,15 @@ function FeeBalancePage() {
 
   // auto-open payment for the class just enrolled in
   useEffect(() => {
-    const targetEnrollmentId = location.state && location.state.enrollmentId;
+    const fromLink = Number(new URLSearchParams(location.search).get('enrollment')) || null;
+    const targetEnrollmentId = (location.state && location.state.enrollmentId) || fromLink;
     if (!targetEnrollmentId || autoStartedRef.current || balances.length === 0) return;
-    const target = balances.find((b) => b.enrollmentId === targetEnrollmentId);
+    const target = balances.find((b) => b.enrollmentId === targetEnrollmentId && b.balance > 0);
     if (target) {
       autoStartedRef.current = true;
       startPayment(target);
     }
-  }, [location.state, balances]);
+  }, [location.state, location.search, balances]);
 
   // change one card form field
   function updateCardField(field, value) {
@@ -559,10 +571,26 @@ function FeeBalancePage() {
                       {balances.map((enrollment) => (
                         <tr key={enrollment.enrollmentId}>
                           <td>
-                            <div className="order-line-title">{enrollment.subject}</div>
+                            <div className="order-line-title">
+                              {/* green dot - this class is paid */}
+                              {enrollment.isPaid && <span className="paid-dot" title="Paid" aria-label="Paid" />}
+                              {enrollment.subject}
+                            </div>
                             {enrollment.tutorName && <div className="order-line-sub">{enrollment.tutorName}</div>}
+                            {/* unpaid with a pay-by time - the place is released after it */}
+                            {enrollment.paymentDueAt && (
+                              <div className="order-line-sub" style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
+                                Pay by {formatDue(enrollment.paymentDueAt)} to keep your place
+                              </div>
+                            )}
                           </td>
-                          <td>{formatCurrency(enrollment.balance)}</td>
+                          <td>
+                            {enrollment.isPaid ? (
+                              <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Paid</span>
+                            ) : (
+                              formatCurrency(enrollment.balance)
+                            )}
+                          </td>
                           <td>
                             {/* pay btn - only while something is owed */}
                             {enrollment.balance > 0 && (

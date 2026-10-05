@@ -89,6 +89,111 @@ function NextClassCard({ classes, holidays, events }) {
 }
 
 // student dashboard - attendance rate, fee balance, next class, timetable and shortcuts
+// a pay-by time as "Fri 9 Oct, 3:30 PM"
+function formatDue(value) {
+  return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+// the pop-up shows once the release is less than this far away (2 days before the class)
+const WARNING_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// unpaid new enrolments - the urgent banner, and a pop-up when a place is about to be released
+function PaymentWarning({ balances }) {
+  const unpaid = balances.filter((item) => item.paymentDueAt && !item.isPaid && item.balance > 0);
+  const atRisk = unpaid.filter(
+    (item) => new Date(String(item.paymentDueAt).replace(' ', 'T')).getTime() - Date.now() <= WARNING_WINDOW_MS
+  );
+  // the pop-up shows once per visit, and again if another place becomes at risk
+  const seenKey = `bi_pay_warning_${atRisk.map((item) => item.enrollmentId).join('-')}`;
+  const [showPopup, setShowPopup] = useState(() => {
+    if (atRisk.length === 0) return false;
+    try {
+      return window.sessionStorage.getItem(seenKey) !== '1';
+    } catch {
+      return true;
+    }
+  });
+
+  // close the pop-up for the rest of this visit
+  function closePopup() {
+    try {
+      window.sessionStorage.setItem(seenKey, '1');
+    } catch {
+      // ignore - it just shows again next time
+    }
+    setShowPopup(false);
+  }
+
+  if (unpaid.length === 0) return null;
+  const first = atRisk[0] || unpaid[0];
+
+  return (
+    <>
+      {/* urgent banner - every unpaid place and its pay-by time */}
+      <div className="urgent-payment" role="alert">
+        <Icon name="alertTriangle" size={22} />
+        <div>
+          <strong>Payment needed to keep your place</strong>
+          <ul>
+            {unpaid.map((item) => (
+              <li key={item.enrollmentId}>
+                {item.subject} - pay {formatCurrency(item.balance)} by {formatDue(item.paymentDueAt)}
+              </li>
+            ))}
+          </ul>
+          <Link to={`/payments?enrollment=${first.enrollmentId}`} className="btn btn-danger btn-sm">
+            Pay now
+          </Link>
+        </div>
+      </div>
+
+      {/* pop-up - a place is released within a day */}
+      {showPopup && (
+        <div className="modal-overlay" onClick={closePopup}>
+          <div
+            className="modal-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="pay-warning-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <ModalClose onClose={closePopup} />
+            <h2 id="pay-warning-title" style={{ color: 'var(--color-danger)' }}>
+              Your enrolment will be cancelled
+            </h2>
+            <p className="muted">
+              These classes are not paid yet. If they are still unpaid at the time shown, your place is released
+              to a student on the waiting list.
+            </p>
+            <ul>
+              {atRisk.map((item) => (
+                <li key={item.enrollmentId}>
+                  <strong>{item.subject}</strong> - {formatCurrency(item.balance)}, released{' '}
+                  {formatDue(item.paymentDueAt)}
+                </li>
+              ))}
+            </ul>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={closePopup}>
+                Later
+              </button>
+              <Link to={`/payments?enrollment=${first.enrollmentId}`} className="btn btn-danger" onClick={closePopup}>
+                Pay now
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function StudentDashboard({ user }) {
   const [summaryByClass, setSummaryByClass] = useState([]);
   const [balances, setBalances] = useState([]);
@@ -140,6 +245,9 @@ function StudentDashboard({ user }) {
         <LoadingSpinner label="Loading your dashboard..." />
       ) : (
         <>
+          {/* unpaid new enrolments - urgent banner and the release warning pop-up */}
+          <PaymentWarning balances={balances} />
+
           {/* stat cards - attendance, fees and next class */}
           <div className="stat-grid">
             <StatCard

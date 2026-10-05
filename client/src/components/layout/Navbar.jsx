@@ -2,7 +2,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { fetchMyAnnouncements, fetchMyNotifications, fetchUsers } from '../../api/adminApi';
+import {
+  fetchMyAnnouncements,
+  fetchMyNotifications,
+  fetchUsers,
+  dismissMyNotification,
+  dismissMyAnnouncement,
+  clearMyNotifications,
+} from '../../api/adminApi';
 import { browseClasses } from '../../api/courseApi';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import Logo from '../../../../shared/client/src/components/common/Logo';
@@ -50,6 +57,10 @@ const NOTIFICATION_STYLES = {
   PAYMENT_REJECTED: { icon: 'xCircle', badge: 'Action needed', tone: 'badge-danger' },
   PAYMENT_SUBMITTED: { icon: 'wallet', badge: 'To verify', tone: 'badge-warning' },
   PAYOUT_RECORDED: { icon: 'bank', badge: null, tone: '' },
+  PAYMENT_DUE: { icon: 'wallet', badge: 'Pay now', tone: 'badge-danger' },
+  ENROLMENT_AT_RISK: { icon: 'alertTriangle', badge: 'Urgent', tone: 'badge-danger' },
+  ENROLMENT_RELEASED: { icon: 'xCircle', badge: null, tone: '' },
+  SEAT_AVAILABLE: { icon: 'checkCircle', badge: 'Seats free', tone: 'badge-success' },
 };
 
 // icon for announcements
@@ -161,6 +172,8 @@ function Navbar() {
   const feedItems = [
     ...announcements.map((item) => ({
       feedId: `ann:${item.id}`,
+      id: item.id,
+      link: null,
       kind: 'announcement',
       title: item.title,
       body: item.body,
@@ -171,6 +184,8 @@ function Navbar() {
     })),
     ...personalNotifications.map((item) => ({
       feedId: `notif:${item.id}`,
+      id: item.id,
+      link: item.link || null,
       kind: 'notification',
       type: item.type,
       title: item.title,
@@ -208,7 +223,7 @@ function Navbar() {
     }
   }
 
-  // clear btn - hide one notification (until it changes)
+  // clear btn - hide one notification for good: saved on the server (every device) and in this browser
   function dismissNotification(item) {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
@@ -216,9 +231,14 @@ function Navbar() {
       writeVersionMap(dismissedKey, next);
       return next;
     });
+    const saved =
+      item.kind === 'notification' ? dismissMyNotification(item.id) : dismissMyAnnouncement(item.id, item.version);
+    saved.catch(() => {
+      // offline - this browser still remembers it, the server will hear next time
+    });
   }
 
-  // clear all btn - hide every notification
+  // clear all btn - hide every notification, on every device
   function clearAllNotifications() {
     if (!dismissedKey) return;
     setDismissedVersions((prev) => {
@@ -229,6 +249,17 @@ function Navbar() {
       writeVersionMap(dismissedKey, next);
       return next;
     });
+    clearMyNotifications().catch(() => {
+      // offline - this browser still remembers it
+    });
+  }
+
+  // click a notification - open the page it is about (that page highlights the item)
+  function openNotification(item) {
+    if (!item.link) return;
+    setIsNotifOpen(false);
+    setToasts([]);
+    navigate(item.link);
   }
 
   // --- top bar search: classes for everyone, plus users for Admin ---
@@ -411,7 +442,20 @@ function Navbar() {
                   <p className="notification-empty">You&apos;re all caught up - nothing new yet.</p>
                 ) : (
                   visibleItems.map((item) => (
-                    <div key={item.feedId} className="notification-item">
+                    // a notification with a page opens it when clicked
+                    <div
+                      key={item.feedId}
+                      className={`notification-item${item.link ? ' is-link' : ''}`}
+                      role={item.link ? 'button' : undefined}
+                      tabIndex={item.link ? 0 : undefined}
+                      onClick={() => openNotification(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          openNotification(item);
+                        }
+                      }}
+                    >
                       <div className="notification-item-title">
                         <Icon name={styleFor(item).icon} size={14} />
                         <span style={{ flex: 1 }}>{item.title}</span>
@@ -424,7 +468,11 @@ function Navbar() {
                           type="button"
                           className="notification-item-dismiss"
                           aria-label="Clear this notification"
-                          onClick={() => dismissNotification(item)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            dismissNotification(item);
+                          }}
+                          onKeyDown={(event) => event.stopPropagation()}
                         >
                           <Icon name="x" size={14} />
                         </button>
@@ -450,6 +498,11 @@ function Navbar() {
                     type="button"
                     className="toast-main"
                     onClick={() => {
+                      // a pop-up with a page opens it; otherwise the bell opens
+                      if (toast.link) {
+                        openNotification(toast);
+                        return;
+                      }
                       setToasts([]);
                       if (!isNotifOpen) toggleNotifications();
                     }}

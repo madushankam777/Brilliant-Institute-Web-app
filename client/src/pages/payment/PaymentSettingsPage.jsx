@@ -22,7 +22,7 @@ const METHOD_OPTIONS = [
   {
     value: 'PAYPAL',
     label: 'PayPal',
-    help: 'PayPal balance or card. Needs PAYPAL_CLIENT_ID and PAYPAL_SECRET in server/.env.',
+    help: 'PayPal balance or any debit / credit card.',
   },
 ];
 

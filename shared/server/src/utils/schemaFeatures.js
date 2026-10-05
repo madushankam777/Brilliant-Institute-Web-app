@@ -60,6 +60,36 @@ function hasClassEvents() {
   return hasTable('class_events');
 }
 
+// notification bell - links, "cleared" kept on the server, and cleared announcements
+async function hasNotificationCentre() {
+  return (
+    (await hasColumn('notification_log', 'link')) &&
+    (await hasColumn('notification_log', 'dismissed_at')) &&
+    (await hasTable('announcement_dismissals'))
+  );
+}
+
+// can notification_log.type hold any kind (VARCHAR), or only the old fixed list (ENUM)?
+function hasFreeTextNotificationTypes() {
+  return cached('free-notification-types', async () => {
+    const [rows] = await pool.execute(
+      `SELECT DATA_TYPE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notification_log' AND COLUMN_NAME = 'type' LIMIT 1`
+    );
+    return Boolean(rows[0]) && String(rows[0].DATA_TYPE).toLowerCase() === 'varchar';
+  });
+}
+
+// pay-by date on new enrolments (unpaid places are released after it)
+async function hasPaymentDeadlines() {
+  return (await hasColumn('enrollments', 'payment_due_at')) && (await hasColumn('enrollments', 'payment_warned_at'));
+}
+
+// students waiting for a seat in a full class
+function hasClassWaitlist() {
+  return hasTable('class_waitlist');
+}
+
 // Setup steps belong in the server log - users only see a short message.
 function migrationRequired() {
   console.warn(`[setup] This action needs the database update. Run ${UPDATE_FILE} once as root in MySQL Workbench.`);
@@ -75,6 +105,9 @@ async function reportPendingUpdates() {
   if (!(await hasClassEvents())) missing.push('cancelled and extra classes');
   if (!(await hasTable('contact_messages'))) missing.push('contact us messages');
   if (!(await hasTable('uploaded_files'))) missing.push('uploads stored in MySQL');
+  if (!(await hasNotificationCentre())) missing.push('notification links and cleared notifications');
+  if (!(await hasPaymentDeadlines())) missing.push('payment deadlines for new enrolments');
+  if (!(await hasClassWaitlist())) missing.push('waiting list for full classes');
 
   if (missing.length > 0) {
     console.warn(
@@ -92,6 +125,10 @@ module.exports = {
   hasPayoutTracking,
   hasClassStartDate,
   hasClassEvents,
+  hasNotificationCentre,
+  hasFreeTextNotificationTypes,
+  hasPaymentDeadlines,
+  hasClassWaitlist,
   migrationRequired,
   reportPendingUpdates,
 };

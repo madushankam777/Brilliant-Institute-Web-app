@@ -73,6 +73,10 @@ async function getMyBalances(studentUser) {
     subject: row.subject,
     tutorName: row.tutor_name,
     balance: Number(row.balance),
+    // fully paid - the green dot
+    isPaid: row.payment_status === 'PAID' || Number(row.balance) <= 0,
+    // pay by this time or the place is released
+    paymentDueAt: Number(row.balance) > 0 ? row.payment_due_at : null,
   }));
 }
 
@@ -193,7 +197,11 @@ async function finalizePendingPayment(studentUser, paymentId) {
       // ask the gateway to charge it (a timeout becomes GatewayUnavailableError)
       let gatewayResult;
       try {
-        gatewayResult = await gateway.chargePaymentToken({ amount: Number(payment.amount) });
+        gatewayResult = await gateway.chargePaymentToken({
+          amount: Number(payment.amount),
+          paymentMethod: payment.payment_method,
+          paymentDetails: payment.payment_details,
+        });
       } catch (gatewayError) {
         throw new GatewayUnavailableError(gatewayError.message);
       }
@@ -367,6 +375,7 @@ async function submitBankTransferPayment(
         recipientId: adminId,
         type: 'PAYMENT_SUBMITTED',
         message: `${studentUser.email} submitted a bank transfer of LKR ${Number(amount).toFixed(2)} - awaiting your verification.`,
+        link: `/admin/payments/verify?highlight=${paymentId}`,
         sentBy: studentUser.id,
       })
     )
@@ -520,6 +529,7 @@ async function approveBankTransferPayment(adminUser, paymentId, { amount } = {})
     recipientId: payment.student_id,
     type: 'PAYMENT_APPROVED',
     message: `${message} Receipt: ${outcome.receiptNumber}.`,
+    link: `/payments/history?highlight=${payment.id}`,
     sentBy: adminUser.id,
   });
 
@@ -616,6 +626,7 @@ async function recordOfficePayment(adminUser, { enrollmentId, amount, method, re
     message:
       `Your ${OFFICE_METHODS[method].toLowerCase()} payment of ${formatLkr(paid)} for ${outcome.subject} was recorded. ` +
       `Receipt: ${outcome.receiptNumber}.`,
+    link: `/payments/history?highlight=${outcome.paymentId}`,
     sentBy: adminUser.id,
   });
 
@@ -644,6 +655,7 @@ async function rejectBankTransferPayment(adminUser, paymentId) {
     recipientId: pendingPayment.student_id,
     type: 'PAYMENT_REJECTED',
     message: `Your bank transfer of LKR ${Number(pendingPayment.amount).toFixed(2)} for ${enrollment ? enrollment.subject : 'your class'} was rejected. Please check your reference and receipt, then resubmit.`,
+    link: `/payments/history?highlight=${paymentId}`,
     sentBy: adminUser.id,
   });
 
@@ -806,6 +818,7 @@ async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, acc
     recipientId: tutorId,
     type: 'PAYOUT_RECORDED',
     message: 'An Admin updated the bank account your payouts are sent to. Check your profile if this was unexpected.',
+    link: '/profile',
     sentBy: adminUser.id,
   });
 
@@ -980,6 +993,7 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
       recipientId: tutorId,
       type: 'PAYOUT_RECORDED',
       message: payoutNotification({ method: payoutMethod, amount, periodLabel, destination, reference: bankReference }),
+      link: '/profile',
       sentBy: adminUser.id,
     });
   }
@@ -1308,6 +1322,7 @@ async function handlePayHereNotification(body) {
       recipientId: outcome.studentId,
       type: 'PAYMENT_APPROVED',
       message: `Your payment of LKR ${outcome.amount.toFixed(2)} for ${outcome.subject} was received. Receipt: ${outcome.receiptNumber}.`,
+      link: `/payments/history?highlight=${result.paymentId}`,
       sentBy: null,
     });
   } else if (outcome.status === 'failed') {
@@ -1498,6 +1513,7 @@ async function completePayPalCheckout(paymentId) {
       recipientId: outcome.studentId,
       type: 'PAYMENT_APPROVED',
       message: `Your PayPal payment of LKR ${outcome.amount.toFixed(2)} for ${outcome.subject} was received. Receipt: ${outcome.receiptNumber}.`,
+      link: `/payments/history?highlight=${payment.id}`,
       sentBy: null,
     });
   }

@@ -16,8 +16,10 @@ const { GRADES, nextGrade, isFinalGrade } = require('../../../../../shared/serve
 const gateway = require('./notificationGateway');
 const repository = require('./admin.repository');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
+const { defaultLinkFor } = require('../../../../../shared/server/src/utils/notifications');
 const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
+const enrollmentPayments = require('../../../../../C D Kumanan/server/src/modules/course/enrollmentPayments');
 
 // milliseconds in one day
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -387,6 +389,12 @@ async function deleteUser(actingUser, userId) {
     entityType: 'user',
     entityId: userId,
   });
+
+  // a deleted student no longer holds seats - free them and tell the waiting lists
+  const freedClassIds = await repository.dropActiveEnrollmentsForStudent(userId);
+  for (const classId of freedClassIds) {
+    await enrollmentPayments.notifyWaitlist(classId).catch(() => 0);
+  }
 }
 
 // Admin: one-time reset link to give the user in person
@@ -824,7 +832,7 @@ async function listAllAnnouncements() {
 // notification bell - announcements for this user
 async function listAnnouncementsForUser(user) {
   const fullUser = await repository.findUserById(user.id);
-  const rows = await repository.listAnnouncementsForAudience(user.role, fullUser ? fullUser.grade : null);
+  const rows = await repository.listAnnouncementsForAudience(user.role, fullUser ? fullUser.grade : null, user.id);
   return rows.map(toSafeAnnouncement);
 }
 
@@ -963,10 +971,38 @@ async function sendTutorMessage(tutorUser, { audience, classId, subject, message
   return { recipientCount: recipientIds.size, audience };
 }
 
-// notification bell - personal reminders for this user
+// notification bell - personal reminders for this user, each with the page a click opens
 async function listMyNotifications(user) {
   const rows = await repository.listNotificationsForUser(user.id, 30);
-  return rows.map(toSafeNotification);
+  return rows.map((row) => {
+    const item = toSafeNotification(row);
+    return { ...item, link: row.link || defaultLinkFor(item.type, user.role) };
+  });
+}
+
+// clear btn - hide one notification on every device (false = the database update is not run yet)
+async function dismissMyNotification(user, notificationId) {
+  if (!(await schema.hasNotificationCentre())) return false;
+  await repository.dismissNotification(user.id, notificationId);
+  return true;
+}
+
+// clear btn on an announcement - it comes back only if the admin edits it
+async function dismissMyAnnouncement(user, announcementId, version) {
+  if (!(await schema.hasNotificationCentre())) return false;
+  await repository.dismissAnnouncement(user.id, announcementId, Number(version) || 1);
+  return true;
+}
+
+// clear all btn - every notification and announcement in my bell, on every device
+async function clearMyNotifications(user) {
+  if (!(await schema.hasNotificationCentre())) return false;
+  await repository.dismissAllNotifications(user.id);
+  const announcements = await listAnnouncementsForUser(user);
+  for (const item of announcements) {
+    await repository.dismissAnnouncement(user.id, item.id, item.version || 1);
+  }
+  return true;
 }
 
 // --- Scheduled reminders (tutor) ---
@@ -1121,6 +1157,9 @@ module.exports = {
   sendReminders,
   getReminderCandidates,
   listMyNotifications,
+  dismissMyNotification,
+  dismissMyAnnouncement,
+  clearMyNotifications,
   listMyClassesForMessaging,
   sendTutorMessage,
   listReregistrationKeys,

@@ -11,8 +11,12 @@ const { ROLES, SESSION_COOKIE_NAME } = require('../../../../../shared/server/src
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { resolveUploadPath } = require('../../../../../shared/server/src/utils/resolveUploadPath');
 const { deleteUpload, publicIdOf } = require('../../../../../shared/server/src/utils/fileStore');
-const { passwordVersion, revokeToken } = require('../../../../../shared/server/src/utils/sessionToken');
-const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
+const {
+  revokeToken,
+  signSessionToken,
+  setSessionCookie,
+} = require('../../../../../shared/server/src/utils/sessionToken');
+const { sendMail, isSmtpReady } = require('../../../../../shared/server/src/utils/mailer');
 const { hashPassword, comparePassword, hashNow } = require('../../../../../shared/server/src/utils/passwordHasher');
 const repository = require('./auth.repository');
 
@@ -104,26 +108,9 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
   return toSafeUser(user);
 }
 
-// login token - pwv logs out old sessions after a password change
-function signSessionToken(user) {
-  return jwt.sign(
-    { sub: user.id, role: user.role, email: user.email, pwv: passwordVersion(user.password_hash) },
-    config.auth.jwtSecret,
-    { expiresIn: config.auth.jwtExpiresIn, algorithm: 'HS256' }
-  );
-}
-
-// Store the login token in a cookie that JavaScript can't read
+// Store the login token in a cookie that JavaScript can't read - it ends when the browser closes
 function attachSessionCookie(res, token) {
-  // Secure cookie on HTTPS
-  const isHttps = Boolean(res.req && res.req.secure);
-  res.cookie(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: config.auth.cookieSecure || isHttps, // HTTPS-only outside local development
-    sameSite: 'strict',
-    maxAge: config.auth.sessionTimeoutMinutes * 60 * 1000,
-    path: '/',
-  });
+  setSessionCookie(res, token);
 }
 
 // logout - removes the session cookie from the browser
@@ -353,6 +340,13 @@ async function requestPasswordReset(email) {
     entityId: user.id,
   });
 
+  // no real email account yet (development) - the code would only reach a fake test inbox,
+  // so show it in the server window instead (never on the website)
+  if (!config.isProduction && !isSmtpReady() && !config.mail.resendApiKey) {
+    // eslint-disable-next-line no-console
+    console.log(`[dev-only] reset code for ${user.email}: ${code}  (real emails need SMTP_PASS in server/.env)`);
+  }
+
   // sent in the background so the reply takes the same time for every email
   sendMail({
     to: user.email,
@@ -366,7 +360,8 @@ async function requestPasswordReset(email) {
   }).catch((error) => {
     // eslint-disable-next-line no-console
     console.error(`[mail] could not send the reset code to ${user.email}: ${error.message}`);
-    if (!config.isProduction) {
+    // Gmail is set up but refused - still let the developer finish the reset locally
+    if (!config.isProduction && isSmtpReady()) {
       // eslint-disable-next-line no-console
       console.log(`[dev-only] reset code for ${user.email}: ${code}`);
     }

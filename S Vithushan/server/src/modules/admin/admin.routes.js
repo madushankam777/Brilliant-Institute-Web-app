@@ -1,5 +1,6 @@
 // admin routes - users, tutor keys, re-registration, announcements and reminders (mounted at /api)
 const express = require('express');
+const { param, body } = require('express-validator');
 const authenticate = require('../../../../../shared/server/src/middleware/authenticate');
 const authorize = require('../../../../../shared/server/src/middleware/authorize');
 const validateRequest = require('../../../../../shared/server/src/middleware/validateRequest');
@@ -42,6 +43,23 @@ router.use(authenticate);
 router.get('/announcements', controller.listMyAnnouncements);
 // notification bell - my personal notifications
 router.get('/notifications/mine', controller.listMyNotifications);
+// clear all btn - every notification in my bell, on every device
+router.post('/notifications/clear-all', controller.clearMyNotifications);
+// clear btn - one of my notifications
+router.post(
+  '/notifications/:notificationId/dismiss',
+  param('notificationId').isInt({ min: 1 }).withMessage('Invalid notification id.'),
+  validateRequest,
+  controller.dismissMyNotification
+);
+// clear btn - one announcement (it comes back if it is edited)
+router.post(
+  '/announcements/:announcementId/dismiss',
+  param('announcementId').isInt({ min: 1 }).withMessage('Invalid announcement id.'),
+  body('version').optional().isInt({ min: 1 }).withMessage('Invalid version.'),
+  validateRequest,
+  controller.dismissMyAnnouncement
+);
 
 // suspend btn - an admin, or a tutor for their own students
 router.patch(

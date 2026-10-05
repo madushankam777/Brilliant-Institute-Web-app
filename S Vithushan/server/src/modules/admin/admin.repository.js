@@ -1,5 +1,7 @@
 // Admin module - all database queries
 const { pool } = require('../../../../../shared/server/src/config/db');
+const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
+const notifications = require('../../../../../shared/server/src/utils/notifications');
 
 // --- Dashboard -----------------------------------------------------------
 
@@ -134,6 +136,19 @@ async function updateUserStatus(userId, status) {
 }
 
 // delete btn - soft delete only
+// a deleted student leaves their classes - returns the classes that now have a free seat
+async function dropActiveEnrollmentsForStudent(userId) {
+  const [rows] = await pool.execute(
+    `SELECT class_id FROM enrollments WHERE student_id = ? AND status = 'ACTIVE'`,
+    [userId]
+  );
+  await pool.execute(
+    `UPDATE enrollments SET status = 'DROPPED', drop_date = NOW() WHERE student_id = ? AND status = 'ACTIVE'`,
+    [userId]
+  );
+  return rows.map((row) => row.class_id);
+}
+
 async function softDeleteUser(userId) {
   await pool.execute(`UPDATE users SET status = 'DELETED', updated_at = NOW() WHERE id = ?`, [
     userId,
@@ -571,7 +586,24 @@ async function listAllAnnouncements() {
 }
 
 // announcements for one role and grade - for everyone or that role, and for no grade or that grade (latest 50)
-async function listAnnouncementsForAudience(role, grade) {
+async function listAnnouncementsForAudience(role, grade, userId) {
+  // announcements this user cleared stay hidden until they are edited again
+  if (userId && (await schema.hasNotificationCentre())) {
+    const [rows] = await pool.execute(
+      `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name
+       FROM announcements a
+       JOIN users u ON u.id = a.published_by
+       LEFT JOIN users e ON e.id = a.updated_by
+       LEFT JOIN announcement_dismissals d ON d.announcement_id = a.id AND d.user_id = ?
+       WHERE a.status = 'PUBLISHED' AND (a.target_audience = 'ALL' OR a.target_audience = ?)
+         AND (a.target_grade IS NULL OR a.target_grade = ?)
+         AND (d.user_id IS NULL OR d.version < a.version)
+       ORDER BY a.created_at DESC
+       LIMIT 50`,
+      [userId, role, grade || null]
+    );
+    return rows;
+  }
   const [rows] = await pool.execute(
     `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name
      FROM announcements a
@@ -618,26 +650,59 @@ async function findStudentsWithLowAttendance(thresholdPercent) {
 }
 
 // save a notification for one person
-async function logNotification({ recipientId, channel, type, message, sentBy }) {
-  await pool.execute(
-    `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
-     VALUES (?, ?, ?, ?, ?, NOW())`,
-    [recipientId, channel, type, message, sentBy || null]
-  );
+async function logNotification({ recipientId, channel, type, message, sentBy, link }) {
+  await notifications.createNotification({ recipientId, channel, type, message, sentBy: sentBy || null, link });
 }
 
-// notification bell - only what is due; scheduled reminders wait for their time
+// notification bell - only what is due and not cleared; scheduled reminders wait for their time
 async function listNotificationsForUser(userId, limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 30;
+  const withCentre = await schema.hasNotificationCentre();
   const [rows] = await pool.query(
-    `SELECT id, type, message, sent_at
-     FROM notification_log
-     WHERE recipient_id = ? AND sent_at <= NOW()
-     ORDER BY sent_at DESC
-     LIMIT ${safeLimit}`,
+    withCentre
+      ? `SELECT id, type, message, link, sent_at
+         FROM notification_log
+         WHERE recipient_id = ? AND sent_at <= NOW() AND dismissed_at IS NULL
+         ORDER BY sent_at DESC
+         LIMIT ${safeLimit}`
+      : `SELECT id, type, message, sent_at
+         FROM notification_log
+         WHERE recipient_id = ? AND sent_at <= NOW()
+         ORDER BY sent_at DESC
+         LIMIT ${safeLimit}`,
     [userId]
   );
   return rows;
+}
+
+// clear btn - hide one of my notifications for good (on every device)
+async function dismissNotification(userId, notificationId) {
+  const [result] = await pool.execute(
+    `UPDATE notification_log SET dismissed_at = NOW()
+     WHERE id = ? AND recipient_id = ? AND dismissed_at IS NULL`,
+    [notificationId, userId]
+  );
+  return result.affectedRows;
+}
+
+// clear all btn - hide every notification I can see now
+async function dismissAllNotifications(userId) {
+  const [result] = await pool.execute(
+    `UPDATE notification_log SET dismissed_at = NOW()
+     WHERE recipient_id = ? AND sent_at <= NOW() AND dismissed_at IS NULL`,
+    [userId]
+  );
+  return result.affectedRows;
+}
+
+// clear an announcement for me - a newer version of it shows again
+async function dismissAnnouncement(userId, announcementId, version) {
+  await pool.execute(
+    `INSERT INTO announcement_dismissals (user_id, announcement_id, version, dismissed_at)
+     VALUES (?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE version = VALUES(version), dismissed_at = NOW()`,
+    [userId, announcementId, version]
+  );
 }
 
 // --- Scheduled reminders (tutor) ---
@@ -749,6 +814,7 @@ module.exports = {
   findUserById,
   updateUserStatus,
   softDeleteUser,
+  dropActiveEnrollmentsForStudent,
   isStudentEnrolledWithTutor,
   listStudentsForTutor,
   createTutorKey,
@@ -783,4 +849,7 @@ module.exports = {
   findStudentsWithLowAttendance,
   logNotification,
   listNotificationsForUser,
+  dismissNotification,
+  dismissAllNotifications,
+  dismissAnnouncement,
 };

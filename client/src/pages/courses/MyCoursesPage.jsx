@@ -8,6 +8,8 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import { formatTimeRange } from '../../../../shared/client/src/utils/schedule';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
+import Icon from '../../../../shared/client/src/components/common/Icon';
+import useHighlight from '../../../../shared/client/src/hooks/useHighlight';
 
 // the side menu for a student
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
@@ -17,10 +19,23 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
+// a pay-by time as "Fri 9 Oct, 3:30 PM"
+function formatDue(value) {
+  return new Date(String(value).replace(' ', 'T')).toLocaleString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 // my courses - active enrolments, past ones, drop, re-enrol and remove from history
 function MyCoursesPage() {
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  // the enrolment a notification pointed at (?highlight=ID)
+  const highlightId = useHighlight(!isLoading);
   const [errorMessage, setErrorMessage] = useState('');
   const [droppingId, setDroppingId] = useState(null);
   const [confirmDropId, setConfirmDropId] = useState(null);
@@ -112,6 +127,8 @@ function MyCoursesPage() {
   // enrolments I am still in, and past ones (dropped or cancelled)
   const activeCourses = courses.filter((c) => c.enrollmentStatus === 'ACTIVE');
   const pastCourses = courses.filter((c) => c.enrollmentStatus !== 'ACTIVE');
+  // unpaid new enrolments that will be released if not paid in time
+  const unpaidWithDeadline = activeCourses.filter((c) => c.paymentDueAt && !c.isPaid);
 
   // the page - active enrolments, past enrolments and the remove pop-up
   return (
@@ -123,6 +140,26 @@ function MyCoursesPage() {
         </div>
 
         <Alert type="error" message={errorMessage} />
+
+        {/* urgent - unpaid new enrolments and the time each place is released */}
+        {!isLoading && unpaidWithDeadline.length > 0 && (
+          <div className="urgent-payment" role="alert">
+            <Icon name="alertTriangle" size={22} />
+            <div>
+              <strong>Payment needed to keep your place</strong>
+              <ul>
+                {unpaidWithDeadline.map((course) => (
+                  <li key={course.enrollmentId}>
+                    {course.subject} - pay {formatCurrency(course.balance)} by {formatDue(course.paymentDueAt)}
+                  </li>
+                ))}
+              </ul>
+              <Link to={`/payments?enrollment=${unpaidWithDeadline[0].enrollmentId}`} className="btn btn-danger btn-sm">
+                Pay now
+              </Link>
+            </div>
+          </div>
+        )}
 
         {isLoading ? (
           <LoadingSpinner label="Loading your courses..." />
@@ -149,11 +186,22 @@ function MyCoursesPage() {
                     </thead>
                     <tbody>
                       {activeCourses.map((course) => (
-                        <tr key={course.enrollmentId}>
+                        <tr
+                          key={course.enrollmentId}
+                          className={course.enrollmentId === highlightId ? 'row-highlight' : undefined}
+                        >
                           <td>
+                            {/* green dot - this class is paid */}
+                            {course.isPaid && <span className="paid-dot" title="Paid" aria-label="Paid" />}
                             <Link to={`/courses/classes/${course.classId}`} className="order-line-title" style={{ textDecoration: 'none' }}>
                               {course.subject}
                             </Link>
+                            {/* unpaid with a pay-by time */}
+                            {course.paymentDueAt && (
+                              <div className="order-line-sub" style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
+                                Pay by {formatDue(course.paymentDueAt)} to keep your place
+                              </div>
+                            )}
                             {course.classStatus === 'CANCELLED' && (
                               <div className="order-line-sub" style={{ color: 'var(--color-danger)' }}>
                                 This class has been cancelled by the tutor.
@@ -164,7 +212,13 @@ function MyCoursesPage() {
                           <td>
                             {course.dayOfWeek}, {formatTimeRange(course.startTime, course.endTime)}
                           </td>
-                          <td>{formatCurrency(course.balance)}</td>
+                          <td>
+                            {course.isPaid ? (
+                              <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Paid</span>
+                            ) : (
+                              formatCurrency(course.balance)
+                            )}
+                          </td>
                           <td>
                             {confirmDropId === course.enrollmentId ? (
                               <div style={{ display: 'flex', gap: '6px' }}>
@@ -223,9 +277,18 @@ function MyCoursesPage() {
                       {pastCourses.map((course) => {
                         const classUnavailable = course.classStatus === 'CANCELLED';
                         return (
-                          <tr key={course.enrollmentId}>
+                          <tr
+                            key={course.enrollmentId}
+                            className={course.enrollmentId === highlightId ? 'row-highlight' : undefined}
+                          >
                             <td>
                               {course.subject}
+                              {/* released by the system - not paid by the pay-by time */}
+                              {course.wasReleased && (
+                                <div className="order-line-sub" style={{ color: 'var(--color-danger)' }}>
+                                  Released - not paid in time
+                                </div>
+                              )}
                               {classUnavailable && (
                                 <div className="order-line-sub" style={{ color: 'var(--color-danger)' }}>
                                   This class has been cancelled by the tutor.

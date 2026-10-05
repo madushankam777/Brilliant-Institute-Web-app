@@ -1,5 +1,6 @@
 // payment queries - balances, payments, receipts, bank details, tutor payouts and settings
 const { pool } = require('../../../../../shared/server/src/config/db');
+const notifications = require('../../../../../shared/server/src/utils/notifications');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
 // one enrolment (a student in a class) with its balance and subject
@@ -30,8 +31,11 @@ async function findEnrollmentByIdForUpdate(enrollmentId, connection) {
 
 // what a student still owes on each active class
 async function listBalancesForStudent(studentId, executor = pool) {
+  // the pay-by time only exists after the database update
+  const dueColumn = (await schema.hasPaymentDeadlines()) ? 'e.payment_due_at' : 'NULL';
   const [rows] = await executor.execute(
-    `SELECT e.id AS enrollment_id, e.class_id, c.subject, e.balance, t.full_name AS tutor_name
+    `SELECT e.id AS enrollment_id, e.class_id, c.subject, e.balance, e.payment_status,
+            ${dueColumn} AS payment_due_at, t.full_name AS tutor_name
      FROM enrollments e
      JOIN classes c ON c.id = e.class_id
      JOIN users t ON t.id = c.tutor_id
@@ -222,12 +226,8 @@ async function listRecentPayments(limit) {
 }
 
 // notify everyone who needs to react to a payment event
-async function createNotification({ recipientId, type, message, sentBy }) {
-  await pool.execute(
-    `INSERT INTO notification_log (recipient_id, channel, type, message, sent_by, sent_at)
-     VALUES (?, 'EMAIL', ?, ?, ?, NOW())`,
-    [recipientId, type, message, sentBy || null]
-  );
+async function createNotification({ recipientId, type, message, sentBy, link }) {
+  await notifications.createNotification({ recipientId, type, message, sentBy: sentBy || null, link, channel: 'EMAIL' });
 }
 
 // admin record payment - find students by registration number, name or email
