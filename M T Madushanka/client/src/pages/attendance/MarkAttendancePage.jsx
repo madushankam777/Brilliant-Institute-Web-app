@@ -15,6 +15,7 @@ const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
 
 // the words shown for each mark
 const STATUS_LABEL = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent' };
+const STATUS_BADGE = { PRESENT: 'badge-success', LATE: 'badge-warning', ABSENT: 'badge-danger' };
 
 // attendance sheet - mark each student present, late or absent, or open a check-in key
 function MarkAttendancePage() {
@@ -39,20 +40,14 @@ function MarkAttendancePage() {
   const [isStartingCheckin, setIsStartingCheckin] = useState(false);
   const [checkinError, setCheckinError] = useState('');
 
-  // load the sheet - students not marked yet start as Present
+  // load the sheet - students without a saved mark stay unmarked
   const loadSheet = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
     try {
       const data = await fetchAttendanceSheet(sessionId);
       setSessionInfo(data.session);
-      // Default anyone not yet marked to PRESENT
-      setRows(
-        data.students.map((student) => ({
-          ...student,
-          status: student.status || 'PRESENT',
-        }))
-      );
+      setRows(data.students.map((student) => ({ ...student, status: student.status || null })));
     } catch (error) {
       setLoadError(error.message);
     } finally {
@@ -72,9 +67,9 @@ function MarkAttendancePage() {
     );
   }
 
-  // quick action - set every visible student to the same status in one click
+  // quick action - mark visible students who do not have a mark yet
   function markAllVisible(status) {
-    const visibleIds = new Set(filteredRows.map((row) => row.studentId));
+    const visibleIds = new Set(filteredRows.filter((row) => !row.status).map((row) => row.studentId));
     setRows((previousRows) =>
       previousRows.map((row) => (visibleIds.has(row.studentId) ? { ...row, status } : row))
     );
@@ -103,17 +98,27 @@ function MarkAttendancePage() {
     setSaveError('');
     setIsSaving(true);
 
-    // the marks to send to the server
-    const records = rows.map((row) => ({
+    const records = rows.filter((row) => row.status).map((row) => ({
       studentId: row.studentId,
       status: row.status,
       remarks: row.remarks,
     }));
 
+    if (records.length === 0) {
+      setSaveError('Nothing to save - mark at least one student first.');
+      setIsSaving(false);
+      return;
+    }
+
     try {
       const data = await saveAttendance(sessionId, records);
-      setRows(data.students.map((student) => ({ ...student, status: student.status || 'PRESENT' })));
-      setSaveMessage('Attendance saved successfully.');
+      setRows(data.students.map((student) => ({ ...student, status: student.status || null })));
+      const notMarked = data.students.filter((student) => !student.status).length;
+      setSaveMessage(
+        notMarked > 0
+          ? `Attendance saved. ${notMarked} student(s) are still not marked.`
+          : 'Attendance saved for every student.'
+      );
     } catch (error) {
       setSaveError(error.message);
     } finally {
@@ -131,6 +136,7 @@ function MarkAttendancePage() {
     acc[status] = rows.filter((row) => row.status === status).length;
     return acc;
   }, {});
+  counts.NOT_MARKED = rows.filter((row) => !row.status).length;
 
   return (
     <PortalShell navItems={NAV_ITEMS}>
@@ -217,10 +223,10 @@ function MarkAttendancePage() {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllVisible('PRESENT')}>
-                        Mark all Present
+                        Mark rest Present
                       </button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllVisible('ABSENT')}>
-                        Mark all Absent
+                        Mark rest Absent
                       </button>
                     </div>
                   </div>
@@ -255,12 +261,35 @@ function MarkAttendancePage() {
                                 aria-label={`Attendance status for ${row.studentName}`}
                                 style={{ display: 'inline-flex', gap: '6px' }}
                               >
+                                <button
+                                  type="button"
+                                  className="badge badge-neutral"
+                                  aria-pressed={!row.status}
+                                  disabled={row.alreadyMarked}
+                                  title={row.alreadyMarked ? 'Already marked - choose Present, Late or Absent to change it' : undefined}
+                                  style={{
+                                    border: !row.status ? '1.5px dashed currentColor' : '1.5px solid transparent',
+                                    cursor: row.alreadyMarked ? 'not-allowed' : 'pointer',
+                                    padding: '4px 11px',
+                                    opacity: !row.status ? 1 : 0.55,
+                                    fontWeight: !row.status ? 700 : 600,
+                                  }}
+                                  onClick={() => updateRow(row.studentId, 'status', null)}
+                                >
+                                  Not marked
+                                </button>
                                 {STATUS_OPTIONS.map((option) => (
                                   <button
                                     key={option}
                                     type="button"
-                                    className={`badge${row.status === option ? ` badge-${option === 'PRESENT' ? 'success' : option === 'LATE' ? 'warning' : 'danger'}` : ' badge-neutral'}`}
-                                    style={{ border: 'none', cursor: 'pointer', padding: '5px 12px' }}
+                                    aria-pressed={row.status === option}
+                                    className={`badge ${row.status === option ? STATUS_BADGE[option] : 'badge-neutral'}`}
+                                    style={{
+                                      border: '1.5px solid transparent',
+                                      cursor: 'pointer',
+                                      padding: '4px 11px',
+                                      opacity: row.status === option ? 1 : 0.55,
+                                    }}
                                     onClick={() => updateRow(row.studentId, 'status', option)}
                                   >
                                     {STATUS_LABEL[option]}
@@ -305,6 +334,9 @@ function MarkAttendancePage() {
 
                   <div className="flex-between" style={{ marginTop: '18px' }}>
                     <div style={{ display: 'flex', gap: '18px', fontSize: '0.85rem' }}>
+                      <span>
+                        <span className="badge badge-neutral">Not marked</span> {counts.NOT_MARKED}
+                      </span>
                       <span>
                         <span className="badge badge-success">Present</span> {counts.PRESENT}
                       </span>

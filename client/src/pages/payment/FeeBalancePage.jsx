@@ -631,6 +631,9 @@ function FeeBalancePage() {
                     <span>Total Amount</span>
                     <span className="order-total-amount">{formatCurrency(amount || 0)}</span>
                   </div>
+                  {paymentMethod === 'PAYPAL' && paypalAmount && (
+                    <p className="order-line-sub">PayPal charge: {paypalAmount}</p>
+                  )}
                 </div>
 
                 {/* payment details - method tabs, the fields and the pay btn */}
@@ -677,24 +680,6 @@ function FeeBalancePage() {
                           we&apos;ll hand you over to PayHere&apos;s secure page to choose your card,
                           eZ Cash or mCash and enter your details. Brilliant Institute never sees or
                           stores your card number. You&apos;ll come straight back here afterwards.
-                        </span>
-                      </div>
-                    )}
-
-                    {/* paypal - the student approves on PayPal, then comes back */}
-                    {paymentMethod === 'PAYPAL' && (
-                      <div className="callout" style={{ marginBottom: '16px' }}>
-                        <span>
-                          <strong>You&apos;ll finish this payment on PayPal.</strong> Tap Pay and we
-                          hand you over to PayPal, where you can use your PayPal balance or a card.
-                          Brilliant Institute never sees your card number.
-                          {paypalAmount && (
-                            <>
-                              {' '}
-                              PayPal does not accept rupees, so this is charged as{' '}
-                              <strong>{paypalAmount}</strong>.
-                            </>
-                          )}
                         </span>
                       </div>
                     )}
@@ -915,12 +900,17 @@ function FeeBalancePage() {
                     >
                       Cancel
                     </button>
-                    {/* privacy note */}
-                    <p className="secure-note">
-                      {paymentMethod === 'BANK_TRANSFER'
-                        ? 'Your receipt is only ever visible to you and to Administrators reviewing your transfer.'
-                        : 'Your card details are validated in your browser and never stored by Brilliant Institute - only the card brand and last 4 digits are kept on your receipt.'}
-                    </p>
+                    {paymentMethod === 'BANK_TRANSFER' && (
+                      <p className="secure-note">
+                        Your receipt is only ever visible to you and to Administrators reviewing your transfer.
+                      </p>
+                    )}
+                    {paymentMethod === 'CARD' && (
+                      <p className="secure-note">
+                        Your card details are validated in your browser and never stored by Brilliant Institute -
+                        only the card brand and last 4 digits are kept on your receipt.
+                      </p>
+                    )}
                   </form>
                   )}
                 </div>

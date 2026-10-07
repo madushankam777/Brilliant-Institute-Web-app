@@ -16,7 +16,7 @@ const {
   signSessionToken,
   setSessionCookie,
 } = require('../../../../../shared/server/src/utils/sessionToken');
-const { sendMail, isSmtpReady } = require('../../../../../shared/server/src/utils/mailer');
+const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
 const { hashPassword, comparePassword, hashNow } = require('../../../../../shared/server/src/utils/passwordHasher');
 const repository = require('./auth.repository');
 
@@ -321,7 +321,6 @@ async function requestPasswordReset(email) {
   // one code a minute at most
   const last = lastCodeSentAt.get(user.id) || 0;
   if (Date.now() - last < RESET_CODE_RESEND_SECONDS * 1000) return;
-  lastCodeSentAt.set(user.id, Date.now());
 
   // make the random 6-digit reset code
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -340,32 +339,30 @@ async function requestPasswordReset(email) {
     entityId: user.id,
   });
 
-  // no real email account yet (development) - the code would only reach a fake test inbox,
-  // so show it in the server window instead (never on the website)
-  if (!config.isProduction && !isSmtpReady() && !config.mail.resendApiKey) {
-    // eslint-disable-next-line no-console
-    console.log(`[dev-only] reset code for ${user.email}: ${code}  (real emails need SMTP_PASS in server/.env)`);
-  }
-
-  // sent in the background so the reply takes the same time for every email
-  sendMail({
-    to: user.email,
-    subject: `${code} is your Brilliant Institute reset code`,
-    text:
-      `Hi ${user.full_name},\n\nYour password reset code is ${code}\n\n` +
-      `It works once and expires in ${RESET_CODE_TTL_MINUTES} minutes. ` +
-      'If you did not ask for this, you can ignore this email - your password stays the same.\n\n' +
-      `Brilliant Institute\n${config.institute.address}\n${config.institute.email} | ${config.institute.phone}`,
-    html: resetCodeEmail(user.full_name, code),
-  }).catch((error) => {
+  try {
+    await sendMail({
+      to: user.email,
+      subject: `${code} is your Brilliant Institute reset code`,
+      text:
+        `Hi ${user.full_name},\n\nYour password reset code is ${code}\n\n` +
+        `It works once and expires in ${RESET_CODE_TTL_MINUTES} minutes. ` +
+        'If you did not ask for this, you can ignore this email - your password stays the same.\n\n' +
+        `Brilliant Institute\n${config.institute.address}\n${config.institute.email} | ${config.institute.phone}`,
+      html: resetCodeEmail(user.full_name, code),
+    });
+  } catch (error) {
     // eslint-disable-next-line no-console
     console.error(`[mail] could not send the reset code to ${user.email}: ${error.message}`);
-    // Gmail is set up but refused - still let the developer finish the reset locally
-    if (!config.isProduction && isSmtpReady()) {
+    if (!config.isProduction) {
       // eslint-disable-next-line no-console
       console.log(`[dev-only] reset code for ${user.email}: ${code}`);
+      lastCodeSentAt.set(user.id, Date.now());
+      return;
     }
-  });
+    throw new ApiError(503, 'We could not send your reset code. Please try again later.');
+  }
+
+  lastCodeSentAt.set(user.id, Date.now());
 }
 
 // makes text safe to put inside the email

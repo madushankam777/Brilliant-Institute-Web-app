@@ -305,7 +305,7 @@ function checkoutMethodsFor(enabled) {
   const tabs = [];
   if (online.length > 0) {
     if (payhere.isConfigured()) tabs.push('ONLINE');
-    else tabs.push(...online);
+    else if (!config.isProduction && config.paymentGateway.providerName === 'mock-gateway') tabs.push(...online);
   }
   // PayPal is its own tab once the admin switches it on and the keys are set
   if (enabled.includes('PAYPAL') && paypal.isConfigured()) tabs.push('PAYPAL');
