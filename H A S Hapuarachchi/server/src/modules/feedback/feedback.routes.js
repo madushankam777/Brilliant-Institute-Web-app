@@ -5,7 +5,7 @@ const authorize = require('../../../../../shared/server/src/middleware/authorize
 const validateRequest = require('../../../../../shared/server/src/middleware/validateRequest');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const controller = require('./feedback.controller');
-const { ticketIdParamRules, createTicketRules, replyRules, listQueryRules } = require('./feedback.validation');
+const { ticketIdParamRules, createTicketRules, replyRules, listQueryRules, boxRules } = require('./feedback.validation');
 
 const router = express.Router();
 
@@ -40,8 +40,21 @@ router.get(
   controller.getTicketStatusCounts
 );
 
+// the number on the Feedback menu item
+router.get('/unread-count', controller.unreadCount);
+// mark all as read btn - inbox (sent to me) or sent (by me)
+router.post('/read-all', boxRules, validateRequest, controller.markAllRead);
+// delete read btn
+router.post('/clear-read', boxRules, validateRequest, controller.clearRead);
+// delete all btn
+router.post('/clear-all', boxRules, validateRequest, controller.clearAll);
+
 // one ticket with its replies
 router.get('/:ticketId', ticketIdParamRules, validateRequest, controller.getTicketDetails);
+// opened - I have read it
+router.post('/:ticketId/read', ticketIdParamRules, validateRequest, controller.markTicketRead);
+// delete btn - off my list only (the ticket stays for the other person and the reports)
+router.delete('/:ticketId', ticketIdParamRules, validateRequest, controller.hideTicket);
 
 // send reply btn - service layer checks sender is allowed
 router.post('/:ticketId/reply', replyRules, validateRequest, controller.replyToTicket);

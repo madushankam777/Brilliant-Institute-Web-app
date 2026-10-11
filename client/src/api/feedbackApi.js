@@ -42,3 +42,24 @@ export async function fetchTicketStatusCounts() {
   const response = await httpClient.get('/feedback/status-counts');
   return response.data.data.counts;
 }
+
+// tells the Feedback badge to check again (after reading or deleting)
+export function announceFeedbackChanged() {
+  window.dispatchEvent(new Event('brilliant:feedback-changed'));
+}
+
+// opened - I have read this ticket
+export async function markTicketRead(ticketId) {
+  await httpClient.post(`/feedback/${ticketId}/read`, undefined, { background: true });
+}
+
+// delete btn - take a ticket off my list (only for me)
+export async function hideTicket(ticketId) {
+  await httpClient.delete(`/feedback/${ticketId}`);
+}
+
+// mark all read / delete read / delete all - box is 'inbox' (sent to me) or 'sent' (by me)
+export async function updateAllTickets(action, box) {
+  const response = await httpClient.post(`/feedback/${action}`, { box });
+  return response.data.data;
+}

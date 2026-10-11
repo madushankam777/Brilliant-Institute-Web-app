@@ -1,15 +1,9 @@
 // Feedback & complaints report - tickets received, solved and still open
 const parts = require('../reportParts');
+// the student and tutor categories, from the feedback module
+const { CATEGORIES } = require('../../../../../../H A S Hapuarachchi/server/src/modules/feedback/feedback.constants');
 
 const { num, percent, kpi, table, bars, section, rows, one } = parts;
-
-const CATEGORIES = [
-  'Class Scheduling Issue',
-  'Class Quality & Tutor Feedback',
-  'Billing / Payment Inquiry',
-  'Technical Issue',
-  'Other',
-];
 
 // feedback report - tickets received and resolved, open ones by priority, and time to resolve
 async function build(params, { period }) {

@@ -195,5 +195,88 @@ PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @ddl = IF(@add_email, 'UPDATE notification_log SET emailed_at = sent_at WHERE id > 0 AND sent_at <= NOW()', 'SELECT 1');
 PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- notification bell: read / unread (notifications from before this update count as read)
+SET @add_read = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notification_log' AND COLUMN_NAME = 'read_at');
+SET @ddl = IF(@add_read,
+  'ALTER TABLE notification_log ADD COLUMN read_at DATETIME NULL AFTER dismissed_at, ADD KEY idx_notification_unread (recipient_id, read_at)',
+  'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @ddl = IF(@add_read, 'UPDATE notification_log SET read_at = sent_at WHERE id > 0 AND sent_at <= NOW()', 'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- announcements a user has read (an edited announcement counts as unread again)
+CREATE TABLE IF NOT EXISTS announcement_reads (
+  user_id          INT UNSIGNED NOT NULL,
+  announcement_id  INT UNSIGNED NOT NULL,
+  version          INT UNSIGNED NOT NULL DEFAULT 1,
+  read_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, announcement_id),
+  CONSTRAINT fk_announcement_read_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_announcement_read_item FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Messages: private chats - a student or tutor with the office (every admin), or a student with their tutor.
+-- Students can never chat with other students. pair_key keeps one chat per pair, e.g. office:15 or tutor:15:7
+CREATE TABLE IF NOT EXISTS conversations (
+  id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  kind                    ENUM('OFFICE', 'TUTOR') NOT NULL,
+  member_id               INT UNSIGNED NOT NULL,
+  tutor_id                INT UNSIGNED NULL,
+  pair_key                VARCHAR(40) NOT NULL,
+  started_by              INT UNSIGNED NULL,
+  last_message_id         BIGINT UNSIGNED NULL,
+  last_member_message_id  BIGINT UNSIGNED NULL,
+  last_other_message_id   BIGINT UNSIGNED NULL,
+  last_message_at         DATETIME NULL,
+  created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_conversation_pair (pair_key),
+  KEY idx_conversation_member (member_id),
+  KEY idx_conversation_tutor (tutor_id),
+  KEY idx_conversation_kind (kind, last_message_id),
+  CONSTRAINT fk_conversation_member FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_conversation_tutor FOREIGN KEY (tutor_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_conversation_starter FOREIGN KEY (started_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- the messages in a chat (from_member = sent by the student / tutor side, not the office or the tutor)
+CREATE TABLE IF NOT EXISTS conversation_messages (
+  id               BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  conversation_id  INT UNSIGNED NOT NULL,
+  sender_id        INT UNSIGNED NULL,
+  from_member      TINYINT(1) NOT NULL,
+  body             VARCHAR(2000) NOT NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_message_conversation (conversation_id, id),
+  CONSTRAINT fk_message_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+  CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- how far each person has read a chat, and up to where they deleted it (newer messages bring it back)
+CREATE TABLE IF NOT EXISTS conversation_reads (
+  conversation_id   INT UNSIGNED NOT NULL,
+  user_id           INT UNSIGNED NOT NULL,
+  last_read_id      BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  cleared_up_to_id  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (conversation_id, user_id),
+  KEY idx_conversation_reads_user (user_id),
+  CONSTRAINT fk_conversation_read_chat FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+  CONSTRAINT fk_conversation_read_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- feedback tickets: how many messages each person has read, and up to where they deleted the ticket from their list
+CREATE TABLE IF NOT EXISTS feedback_reads (
+  ticket_id     INT UNSIGNED NOT NULL,
+  user_id       INT UNSIGNED NOT NULL,
+  seen_count    INT UNSIGNED NOT NULL DEFAULT 0,
+  hidden_count  INT UNSIGNED NOT NULL DEFAULT 0,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (ticket_id, user_id),
+  KEY idx_feedback_reads_user (user_id),
+  CONSTRAINT fk_feedback_read_ticket FOREIGN KEY (ticket_id) REFERENCES feedback_complaints(id) ON DELETE CASCADE,
+  CONSTRAINT fk_feedback_read_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- shows that the script finished
 SELECT 'database update complete' AS result;

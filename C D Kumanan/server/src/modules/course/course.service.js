@@ -468,6 +468,7 @@ async function listMyCourses(studentUser) {
     startTime: row.start_time,
     endTime: row.end_time,
     classStatus: row.status,
+    tutorId: row.tutor_id,
     tutorName: row.tutor_name,
   }));
 }

@@ -1,16 +1,66 @@
 // portal shell - the side menu on a computer and a bottom tab bar on a phone, around every logged-in page
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import httpClient from '../../api/httpClient';
 import Icon from '../common/Icon';
 
 // overflow nav items go behind a "More" tab on mobile
 const MAX_VISIBLE_TABS = 4;
+// check the badges every minute
+const BADGE_POLL_MS = 60 * 1000;
+// where each badge number comes from
+const BADGE_SOURCES = { messages: '/messages/unread-count', feedback: '/feedback/unread-count' };
+
+// the small number on a menu item, e.g. unread chats
+function NavBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span className="nav-badge" aria-label={`${count} unread`}>
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
 
 // portal shell - the page frame for logged-in users
 function PortalShell({ navItems, children }) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [badges, setBadges] = useState({});
   const moreRef = useRef(null);
   const location = useLocation();
+  // the badges this menu shows, e.g. "messages,feedback"
+  const badgeKeys = navItems
+    .map((item) => item.badge)
+    .filter((key) => BADGE_SOURCES[key])
+    .join(',');
+
+  // unread chats and tickets - when the page opens, every minute, and after reading or sending
+  useEffect(() => {
+    if (!badgeKeys) return undefined;
+    let isCurrent = true;
+    async function loadBadges() {
+      if (document.visibilityState === 'hidden') return;
+      for (const key of badgeKeys.split(',')) {
+        try {
+          const response = await httpClient.get(BADGE_SOURCES[key], { background: true });
+          if (isCurrent) setBadges((previous) => ({ ...previous, [key]: response.data.data.unread }));
+        } catch {
+          // not critical - the badge just stays as it was
+        }
+      }
+    }
+    loadBadges();
+    const timer = setInterval(loadBadges, BADGE_POLL_MS);
+    window.addEventListener('brilliant:messages-changed', loadBadges);
+    window.addEventListener('brilliant:feedback-changed', loadBadges);
+    window.addEventListener('focus', loadBadges);
+    return () => {
+      isCurrent = false;
+      clearInterval(timer);
+      window.removeEventListener('brilliant:messages-changed', loadBadges);
+      window.removeEventListener('brilliant:feedback-changed', loadBadges);
+      window.removeEventListener('focus', loadBadges);
+    };
+  }, [badgeKeys]);
 
   const visibleItems = navItems.slice(0, MAX_VISIBLE_TABS);
   const overflowItems = navItems.slice(MAX_VISIBLE_TABS);
@@ -47,6 +97,7 @@ function PortalShell({ navItems, children }) {
           >
             <Icon name={item.icon} size={19} />
             <span>{item.label}</span>
+            <NavBadge count={badges[item.badge]} />
           </NavLink>
         ))}
       </aside>
@@ -65,6 +116,7 @@ function PortalShell({ navItems, children }) {
           >
             <Icon name={item.icon} size={20} />
             <span>{item.shortLabel || item.label}</span>
+            <NavBadge count={badges[item.badge]} />
           </NavLink>
         ))}
 
@@ -84,6 +136,7 @@ function PortalShell({ navItems, children }) {
                   >
                     <Icon name={item.icon} size={18} />
                     <span>{item.label}</span>
+                    <NavBadge count={badges[item.badge]} />
                   </NavLink>
                 ))}
               </div>

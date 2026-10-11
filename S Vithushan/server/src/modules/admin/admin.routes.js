@@ -45,6 +45,25 @@ router.get('/announcements', controller.listMyAnnouncements);
 router.get('/notifications/mine', controller.listMyNotifications);
 // clear all btn - every notification in my bell, on every device
 router.post('/notifications/clear-all', controller.clearMyNotifications);
+// mark all as read btn - the whole bell
+router.post('/notifications/read-all', controller.markAllMyNotificationsRead);
+// delete read btn - every read item in my bell
+router.post('/notifications/clear-read', controller.clearMyReadNotifications);
+// click a notification - it is read now
+router.post(
+  '/notifications/:notificationId/read',
+  param('notificationId').isInt({ min: 1 }).withMessage('Invalid notification id.'),
+  validateRequest,
+  controller.markMyNotificationRead
+);
+// click an announcement - this version of it is read
+router.post(
+  '/announcements/:announcementId/read',
+  param('announcementId').isInt({ min: 1 }).withMessage('Invalid announcement id.'),
+  body('version').optional().isInt({ min: 1 }).withMessage('Invalid version.'),
+  validateRequest,
+  controller.markMyAnnouncementRead
+);
 // clear btn - one of my notifications
 router.post(
   '/notifications/:notificationId/dismiss',

@@ -1,8 +1,4 @@
-// emails for bell notifications - every notification also goes to the person's inbox
-//
-// After sql/update_database.sql each notification waits in notification_log until it is emailed
-// (emailed_at), so scheduled reminders go out at their time and a failed email is tried again.
-// Before that update the email is sent straight away.
+// emails for bell notifications - each one waits in notification_log until emailed (sent straight away before the database update)
 const { pool } = require('../config/db');
 const config = require('../config/env');
 const schema = require('./schemaFeatures');

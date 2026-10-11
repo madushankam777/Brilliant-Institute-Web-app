@@ -29,9 +29,14 @@ export function onRequestActivity(listener) {
   return () => activityListeners.delete(listener);
 }
 
+// background requests (the bell and chat checks) never show the loading bar
+function isBackground(requestConfig) {
+  return Boolean(requestConfig && requestConfig.background);
+}
+
 // before every request - count it and mark the ones that change data
 httpClient.interceptors.request.use((requestConfig) => {
-  setActive(1);
+  if (!isBackground(requestConfig)) setActive(1);
   const method = (requestConfig.method || 'get').toLowerCase();
   if (STATE_CHANGING_METHODS.has(method)) {
     requestConfig.headers['X-Requested-With'] = 'brilliant-institute-client';
@@ -65,11 +70,11 @@ async function readErrorBody(error) {
 // after every response - handle a 401, and turn an error into { message, status, details }
 httpClient.interceptors.response.use(
   (response) => {
-    setActive(-1);
+    if (!isBackground(response.config)) setActive(-1);
     return response;
   },
   async (error) => {
-    setActive(-1);
+    if (!isBackground(error.config)) setActive(-1);
     const status = error.response ? error.response.status : null;
     const requestUrl = error.config ? error.config.url : '';
     const isAuthEntryPoint = AUTH_ENTRY_POINTS.some((path) => requestUrl.includes(path));

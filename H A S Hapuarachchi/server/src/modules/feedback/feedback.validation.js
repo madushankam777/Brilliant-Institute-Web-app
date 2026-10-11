@@ -28,4 +28,7 @@ const listQueryRules = [
   query('status').optional().isIn(Object.values(STATUSES)).withMessage('Invalid status filter.'),
 ];
 
-module.exports = { ticketIdParamRules, createTicketRules, replyRules, listQueryRules };
+// mark all read / delete read / delete all - for the tickets sent to me (inbox) or by me (sent)
+const boxRules = [body('box').isIn(['inbox', 'sent']).withMessage('Choose which list to change.')];
+
+module.exports = { ticketIdParamRules, createTicketRules, replyRules, listQueryRules, boxRules };

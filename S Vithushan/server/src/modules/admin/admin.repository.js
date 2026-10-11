@@ -587,20 +587,23 @@ async function listAllAnnouncements() {
 
 // announcements for one role and grade - for everyone or that role, and for no grade or that grade (latest 50)
 async function listAnnouncementsForAudience(role, grade, userId) {
-  // announcements this user cleared stay hidden until they are edited again
+  // announcements this user cleared stay hidden until they are edited again; read_version = the version they read
   if (userId && (await schema.hasNotificationCentre())) {
+    const withReads = await schema.hasNotificationReadState();
     const [rows] = await pool.execute(
-      `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name
+      `SELECT a.*, u.full_name AS published_by_name, e.full_name AS updated_by_name,
+              ${withReads ? 'r.version' : 'NULL'} AS read_version
        FROM announcements a
        JOIN users u ON u.id = a.published_by
        LEFT JOIN users e ON e.id = a.updated_by
        LEFT JOIN announcement_dismissals d ON d.announcement_id = a.id AND d.user_id = ?
+       ${withReads ? 'LEFT JOIN announcement_reads r ON r.announcement_id = a.id AND r.user_id = ?' : ''}
        WHERE a.status = 'PUBLISHED' AND (a.target_audience = 'ALL' OR a.target_audience = ?)
          AND (a.target_grade IS NULL OR a.target_grade = ?)
          AND (d.user_id IS NULL OR d.version < a.version)
        ORDER BY a.created_at DESC
        LIMIT 50`,
-      [userId, role, grade || null]
+      withReads ? [userId, userId, role, grade || null] : [userId, role, grade || null]
     );
     return rows;
   }
@@ -658,9 +661,10 @@ async function logNotification({ recipientId, channel, type, message, sentBy, li
 async function listNotificationsForUser(userId, limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 30;
   const withCentre = await schema.hasNotificationCentre();
+  const withReads = await schema.hasNotificationReadState();
   const [rows] = await pool.query(
     withCentre
-      ? `SELECT id, type, message, link, sent_at
+      ? `SELECT id, type, message, link, sent_at${withReads ? ', read_at' : ''}
          FROM notification_log
          WHERE recipient_id = ? AND sent_at <= NOW() AND dismissed_at IS NULL
          ORDER BY sent_at DESC
@@ -701,6 +705,45 @@ async function dismissAnnouncement(userId, announcementId, version) {
     `INSERT INTO announcement_dismissals (user_id, announcement_id, version, dismissed_at)
      VALUES (?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE version = VALUES(version), dismissed_at = NOW()`,
+    [userId, announcementId, version]
+  );
+}
+
+// click a notification - it is read now
+async function markNotificationRead(userId, notificationId) {
+  const [result] = await pool.execute(
+    `UPDATE notification_log SET read_at = NOW() WHERE id = ? AND recipient_id = ? AND read_at IS NULL`,
+    [notificationId, userId]
+  );
+  return result.affectedRows;
+}
+
+// mark all as read btn - every notification I can see now
+async function markAllNotificationsRead(userId) {
+  const [result] = await pool.execute(
+    `UPDATE notification_log SET read_at = NOW()
+     WHERE recipient_id = ? AND sent_at <= NOW() AND read_at IS NULL`,
+    [userId]
+  );
+  return result.affectedRows;
+}
+
+// delete read btn - hide every notification I have already read
+async function dismissReadNotifications(userId) {
+  const [result] = await pool.execute(
+    `UPDATE notification_log SET dismissed_at = NOW()
+     WHERE recipient_id = ? AND read_at IS NOT NULL AND dismissed_at IS NULL`,
+    [userId]
+  );
+  return result.affectedRows;
+}
+
+// an announcement is read (this version of it)
+async function markAnnouncementRead(userId, announcementId, version) {
+  await pool.execute(
+    `INSERT INTO announcement_reads (user_id, announcement_id, version, read_at)
+     VALUES (?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE version = GREATEST(version, VALUES(version)), read_at = NOW()`,
     [userId, announcementId, version]
   );
 }
@@ -852,4 +895,8 @@ module.exports = {
   dismissNotification,
   dismissAllNotifications,
   dismissAnnouncement,
+  markNotificationRead,
+  markAllNotificationsRead,
+  dismissReadNotifications,
+  markAnnouncementRead,
 };

@@ -59,6 +59,31 @@ const getTicketStatusCounts = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { counts } });
 });
 
+// POST /:ticketId/read - I have read this ticket
+const markTicketRead = asyncHandler(async (req, res) => {
+  await service.markTicketRead(req.user, Number(req.params.ticketId));
+  res.status(200).json({ success: true });
+});
+
+// DELETE /:ticketId - take a ticket off my list (only for me)
+const hideTicket = asyncHandler(async (req, res) => {
+  await service.hideTicket(req.user, Number(req.params.ticketId));
+  res.status(200).json({ success: true, message: 'Removed from your list.' });
+});
+
+// POST /read-all, /clear-read, /clear-all - the buttons above a ticket list
+const updateAllTickets = (action) =>
+  asyncHandler(async (req, res) => {
+    const result = await service.updateAllTickets(req.user, action, req.body.box);
+    res.status(200).json({ success: true, data: result });
+  });
+
+// GET /unread-count - the number on the Feedback menu item
+const unreadCount = asyncHandler(async (req, res) => {
+  const unread = await service.countUnreadTickets(req.user);
+  res.status(200).json({ success: true, data: { unread } });
+});
+
 module.exports = {
   submitFeedback,
   getMyTickets,
@@ -67,4 +92,10 @@ module.exports = {
   replyToTicket,
   resolveTicket,
   getTicketStatusCounts,
+  markTicketRead,
+  hideTicket,
+  unreadCount,
+  markAllRead: updateAllTickets('read-all'),
+  clearRead: updateAllTickets('clear-read'),
+  clearAll: updateAllTickets('clear-all'),
 };

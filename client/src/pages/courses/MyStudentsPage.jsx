@@ -1,5 +1,6 @@
 // my students page - the students in my classes, with suspend and reactivate
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchMyStudents, suspendUser, activateUser } from '../../api/adminApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
@@ -129,6 +130,16 @@ function MyStudentsPage() {
                         <span className={statusBadgeClass(student.status)}>{student.status}</span>
                       </td>
                       <td>
+                        {/* message btn - opens a chat with this student */}
+                        {student.status === 'ACTIVE' && (
+                          <Link
+                            to={`/messages?to=${student.id}&name=${encodeURIComponent(student.fullName)}`}
+                            className="btn btn-primary btn-sm"
+                            style={{ marginRight: '6px' }}
+                          >
+                            Message
+                          </Link>
+                        )}
                         {/* suspend btn for active students, reactivate btn for the others */}
                         {student.status === 'ACTIVE' ? (
                           <button

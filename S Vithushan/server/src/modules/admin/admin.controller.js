@@ -242,6 +242,30 @@ const clearMyNotifications = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { stored } });
 });
 
+// POST /notifications/:id/read - one notification is read
+const markMyNotificationRead = asyncHandler(async (req, res) => {
+  const stored = await service.markMyNotificationRead(req.user, Number(req.params.notificationId));
+  res.status(200).json({ success: true, data: { stored } });
+});
+
+// POST /announcements/:id/read - one announcement is read (this version of it)
+const markMyAnnouncementRead = asyncHandler(async (req, res) => {
+  const stored = await service.markMyAnnouncementRead(req.user, Number(req.params.announcementId), req.body.version);
+  res.status(200).json({ success: true, data: { stored } });
+});
+
+// POST /notifications/read-all - mark the whole bell as read
+const markAllMyNotificationsRead = asyncHandler(async (req, res) => {
+  const stored = await service.markAllMyNotificationsRead(req.user);
+  res.status(200).json({ success: true, data: { stored } });
+});
+
+// POST /notifications/clear-read - delete every read item in the bell
+const clearMyReadNotifications = asyncHandler(async (req, res) => {
+  const stored = await service.clearMyReadNotifications(req.user);
+  res.status(200).json({ success: true, data: { stored } });
+});
+
 // GET /notifications/mine - my notification bell
 const listMyNotifications = asyncHandler(async (req, res) => {
   const notifications = await service.listMyNotifications(req.user);
@@ -257,9 +281,14 @@ const listMyClassesForMessaging = asyncHandler(async (req, res) => {
 // POST /tutor/messages - a tutor messages their students and/or the admin
 const sendTutorMessage = asyncHandler(async (req, res) => {
   const result = await service.sendTutorMessage(req.user, req.body);
+  const people = [];
+  if (result.studentCount > 0) people.push(`${result.studentCount} student${result.studentCount === 1 ? '' : 's'}`);
+  if (result.toOffice) people.push('the office');
   res.status(201).json({
     success: true,
-    message: `Message sent to ${result.recipientCount} recipient(s).`,
+    message: result.viaMessages
+      ? `Message sent to ${people.join(' and ')}. Replies arrive in your Messages.`
+      : `Message sent to ${people.join(' and ')}.`,
     data: { result },
   });
 });
@@ -374,6 +403,10 @@ module.exports = {
   dismissMyNotification,
   dismissMyAnnouncement,
   clearMyNotifications,
+  markMyNotificationRead,
+  markMyAnnouncementRead,
+  markAllMyNotificationsRead,
+  clearMyReadNotifications,
   listMyClassesForMessaging,
   sendTutorMessage,
 };

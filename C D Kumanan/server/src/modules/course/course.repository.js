@@ -494,7 +494,7 @@ async function listMyEnrollments(studentId) {
     `SELECT e.id AS enrollment_id, e.status AS enrollment_status, e.balance, e.enrolled_at, e.drop_date,
             e.payment_status, ${dueColumn} AS payment_due_at,
             c.id, c.subject, c.subject_area, c.level, c.venue, c.day_of_week, c.start_time, c.end_time,
-            c.status, t.full_name AS tutor_name
+            c.status, c.tutor_id, t.full_name AS tutor_name
      FROM enrollments e
      JOIN classes c ON c.id = e.class_id
      JOIN users t ON t.id = c.tutor_id

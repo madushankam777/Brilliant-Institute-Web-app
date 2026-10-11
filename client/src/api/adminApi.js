@@ -126,14 +126,34 @@ export async function cancelReminder(reminderId) {
 
 // notification bell - announcements
 export async function fetchMyAnnouncements() {
-  const response = await httpClient.get('/announcements');
+  const response = await httpClient.get('/announcements', { background: true });
   return response.data.data.announcements;
 }
 
 // notification bell - personal reminders
 export async function fetchMyNotifications() {
-  const response = await httpClient.get('/notifications/mine');
+  const response = await httpClient.get('/notifications/mine', { background: true });
   return response.data.data.notifications;
+}
+
+// click a notification - it is read now
+export async function markMyNotificationRead(notificationId) {
+  await httpClient.post(`/notifications/${notificationId}/read`, undefined, { background: true });
+}
+
+// click an announcement - this version of it is read
+export async function markMyAnnouncementRead(announcementId, version) {
+  await httpClient.post(`/announcements/${announcementId}/read`, { version }, { background: true });
+}
+
+// mark all as read btn - the whole bell
+export async function markAllMyNotificationsRead() {
+  await httpClient.post('/notifications/read-all');
+}
+
+// delete read btn - every read item in the bell
+export async function clearMyReadNotifications() {
+  await httpClient.post('/notifications/clear-read');
 }
 
 // clear btn - hide one of my notifications on every device

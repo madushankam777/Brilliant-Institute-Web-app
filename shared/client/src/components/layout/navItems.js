@@ -4,6 +4,7 @@ export function getNavItems(role) {
   if (role === 'ADMIN') {
     return [
       { to: '/admin/dashboard', label: 'Dashboard', icon: 'home', end: true },
+      { to: '/messages', label: 'Messages', icon: 'mail', badge: 'messages' },
       { to: '/admin/users', label: 'Manage Users', shortLabel: 'Users', icon: 'users' },
       { to: '/courses/manage', label: 'Manage Classes', shortLabel: 'Classes', icon: 'book' },
       { to: '/calendar', label: 'Calendar', icon: 'calendarDays' },
@@ -13,7 +14,7 @@ export function getNavItems(role) {
       { to: '/admin/payments/settings', label: 'Payment Settings', icon: 'card' },
       { to: '/admin/announcements', label: 'Announcements', icon: 'megaphone' },
       { to: '/admin/reregistration', label: 'Re-registration', icon: 'refresh' },
-      { to: '/admin/feedback', label: 'Feedback', icon: 'chat' },
+      { to: '/admin/feedback', label: 'Feedback', icon: 'chat', badge: 'feedback' },
       { to: '/admin/enquiries', label: 'Enquiries', icon: 'inbox' },
       { to: '/admin/analytics', label: 'Analytics', icon: 'spark' },
       { to: '/admin/reports', label: 'Reports', icon: 'barChart' },
@@ -24,19 +25,21 @@ export function getNavItems(role) {
   if (role === 'TUTOR') {
     return [
       { to: '/', label: 'Dashboard', icon: 'home', end: true },
+      { to: '/messages', label: 'Messages', icon: 'mail', badge: 'messages' },
       { to: '/attendance/classes', label: 'Mark Attendance', shortLabel: 'Attendance', icon: 'checkCircle' },
       { to: '/courses/manage', label: 'My Classes', shortLabel: 'Classes', icon: 'book' },
       { to: '/calendar', label: 'Calendar', icon: 'calendarDays' },
       { to: '/students/mine', label: 'My Students', shortLabel: 'Students', icon: 'users' },
       { to: '/reminders', label: 'Reminders', icon: 'clock' },
       { to: '/notify', label: 'Notify Students', icon: 'megaphone' },
-      { to: '/admin/feedback', label: 'Feedback', icon: 'chat' },
+      { to: '/admin/feedback', label: 'Feedback', icon: 'chat', badge: 'feedback' },
       { to: '/profile', label: 'My Profile', icon: 'user' },
     ];
   }
   // the student's side menu (the default)
   return [
     { to: '/', label: 'Dashboard', icon: 'home', end: true },
+    { to: '/messages', label: 'Messages', icon: 'mail', badge: 'messages' },
     { to: '/courses/classes', label: 'Browse Classes', shortLabel: 'Browse', icon: 'search' },
     { to: '/courses/my-courses', label: 'My Courses', shortLabel: 'Courses', icon: 'book' },
     { to: '/calendar', label: 'Calendar', icon: 'calendarDays' },
@@ -44,7 +47,7 @@ export function getNavItems(role) {
     { to: '/attendance/checkin', label: 'Mark Attendance', icon: 'checkCircle' },
     { to: '/payments', label: 'Fees', icon: 'card', end: true },
     { to: '/payments/history', label: 'History', icon: 'receipt' },
-    { to: '/feedback', label: 'Feedback', icon: 'chat' },
+    { to: '/feedback', label: 'Feedback', icon: 'chat', badge: 'feedback' },
     { to: '/reregister', label: 'Re-register', icon: 'refresh' },
     { to: '/profile', label: 'My Profile', icon: 'user' },
   ];

@@ -153,6 +153,15 @@ function UserProfilePage() {
           {/* links for a tutor or student - teaching profile, report and activity log */}
           {user.role !== 'ADMIN' && (
             <div style={{ marginTop: '18px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {/* send message btn - opens an office chat with this person */}
+              {user.status === 'ACTIVE' && (
+                <Link
+                  to={`/messages?to=${user.id}&name=${encodeURIComponent(user.fullName)}`}
+                  className="btn btn-primary btn-sm"
+                >
+                  Send message
+                </Link>
+              )}
               {user.role === 'TUTOR' && (
                 <Link to={`/courses/tutors/${user.id}`} className="btn btn-secondary btn-sm">
                   View Teaching Profile & Classes

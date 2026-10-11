@@ -1,5 +1,6 @@
 // the combined API - security rules, every module's routes and, when hosted, the website itself
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -8,6 +9,7 @@ const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 
 const config = require('../../shared/server/src/config/env');
+const { SESSION_COOKIE_NAME } = require('../../shared/server/src/config/roles');
 const { isTrustedDevOrigin } = require('../../shared/server/src/utils/isTrustedDevOrigin');
 const { apiLimiter } = require('../../shared/server/src/middleware/rateLimiters');
 const csrfGuard = require('../../shared/server/src/middleware/csrfGuard');
@@ -23,6 +25,7 @@ const paymentController = require('../../M T Madushanka/server/src/modules/payme
 const courseRoutes = require('../../C D Kumanan/server/src/modules/course/course.routes');
 const feedbackRoutes = require('../../H A S Hapuarachchi/server/src/modules/feedback/feedback.routes');
 const contactRoutes = require('../../H A S Hapuarachchi/server/src/modules/feedback/contact.routes');
+const messagesRoutes = require('../../H A S Hapuarachchi/server/src/modules/messages/messages.routes');
 const adminRoutes = require('../../S Vithushan/server/src/modules/admin/admin.routes');
 const reportRoutes = require('../../S Vithushan/server/src/modules/reports/reports.routes');
 const analyticsRoutes = require('../../S Vithushan/server/src/modules/reports/analytics.routes');
@@ -118,12 +121,37 @@ if (config.serveClient) {
       },
     })
   );
+  // the home page for visitors - the picture is already on the loading screen, so it shows before the app starts
+  let homePage = { builtAt: 0, heroFile: null, html: null };
+  function homePageFor() {
+    const indexFile = path.join(CLIENT_DIST, 'index.html');
+    const builtAt = fs.statSync(indexFile).mtimeMs;
+    // read again only after a new build (the picture's file name changes with every build)
+    if (homePage.builtAt !== builtAt) {
+      const assets = path.join(CLIENT_DIST, 'assets');
+      const heroFile = fs.existsSync(assets) ? fs.readdirSync(assets).find((name) => /^hero-media-.*\.webp$/.test(name)) : null;
+      const picture = `<img class="boot-hero" src="/assets/${heroFile}" alt="" width="640" height="440" fetchpriority="high" />`;
+      const html = fs.readFileSync(indexFile, 'utf8').replace('<span class="boot-bar"></span>', `<span class="boot-bar"></span>\n        ${picture}`);
+      homePage = { builtAt, heroFile, html };
+    }
+    return homePage;
+  }
+
   // every page address that is not the API is the React app
   app.get(/^\/(?!api\/|uploads\/).*/, (req, res, next) => {
     // a missing file gets a real 404, not the home page
     if (req.path.startsWith('/assets/') || path.extname(req.path)) return next();
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    // a visitor on the home page - start the picture download at once and show it while the app loads
+    if (req.path === '/' && !(req.cookies && req.cookies[SESSION_COOKIE_NAME])) {
+      const home = homePageFor();
+      if (home.heroFile) {
+        res.setHeader('Link', `</assets/${home.heroFile}>; rel=preload; as=image; fetchpriority=high`);
+        res.type('html').send(home.html);
+        return;
+      }
+    }
     res.sendFile(path.join(CLIENT_DIST, 'index.html'));
   });
 }
@@ -163,6 +191,7 @@ app.use('/api/payments', paymentRoutes); // Payments (M T Madushanka)
 app.use('/api/courses', courseRoutes); // Course Management (C D Kumanan)
 app.use('/api/feedback', feedbackRoutes); // Feedback & Complaint (H A S Hapuarachchi)
 app.use('/api/contact', contactRoutes); // Contact Us form + Admin inbox (H A S Hapuarachchi)
+app.use('/api/messages', messagesRoutes); // Messages - chats with the office and tutors (H A S Hapuarachchi)
 app.use('/api/admin/reports', reportRoutes); // Reports + PDF / Excel downloads (S Vithushan)
 app.use('/api/admin/analytics', analyticsRoutes); // Analytics dashboard data (S Vithushan)
 app.use('/api', adminRoutes); // Admin, Notifications & Announcements (S Vithushan) - /api/admin/* + /api/announcements

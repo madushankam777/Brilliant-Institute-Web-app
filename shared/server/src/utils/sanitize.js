@@ -206,6 +206,7 @@ const NOTIFICATION_TYPE_LABELS = {
   WELCOME: 'Welcome',
   ACCOUNT_STATUS: 'Account',
   PASSWORD_CHANGED: 'Security Notice',
+  NEW_MESSAGE: 'New Message',
 };
 
 // Scheduled reminders are CLASS_REMINDER rows whose message starts with this.
@@ -221,6 +222,8 @@ function toSafeNotification(row) {
     title: isReminder ? 'Reminder' : NOTIFICATION_TYPE_LABELS[row.type] || 'Notification',
     message: isReminder ? row.message.slice(REMINDER_PREFIX.length) : row.message,
     sentAt: row.sent_at,
+    // null when the database cannot tell read from unread yet
+    isRead: row.read_at === undefined ? null : row.read_at !== null,
   };
 }
 

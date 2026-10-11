@@ -1,4 +1,4 @@
-// Tutor: send a notice to their own students and/or Admin.
+// Tutor: send one message to their own students and/or the office - it arrives in their Messages
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchMyClassesForMessaging, sendTutorMessage } from '../../api/adminApi';
@@ -104,13 +104,19 @@ function NotifyStudentsPage() {
           <div>
             <h1>Notify Students</h1>
             <p className="muted">
-              Send a notice straight to the notification bell of the students in your classes, the institute office,
-              or both. Want it to arrive later? Schedule a reminder instead.
+              Send one message to the students in your classes, the institute office, or both. Each person gets it in
+              their Messages (with a notification and an email) and can reply to you there. Want it to arrive later?
+              Schedule a reminder instead.
             </p>
           </div>
-          <Link to="/reminders" className="btn btn-secondary">
-            <Icon name="clock" size={16} /> Scheduled Reminders
-          </Link>
+          <div className="flex-between" style={{ gap: '8px' }}>
+            <Link to="/messages" className="btn btn-secondary">
+              <Icon name="mail" size={16} /> Messages
+            </Link>
+            <Link to="/reminders" className="btn btn-secondary">
+              <Icon name="clock" size={16} /> Scheduled Reminders
+            </Link>
+          </div>
         </div>
 
         <Alert type="error" message={loadError} />
@@ -191,7 +197,7 @@ function NotifyStudentsPage() {
                 <label htmlFor="notify-message">Message</label>
                 <textarea
                   id="notify-message"
-                  placeholder="Write the notice your students will see..."
+                  placeholder="Write the message your students will see..."
                   value={form.message}
                   onChange={(e) => updateField('message', e.target.value)}
                   maxLength={350}
@@ -203,7 +209,7 @@ function NotifyStudentsPage() {
 
               {/* send btn */}
               <button type="submit" className="btn btn-primary" disabled={isSending}>
-                {isSending ? 'Sending...' : 'Send notification'}
+                <Icon name="send" size={15} /> {isSending ? 'Sending...' : 'Send message'}
               </button>
             </form>
           </div>

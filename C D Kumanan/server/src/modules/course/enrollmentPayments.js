@@ -1,11 +1,4 @@
-// unpaid enrolments - pay-by time, the 2-day warning, releasing the place, and the waiting list
-//
-// The rule: a new enrolment must be paid for at least 1 day before its first class.
-// - at enrolment: an urgent "pay to keep your place" notice
-// - 2 days before the first class: a pop-up warning that the place will be released
-// - 1 day before the first class, still unpaid: the place is released, so a waiting student can join
-// A class that has any payment (or a bank slip waiting for the office) is never released.
-// Every notice here is emailed too (createNotification does that).
+// unpaid enrolments - pay at least 1 day before the first class, a warning the day before that, then the place is released
 const { pool } = require('../../../../../shared/server/src/config/db');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { createNotification } = require('../../../../../shared/server/src/utils/notifications');

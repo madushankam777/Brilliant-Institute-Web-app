@@ -38,20 +38,21 @@
     </script>
     <style>
       .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #f6f8fb; font-family: 'Segoe UI', system-ui, sans-serif; }
-      .boot img { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 10px 30px -10px rgba(37, 99, 235, 0.45); animation: boot-pulse 1.4s ease-in-out infinite; }
+      .boot-logo { width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 10px 30px -10px rgba(37, 99, 235, 0.45); animation: boot-pulse 1.4s ease-in-out infinite; }
+      .boot-hero { width: min(640px, calc(100vw - 24px)); height: auto; aspect-ratio: 16 / 11; object-fit: cover; border-radius: 18px; box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.18); }
       .boot-name { font-weight: 800; font-size: 1.1rem; color: #0f172a; letter-spacing: -0.01em; }
       .boot-bar { width: 140px; height: 4px; border-radius: 999px; background: #dbeafe; overflow: hidden; }
       .boot-bar::after { content: ''; display: block; width: 40%; height: 100%; border-radius: 999px; background: #2563eb; animation: boot-slide 1s ease-in-out infinite; }
       @keyframes boot-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
       @keyframes boot-pulse { 50% { transform: scale(0.94); } }
-      @media (prefers-reduced-motion: reduce) { .boot img, .boot-bar::after { animation: none; } }
+      @media (prefers-reduced-motion: reduce) { .boot-logo, .boot-bar::after { animation: none; } }
     </style>
   </head>
   <body>
     <div id="root">
       <!-- loading screen - replaced as soon as the app is ready -->
       <div class="boot" role="status" aria-label="Loading">
-        <img src="/favicon.jpeg" alt="" />
+        <img class="boot-logo" src="/boot-logo.webp" alt="" width="64" height="64" />
         <span class="boot-name">Brilliant Institute</span>
         <span class="boot-bar"></span>
       </div>

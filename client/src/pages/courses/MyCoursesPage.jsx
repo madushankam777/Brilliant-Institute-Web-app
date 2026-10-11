@@ -208,7 +208,20 @@ function MyCoursesPage() {
                               </div>
                             )}
                           </td>
-                          <td>{course.tutorName}</td>
+                          <td>
+                            {course.tutorName}
+                            {/* message tutor btn - opens a chat with them */}
+                            {course.classStatus === 'ACTIVE' && course.tutorId && (
+                              <div>
+                                <Link
+                                  to={`/messages?to=${course.tutorId}&name=${encodeURIComponent(course.tutorName)}`}
+                                  className="order-line-sub"
+                                >
+                                  Message tutor
+                                </Link>
+                              </div>
+                            )}
+                          </td>
                           <td>
                             {course.dayOfWeek}, {formatTimeRange(course.startTime, course.endTime)}
                           </td>

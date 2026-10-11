@@ -13,6 +13,7 @@ const { notFoundHandler, errorHandler } = require('../../../shared/server/src/mi
 
 const sessionRoutes = require('./modules/session/session.routes');
 const feedbackRoutes = require('./modules/feedback/feedback.routes');
+const messagesRoutes = require('./modules/messages/messages.routes');
 
 // create the web server
 const app = express();
@@ -60,6 +61,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/session', sessionRoutes); // placeholder login only
 // this module's routes
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/messages', messagesRoutes);
 
 // unknown address gives a 404, any other error gives a JSON error reply
 app.use(notFoundHandler);

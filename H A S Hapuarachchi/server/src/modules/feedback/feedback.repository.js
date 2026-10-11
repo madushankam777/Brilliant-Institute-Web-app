@@ -88,15 +88,17 @@ async function listTicketsForStaff({ role, userId, status }) {
   return rows;
 }
 
-// add a reply to the ticket's reply list and set its new status
+// add a reply to the ticket's reply list and set its new status (a reopened ticket is no longer resolved)
 async function appendResponse(ticketId, responseEntry, newStatus) {
   await pool.execute(
     `UPDATE feedback_complaints
      SET responses = JSON_ARRAY_APPEND(COALESCE(responses, JSON_ARRAY()), '$', CAST(? AS JSON)),
          status = ?,
+         resolved_by = IF(? = 'RESOLVED', resolved_by, NULL),
+         resolved_at = IF(? = 'RESOLVED', resolved_at, NULL),
          updated_at = NOW()
      WHERE id = ?`,
-    [JSON.stringify(responseEntry), newStatus, ticketId]
+    [JSON.stringify(responseEntry), newStatus, newStatus, newStatus, ticketId]
   );
 }
 
@@ -124,6 +126,34 @@ async function countTicketsByStatus() {
   return rows;
 }
 
+// how many messages of each ticket I have read, and up to where I deleted it
+async function listReadStates(userId, ticketIds) {
+  if (ticketIds.length === 0) return new Map();
+  const [rows] = await pool.query(
+    `SELECT ticket_id, seen_count, hidden_count FROM feedback_reads WHERE user_id = ? AND ticket_id IN (?)`,
+    [userId, ticketIds]
+  );
+  return new Map(rows.map((row) => [row.ticket_id, row]));
+}
+
+// save what I have read / deleted - both only move forward
+async function saveReadStates(userId, states) {
+  if (states.length === 0) return;
+  const values = states.map(() => '(?, ?, ?, ?, NOW())').join(', ');
+  const params = [];
+  states.forEach((state) => {
+    params.push(state.ticketId, userId, state.seenCount || 0, state.hiddenCount || 0);
+  });
+  await pool.query(
+    `INSERT INTO feedback_reads (ticket_id, user_id, seen_count, hidden_count, updated_at)
+     VALUES ${values}
+     ON DUPLICATE KEY UPDATE seen_count = GREATEST(seen_count, VALUES(seen_count)),
+                             hidden_count = GREATEST(hidden_count, VALUES(hidden_count)),
+                             updated_at = NOW()`,
+    params
+  );
+}
+
 module.exports = {
   createTicket,
   findActiveTutorById,
@@ -135,4 +165,6 @@ module.exports = {
   markResolved,
   findUserFullName,
   countTicketsByStatus,
+  listReadStates,
+  saveReadStates,
 };

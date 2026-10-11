@@ -90,6 +90,26 @@ function hasClassWaitlist() {
   return hasTable('class_waitlist');
 }
 
+// the bell knows what is read and unread (notifications and announcements)
+async function hasNotificationReadState() {
+  return (await hasColumn('notification_log', 'read_at')) && (await hasTable('announcement_reads'));
+}
+
+// Messages - private chats between students, tutors and the office
+async function hasMessaging() {
+  return (
+    (await hasTable('conversations')) &&
+    (await hasTable('conversation_messages')) &&
+    (await hasTable('conversation_reads')) &&
+    (await hasNotificationReadState())
+  );
+}
+
+// feedback tickets remember what each person has read and deleted from their list
+function hasFeedbackReads() {
+  return hasTable('feedback_reads');
+}
+
 // notifications remember when their email went out (so each is emailed once)
 async function hasNotificationEmails() {
   return (await hasColumn('notification_log', 'emailed_at')) && (await hasColumn('notification_log', 'email_tries'));
@@ -114,6 +134,9 @@ async function reportPendingUpdates() {
   if (!(await hasPaymentDeadlines())) missing.push('payment deadlines for new enrolments');
   if (!(await hasClassWaitlist())) missing.push('waiting list for full classes');
   if (!(await hasNotificationEmails())) missing.push('emailing scheduled reminders and retrying failed emails');
+  if (!(await hasNotificationReadState())) missing.push('read / unread notifications');
+  if (!(await hasMessaging())) missing.push('Messages (chats)');
+  if (!(await hasFeedbackReads())) missing.push('read / delete for feedback tickets');
 
   if (missing.length > 0) {
     console.warn(
@@ -136,6 +159,9 @@ module.exports = {
   hasPaymentDeadlines,
   hasClassWaitlist,
   hasNotificationEmails,
+  hasNotificationReadState,
+  hasMessaging,
+  hasFeedbackReads,
   migrationRequired,
   reportPendingUpdates,
 };

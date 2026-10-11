@@ -18,6 +18,7 @@ const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { defaultLinkFor } = require('../../../../../shared/server/src/utils/notifications');
 const { emailAnnouncement, emailPerson } = require('../../../../../shared/server/src/utils/notificationEmails');
 const { sendMail, canReceiveEmail } = require('../../../../../shared/server/src/utils/mailer');
+const messagesService = require('../../../../../H A S Hapuarachchi/server/src/modules/messages/messages.service');
 const { renderEmail } = require('../../../../../shared/server/src/utils/emailLayout');
 const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
@@ -912,11 +913,15 @@ async function listAllAnnouncements() {
   return rows.map(toSafeAnnouncement);
 }
 
-// notification bell - announcements for this user
+// notification bell - announcements for this user (isRead is null before the database update)
 async function listAnnouncementsForUser(user) {
   const fullUser = await repository.findUserById(user.id);
   const rows = await repository.listAnnouncementsForAudience(user.role, fullUser ? fullUser.grade : null, user.id);
-  return rows.map(toSafeAnnouncement);
+  const withReads = await schema.hasNotificationReadState();
+  return rows.map((row) => ({
+    ...toSafeAnnouncement(row),
+    isRead: withReads ? Number(row.read_version || 0) >= Number(row.version || 1) : null,
+  }));
 }
 
 // the students a reminder applies to - overdue fees or low attendance
@@ -996,11 +1001,10 @@ async function listMyClassesForMessaging(tutorUser) {
   return rows.map((row) => ({ id: row.id, subject: row.subject, level: row.level }));
 }
 
-// Tutor -> their own students and/or Admin
+// Tutor -> their own students and/or the office - each gets it as a chat message they can reply to
 async function sendTutorMessage(tutorUser, { audience, classId, subject, message }) {
-  // collect who will get the message
-  const recipientIds = new Set();
-
+  // the students it goes to
+  let studentIds = [];
   if (audience === 'STUDENTS' || audience === 'BOTH') {
     if (classId) {
       // a tutor can only message students of their own classes
@@ -1011,45 +1015,51 @@ async function sendTutorMessage(tutorUser, { audience, classId, subject, message
         throw ApiError.forbidden('You can only message students in your own classes.');
       }
     }
-    const studentIds = await repository.listStudentIdsForTutor(tutorUser.id, classId);
-    studentIds.forEach((id) => recipientIds.add(id));
+    studentIds = await repository.listStudentIdsForTutor(tutorUser.id, classId);
+    if (audience === 'STUDENTS' && studentIds.length === 0) {
+      throw ApiError.badRequest('No students are actively enrolled in your classes yet.');
+    }
   }
 
-  if (audience === 'ADMIN' || audience === 'BOTH') {
-    const adminIds = await repository.listAdminIds();
-    adminIds.forEach((id) => recipientIds.add(id));
+  // the office (every admin)
+  const adminIds = audience === 'STUDENTS' ? [] : await repository.listAdminIds();
+  if (audience !== 'STUDENTS' && adminIds.length === 0) {
+    throw ApiError.badRequest('No active Admin account was found to send this to.');
   }
 
-  if (recipientIds.size === 0) {
-    throw ApiError.badRequest(
-      audience === 'ADMIN'
-        ? 'No active Admin account was found to send this to.'
-        : 'No students are actively enrolled in your classes yet.'
-    );
-  }
-
-  // req.user only carries id/role/email, so read the tutor's display name
-  const sender = await repository.findUserById(tutorUser.id);
-  const senderName = sender ? sender.full_name : 'your tutor';
-  const body = `${subject.trim()} - ${message.trim()} (from ${senderName})`;
-  for (const recipientId of recipientIds) {
-    await repository.logNotification({
-      recipientId,
-      channel: 'EMAIL',
-      type: 'ANNOUNCEMENT',
-      message: body.slice(0, 500),
-      sentBy: tutorUser.id,
+  // after the database update - into Messages, so students and the office can reply
+  let viaMessages = false;
+  if (await schema.hasMessaging()) {
+    await messagesService.sendFromTutorToMany(tutorUser, {
+      studentIds,
+      includeOffice: adminIds.length > 0,
+      body: `${subject.trim()}\n\n${message.trim()}`,
     });
+    viaMessages = true;
+  } else {
+    // before it - a bell notification only
+    const sender = await repository.findUserById(tutorUser.id);
+    const senderName = sender ? sender.full_name : 'your tutor';
+    const body = `${subject.trim()} - ${message.trim()} (from ${senderName})`;
+    for (const recipientId of new Set([...studentIds, ...adminIds])) {
+      await repository.logNotification({
+        recipientId,
+        channel: 'EMAIL',
+        type: 'ANNOUNCEMENT',
+        message: body.slice(0, 500),
+        sentBy: tutorUser.id,
+      });
+    }
   }
 
   await recordAuditEvent({
     actorId: tutorUser.id,
     action: 'TUTOR_MESSAGE_SENT',
     entityType: 'notification_batch',
-    details: { audience, classId: classId || null, recipientCount: recipientIds.size },
+    details: { audience, classId: classId || null, students: studentIds.length, office: adminIds.length > 0 },
   });
 
-  return { recipientCount: recipientIds.size, audience };
+  return { studentCount: studentIds.length, toOffice: adminIds.length > 0, audience, viaMessages };
 }
 
 // notification bell - personal reminders for this user, each with the page a click opens
@@ -1081,6 +1091,42 @@ async function clearMyNotifications(user) {
   await repository.dismissAllNotifications(user.id);
   const announcements = await listAnnouncementsForUser(user);
   for (const item of announcements) {
+    await repository.dismissAnnouncement(user.id, item.id, item.version || 1);
+  }
+  return true;
+}
+
+// click a notification - it is read now (false = the database update is not run yet)
+async function markMyNotificationRead(user, notificationId) {
+  if (!(await schema.hasNotificationReadState())) return false;
+  await repository.markNotificationRead(user.id, notificationId);
+  return true;
+}
+
+// click an announcement - this version of it is read
+async function markMyAnnouncementRead(user, announcementId, version) {
+  if (!(await schema.hasNotificationReadState())) return false;
+  await repository.markAnnouncementRead(user.id, announcementId, Number(version) || 1);
+  return true;
+}
+
+// mark all as read btn - every notification and announcement in my bell
+async function markAllMyNotificationsRead(user) {
+  if (!(await schema.hasNotificationReadState())) return false;
+  await repository.markAllNotificationsRead(user.id);
+  const announcements = await listAnnouncementsForUser(user);
+  for (const item of announcements.filter((announcement) => !announcement.isRead)) {
+    await repository.markAnnouncementRead(user.id, item.id, item.version || 1);
+  }
+  return true;
+}
+
+// delete read btn - clear what I have read; unread items stay
+async function clearMyReadNotifications(user) {
+  if (!(await schema.hasNotificationReadState())) return false;
+  await repository.dismissReadNotifications(user.id);
+  const announcements = await listAnnouncementsForUser(user);
+  for (const item of announcements.filter((announcement) => announcement.isRead)) {
     await repository.dismissAnnouncement(user.id, item.id, item.version || 1);
   }
   return true;
@@ -1241,6 +1287,10 @@ module.exports = {
   dismissMyNotification,
   dismissMyAnnouncement,
   clearMyNotifications,
+  markMyNotificationRead,
+  markMyAnnouncementRead,
+  markAllMyNotificationsRead,
+  clearMyReadNotifications,
   listMyClassesForMessaging,
   sendTutorMessage,
   listReregistrationKeys,
