@@ -252,31 +252,49 @@ function SubmitFeedbackPage() {
                 </div>
               )}
 
-              {/* subject */}
-              <div className="form-field">
-                <label htmlFor="subject">Subject</label>
-                <input
-                  id="subject"
-                  type="text"
-                  placeholder="A short summary of the issue"
-                  value={form.subject}
-                  onChange={(e) => updateField('subject', e.target.value)}
-                />
-                {fieldErrors.subject && <p className="field-error">{fieldErrors.subject}</p>}
-              </div>
+             {/* subject */}
+<div className="form-field">
+  <label htmlFor="subject">Subject</label>
 
-              {/* message */}
-              <div className="form-field">
-                <label htmlFor="message">Message</label>
-                <textarea
-                  id="message"
-                  placeholder="Type your comments, queries, tutor feedback, or technical issues here..."
-                  value={form.message}
-                  onChange={(e) => updateField('message', e.target.value)}
-                  style={{ minHeight: '130px' }}
-                />
-                {fieldErrors.message && <p className="field-error">{fieldErrors.message}</p>}
-              </div>
+  <input
+    id="subject"
+    type="text"
+    placeholder="A short summary of the issue"
+    value={form.subject}
+    onChange={(e) => updateField('subject', e.target.value)}
+    maxLength={200}
+  />
+
+  <p className="muted" style={{ fontSize: '0.8rem', textAlign: 'right' }}>
+    {form.subject.length}/200 characters
+  </p>
+
+  {fieldErrors.subject && (
+    <p className="field-error">{fieldErrors.subject}</p>
+  )}
+</div>
+
+             {/* message */}
+<div className="form-field">
+  <label htmlFor="message">Message</label>
+
+  <textarea
+    id="message"
+    placeholder="Type your comments, queries, tutor feedback, or technical issues here..."
+    value={form.message}
+    onChange={(e) => updateField('message', e.target.value)}
+    style={{ minHeight: '130px' }}
+    maxLength={4000}
+  />
+
+  <p className="muted" style={{ fontSize: '0.8rem', textAlign: 'right' }}>
+    {form.message.length}/4000 characters
+  </p>
+
+  {fieldErrors.message && (
+    <p className="field-error">{fieldErrors.message}</p>
+  )}
+</div>
 
               {/* send btn */}
               <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
