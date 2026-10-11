@@ -164,6 +164,14 @@ async function createClass(actingUser, data) {
     details: actingUser.role === ROLES.ADMIN ? { assignedTutorId: tutorId } : undefined,
   });
 
+  // an admin made it for a tutor - tell the tutor
+  await notifyTutor({ tutor_id: tutorId }, actingUser.id, {
+    type: 'CLASS_ASSIGNED',
+    message:
+      `A new class was added for you: ${data.subject}, ${data.dayOfWeek} ${formatTime(data.startTime)}-` +
+      `${formatTime(data.endTime)} at ${data.venue}${data.startDate ? `, starting ${data.startDate}` : ''}.`,
+  });
+
   const created = await repository.findClassWithTutorAndCount(classId);
   return { classData: toSafeClass(created) };
 }
@@ -193,14 +201,14 @@ function describeClassChanges(existing, data) {
   ).map((field) => `${field.label} is now ${data[field.key]}`);
 }
 
-// Tell everyone enrolled that their class moved/changed
-async function notifyEnrolledStudents(classId, message, actorId, link = `/courses/classes/${classId}`) {
+// Tell everyone enrolled that their class moved/changed (bell and email)
+async function notifyEnrolledStudents(classId, message, actorId, link = `/courses/classes/${classId}`, type = 'CLASS_UPDATED') {
   try {
     const studentIds = await repository.listActiveStudentIdsForClass(classId);
     for (const studentId of studentIds) {
       await repository.createNotification({
         recipientId: studentId,
-        type: 'CLASS_REMINDER',
+        type,
         message: message.slice(0, 500),
         sentBy: actorId,
         link,
@@ -210,6 +218,14 @@ async function notifyEnrolledStudents(classId, message, actorId, link = `/course
   } catch (error) {
     return 0;
   }
+}
+
+// tell the class's tutor - unless the tutor made the change themselves
+async function notifyTutor(classRow, actorId, { type, message, link = '/courses/manage' }) {
+  if (!classRow || !classRow.tutor_id || classRow.tutor_id === actorId) return;
+  await repository
+    .createNotification({ recipientId: classRow.tutor_id, type, message, sentBy: actorId, link })
+    .catch(() => {});
 }
 
 // save class btn - check clashes, save, log it and tell the enrolled students what changed
@@ -248,11 +264,10 @@ async function updateClass(tutorUser, classId, data) {
 
   let notifiedCount = 0;
   if (changes.length > 0) {
-    notifiedCount = await notifyEnrolledStudents(
-      classId,
-      `"${data.subject || existing.subject}" has been updated: ${changes.join(', ')}.`,
-      tutorUser.id
-    );
+    const message = `"${data.subject || existing.subject}" has been updated: ${changes.join(', ')}.`;
+    notifiedCount = await notifyEnrolledStudents(classId, message, tutorUser.id);
+    // an admin changed it - the tutor hears too
+    await notifyTutor(existing, tutorUser.id, { type: 'CLASS_UPDATED', message, link: `/courses/manage/${classId}/edit` });
   }
 
   // more seats than before - the waiting list hears about them
@@ -273,7 +288,8 @@ async function cancelClass(tutorUser, classId) {
     classId,
     `"${existing.subject}" has been cancelled. Please contact the institute if you have questions.`,
     tutorUser.id,
-    '/courses/my-courses'
+    '/courses/my-courses',
+    'CLASS_CANCELLED'
   );
 
   await repository.cancelClass(classId);
@@ -283,6 +299,13 @@ async function cancelClass(tutorUser, classId) {
     entityType: 'class',
     entityId: classId,
   });
+
+  // the tutor (if an admin cancelled it) and anyone on the waiting list hear too
+  await notifyTutor(existing, tutorUser.id, {
+    type: 'CLASS_CANCELLED',
+    message: `"${existing.subject}" (${existing.day_of_week} ${formatTime(existing.start_time)}) was cancelled by the office.`,
+  });
+  await enrollmentPayments.closeWaitlist(classId, existing.subject).catch(() => 0);
 
   return { notifiedCount };
 }
@@ -342,6 +365,17 @@ async function enrollInClass(studentUser, classId) {
     classRow,
   });
 
+  // tell the tutor who joined and how full the class is
+  const [studentName, taken] = await Promise.all([
+    repository.findUserName(studentUser.id),
+    repository.countActiveEnrollments(classId),
+  ]);
+  await notifyTutor(classRow, studentUser.id, {
+    type: 'STUDENT_ENROLLED',
+    message: `${studentName || 'A student'} enrolled in ${classRow.subject} (${taken} of ${classRow.capacity} seats taken).`,
+    link: `/students/mine`,
+  });
+
   return { enrollmentId, classId, subject: classRow.subject, fee: Number(classRow.fee), paymentDueAt };
 }
 
@@ -365,8 +399,18 @@ async function dropClass(studentUser, enrollmentId) {
     entityId: enrollmentId,
   });
 
+  // tell the tutor (enrollment.id is the class id in this list)
+  const [classRow, studentName] = await Promise.all([
+    repository.findClassById(enrollment.id),
+    repository.findUserName(studentUser.id),
+  ]);
+  await notifyTutor(classRow, studentUser.id, {
+    type: 'STUDENT_LEFT',
+    message: `${studentName || 'A student'} dropped ${classRow ? classRow.subject : 'your class'}.`,
+    link: '/students/mine',
+  });
+
   // a seat is free now - tell the students who were waiting for it
-  // (enrollment.id is the class id in this list)
   await enrollmentPayments.notifyWaitlist(enrollment.id).catch(() => 0);
 }
 
@@ -539,12 +583,9 @@ async function cancelClassDay(user, classId, { date, note }) {
   });
 
   const reason = note ? ` Reason: ${note}` : '';
-  const notifiedCount = await notifyEnrolledStudents(
-    classId,
-    `"${classRow.subject}" on ${formatDate(date)} is cancelled.${reason}`,
-    user.id,
-    '/calendar'
-  );
+  const message = `"${classRow.subject}" on ${formatDate(date)} is cancelled.${reason}`;
+  const notifiedCount = await notifyEnrolledStudents(classId, message, user.id, '/calendar', 'CLASS_CANCELLED');
+  await notifyTutor(classRow, user.id, { type: 'CLASS_CANCELLED', message, link: '/calendar' });
 
   const event = await repository.findClassEvent(eventId);
   return { event: toSafeClassEvent(event), notifiedCount };
@@ -607,13 +648,11 @@ async function addExtraClass(user, classId, { date, startTime, endTime, venue, n
     details: { date, startTime, endTime, venue: room, eventId },
   });
 
-  const notifiedCount = await notifyEnrolledStudents(
-    classId,
+  const message =
     `Extra class for "${classRow.subject}" on ${formatDate(date)}, ` +
-      `${formatTime(startTime)} - ${formatTime(endTime)} at ${room}.${note ? ` ${note}` : ''}`,
-    user.id,
-    '/calendar'
-  );
+    `${formatTime(startTime)} - ${formatTime(endTime)} at ${room}.${note ? ` ${note}` : ''}`;
+  const notifiedCount = await notifyEnrolledStudents(classId, message, user.id, '/calendar');
+  await notifyTutor(classRow, user.id, { type: 'CLASS_UPDATED', message, link: '/calendar' });
 
   const event = await repository.findClassEvent(eventId);
   return { event: toSafeClassEvent(event), notifiedCount };
@@ -645,6 +684,7 @@ async function deleteClassEvent(user, eventId) {
     ? `"${event.subject}" on ${formatDate(event.event_date)} is back on as usual.`
     : `The extra class for "${event.subject}" on ${formatDate(event.event_date)} has been cancelled.`;
   const notifiedCount = await notifyEnrolledStudents(event.class_id, message, user.id, '/calendar');
+  await notifyTutor(event, user.id, { type: 'CLASS_UPDATED', message, link: '/calendar' });
 
   return { restored, notifiedCount };
 }

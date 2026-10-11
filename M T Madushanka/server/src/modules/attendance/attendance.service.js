@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
+const { createNotification } = require('../../../../../shared/server/src/utils/notifications');
 const { toSafeClass } = require('../../../../../shared/server/src/utils/sanitize');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const { CHECKIN_CODE_VALID_MINUTES } = require('./attendance.constants');
@@ -233,6 +234,9 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
   // save each mark - new ones are created, existing ones are corrected and audited
   let createdCount = 0;
   let updatedCount = 0;
+  // students to tell: newly marked absent, or an absent mark that was corrected
+  const markedAbsent = [];
+  const absenceCorrected = [];
 
   for (const record of records) {
     const existing = await repository.findAttendanceRecord(sessionId, record.studentId);
@@ -245,6 +249,10 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     ) {
       continue;
     }
+
+    const wasAbsent = existing && existing.status === 'ABSENT';
+    if (record.status === 'ABSENT' && !wasAbsent) markedAbsent.push(record.studentId);
+    if (wasAbsent && record.status !== 'ABSENT') absenceCorrected.push({ studentId: record.studentId, status: record.status });
 
     if (existing) {
       await repository.updateAttendanceRecord(existing.id, {
@@ -280,6 +288,33 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     entityId: sessionId,
     details: { createdCount, updatedCount },
   });
+
+  // tell the students (bell and email) - a mail problem never stops the save
+  const day = new Date(`${String(session.session_date).slice(0, 10)}T00:00:00`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  for (const studentId of markedAbsent) {
+    await createNotification({
+      recipientId: studentId,
+      type: 'ABSENCE_MARKED',
+      message:
+        `You were marked absent from ${session.subject} on ${day}. ` +
+        'If you were there, please speak to your tutor so it can be corrected.',
+      link: '/attendance/history',
+      sentBy: tutorUser.id,
+    }).catch(() => {});
+  }
+  for (const { studentId, status } of absenceCorrected) {
+    await createNotification({
+      recipientId: studentId,
+      type: 'ABSENCE_MARKED',
+      message: `Your attendance for ${session.subject} on ${day} was corrected to ${status.toLowerCase()}.`,
+      link: '/attendance/history',
+      sentBy: tutorUser.id,
+    }).catch(() => {});
+  }
 
   return getAttendanceSheet(tutorUser, sessionId);
 }

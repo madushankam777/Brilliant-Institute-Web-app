@@ -21,6 +21,9 @@ function roundMoney(value) {
   return Math.round(value * 100) / 100;
 }
 
+// how instant payment methods are named in messages
+const INSTANT_METHOD_NAMES = { CARD: 'card', EZ_CASH: 'eZ Cash', MCASH: 'mCash' };
+
 // 25000 -> "LKR 25,000.00"
 function formatLkr(amount) {
   return `LKR ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -214,7 +217,12 @@ async function finalizePendingPayment(studentUser, paymentId) {
           connection
         );
         // Returned, not thrown, so this commit isn't rolled back.
-        return { declinedReason: gatewayResult.reason, subject: enrollment.subject };
+        return {
+          declinedReason: gatewayResult.reason,
+          subject: enrollment.subject,
+          amount: Number(payment.amount),
+          method: payment.payment_method,
+        };
       }
 
       // approved - mark it SUCCESSFUL, lower the class balance and make the receipt
@@ -229,9 +237,15 @@ async function finalizePendingPayment(studentUser, paymentId) {
       const receiptNumber = buildReceiptNumber(payment.id);
       await repository.createReceipt(payment.id, receiptNumber, connection);
 
-      return { receiptNumber, subject: enrollment.subject };
+      return {
+        receiptNumber,
+        subject: enrollment.subject,
+        amount: Number(payment.amount),
+        method: payment.payment_method,
+      };
     }).then(async (outcome) => {
       // after the transaction - declined: audit it and tell the student, approved: audit it and return the payment
+      const methodName = INSTANT_METHOD_NAMES[outcome.method] || 'online';
       if (outcome.declinedReason) {
         await recordAuditEvent({
           actorId: studentUser.id,
@@ -239,6 +253,16 @@ async function finalizePendingPayment(studentUser, paymentId) {
           entityType: 'payment',
           entityId: paymentId,
           details: { reason: outcome.declinedReason },
+        });
+        await repository.createNotification({
+          recipientId: studentUser.id,
+          type: 'PAYMENT_DECLINED',
+          message:
+            `Your ${methodName} payment of ${formatLkr(outcome.amount)} for ${outcome.subject} was declined ` +
+            `(${String(outcome.declinedReason || 'declined by the bank').replace(/\.$/, '')}). ` +
+            'No money was taken - please try again or use another method.',
+          link: `/payments/history?highlight=${paymentId}`,
+          sentBy: null,
         });
         throw ApiError.badRequest(
           outcome.declinedReason || 'The payment gateway declined this payment. Please try again.'
@@ -251,6 +275,15 @@ async function finalizePendingPayment(studentUser, paymentId) {
         entityType: 'payment',
         entityId: paymentId,
         details: { receiptNumber: outcome.receiptNumber },
+      });
+      await repository.createNotification({
+        recipientId: studentUser.id,
+        type: 'PAYMENT_APPROVED',
+        message:
+          `Your ${methodName} payment of ${formatLkr(outcome.amount)} for ${outcome.subject} was received. ` +
+          `Receipt: ${outcome.receiptNumber}.`,
+        link: `/payments/history?highlight=${paymentId}`,
+        sentBy: null,
       });
 
       const payment = await repository.findPaymentById(paymentId);
@@ -367,19 +400,33 @@ async function submitBankTransferPayment(
     entityId: paymentId,
   });
 
-  // let Admin know there's a slip to review
-  const adminIds = await repository.findActiveAdminIds();
-  await Promise.all(
-    adminIds.map((adminId) =>
-      repository.createNotification({
-        recipientId: adminId,
-        type: 'PAYMENT_SUBMITTED',
-        message: `${studentUser.email} submitted a bank transfer of LKR ${Number(amount).toFixed(2)} - awaiting your verification.`,
-        link: `/admin/payments/verify?highlight=${paymentId}`,
-        sentBy: studentUser.id,
-      })
-    )
-  );
+  // let Admin know there's a slip to review, and tell the student it arrived
+  const [adminIds, studentName, enrollment] = await Promise.all([
+    repository.findActiveAdminIds(),
+    repository.findUserName(studentUser.id),
+    repository.findEnrollmentById(enrollmentId),
+  ]);
+  const subject = enrollment ? enrollment.subject : 'a class';
+  for (const adminId of adminIds) {
+    await repository.createNotification({
+      recipientId: adminId,
+      type: 'PAYMENT_SUBMITTED',
+      message:
+        `${studentName || studentUser.email} submitted a bank transfer of ${formatLkr(amount)} for ${subject} ` +
+        `(reference ${bankReference}) - awaiting your verification.`,
+      link: `/admin/payments/verify?highlight=${paymentId}`,
+      sentBy: studentUser.id,
+    });
+  }
+  await repository.createNotification({
+    recipientId: studentUser.id,
+    type: 'SLIP_RECEIVED',
+    message:
+      `We received your bank slip for ${formatLkr(amount)} (${subject}, reference ${bankReference}). ` +
+      'The office will check it and you will be told as soon as it is approved.',
+    link: `/payments/history?highlight=${paymentId}`,
+    sentBy: null,
+  });
 
   const payment = await repository.findPaymentById(paymentId);
   return { pending: true, payment: toSafePayment(payment) };
@@ -1128,6 +1175,18 @@ async function markPayoutFailed(adminUser, payoutId, reason) {
     details: { reason },
   });
 
+  // tell the tutor the money did not arrive yet
+  await repository.createNotification({
+    recipientId: payout.tutor_id,
+    type: 'PAYOUT_FAILED',
+    message:
+      `Your payout of ${formatLkr(payout.amount)}${payout.period_label ? ` for ${payout.period_label}` : ''} ` +
+      `did not go through${reason ? ` (${String(reason).replace(/\.$/, '')})` : ''}. ` +
+      'The office will send it again - please check your bank details on your profile.',
+    link: '/profile',
+    sentBy: adminUser.id,
+  });
+
   return { id: payoutId, status: 'FAILED' };
 }
 
@@ -1332,6 +1391,15 @@ async function handlePayHereNotification(body) {
       entityType: 'payment',
       entityId: result.paymentId,
       details: { provider: 'payhere', reason: result.statusMessage || result.statusCode },
+    });
+    await repository.createNotification({
+      recipientId: outcome.studentId,
+      type: 'PAYMENT_DECLINED',
+      message:
+        `Your online payment of ${formatLkr(outcome.amount)} did not go through. ` +
+        'No money was taken - please try again or use another method.',
+      link: `/payments/history?highlight=${result.paymentId}`,
+      sentBy: null,
     });
   }
 

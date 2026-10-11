@@ -265,6 +265,12 @@ async function findActiveAdminIds() {
   return rows.map((row) => row.id);
 }
 
+// a person's name, for notification messages
+async function findUserName(userId) {
+  const [rows] = await pool.execute(`SELECT full_name FROM users WHERE id = ? LIMIT 1`, [userId]);
+  return rows[0] ? rows[0].full_name : null;
+}
+
 // --- Tutor payouts (Admin paying a Tutor their share/salary) ---
 
 // tutor picker list
@@ -548,6 +554,7 @@ module.exports = {
   listRecentPayments,
   createNotification,
   findActiveAdminIds,
+  findUserName,
   listActiveTutors,
   findBankDetails,
   updateBankDetails,

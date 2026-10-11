@@ -3,6 +3,7 @@ const config = require('../../shared/server/src/config/env');
 const { verifyDatabaseConnection } = require('../../shared/server/src/config/db');
 const { reportPendingUpdates } = require('../../shared/server/src/utils/schemaFeatures');
 const { checkMailer } = require('../../shared/server/src/utils/mailer');
+const { startNotificationEmails } = require('../../shared/server/src/utils/notificationEmails');
 const { warnAboutDemoPasswords } = require('./startup/demoPasswordCheck');
 const { moveUploadsToDb } = require('./startup/moveUploadsToDb');
 const { reportPayPalSetup } = require('./startup/paypalCheck');
@@ -49,6 +50,8 @@ async function start() {
   startRolloverScheduler();
   // unpaid new enrolments - 2-day warning, then the place is released to the waiting list
   startPaymentDeadlineScheduler();
+  // every bell notification is emailed to its person too
+  startNotificationEmails();
 
   // port already in use - say so and stop
   server.on('error', (error) => {

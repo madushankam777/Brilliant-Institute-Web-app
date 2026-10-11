@@ -2,6 +2,7 @@
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { hasTable, migrationRequired } = require('../../../../../shared/server/src/utils/schemaFeatures');
+const { notifyMany, findActiveAdminIds } = require('../../../../../shared/server/src/utils/notifications');
 const repository = require('./contact.repository');
 
 // stop with a set-up message if the contact_messages table is missing
@@ -25,10 +26,22 @@ function toSafeMessage(row) {
   };
 }
 
-// save a message from the Contact Us form
+// save a message from the Contact Us form, then tell the admins (bell and email)
 async function sendMessage(data) {
   await requireTable();
   const id = await repository.createMessage(data);
+
+  const text = String(data.message || '').replace(/\s+/g, ' ').trim();
+  const preview = text.length > 200 ? `${text.slice(0, 200).replace(/\s+\S*$/, '')}...` : text;
+  const message =
+    `New ${String(data.topic || 'other').toLowerCase()} enquiry from ${data.fullName} (${data.email}` +
+    `${data.phone ? `, ${data.phone}` : ''}): ${preview}`;
+  await notifyMany(await findActiveAdminIds(), {
+    type: 'ENQUIRY_NEW',
+    message,
+    link: `/admin/enquiries?highlight=${id}`,
+  }).catch(() => {});
+
   return { id };
 }
 

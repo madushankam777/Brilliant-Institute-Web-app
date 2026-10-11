@@ -198,9 +198,15 @@ async function listActiveStudentIdsForClass(classId) {
   return rows.map((row) => row.student_id);
 }
 
-// save a notification for a student
+// save a notification for a student or tutor (it is emailed too)
 async function createNotification({ recipientId, type, message, sentBy, link }) {
   await notifications.createNotification({ recipientId, type, message, sentBy: sentBy || null, link, channel: 'EMAIL' });
+}
+
+// a person's name, for messages to the tutor
+async function findUserName(userId) {
+  const [rows] = await pool.execute(`SELECT full_name FROM users WHERE id = ? LIMIT 1`, [userId]);
+  return rows[0] ? rows[0].full_name : null;
 }
 
 // mark a class CANCELLED
@@ -514,6 +520,7 @@ module.exports = {
   cancelClass,
   listActiveStudentIdsForClass,
   createNotification,
+  findUserName,
   findConflictingVenueClass,
   findConflictingTutorClass,
   listPublicTutors,

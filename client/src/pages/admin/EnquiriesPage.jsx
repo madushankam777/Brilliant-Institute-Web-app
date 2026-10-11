@@ -8,6 +8,7 @@ import LoadingSpinner from '../../../../shared/client/src/components/common/Load
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../../../shared/client/src/components/layout/navItems';
 import ReportLink from '../../../../shared/client/src/components/common/ReportLink';
+import useHighlight from '../../../../shared/client/src/hooks/useHighlight';
 
 // the status tabs
 const FILTERS = [
@@ -46,6 +47,8 @@ function EnquiriesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
+  // the message a notification pointed at
+  const highlightId = useHighlight(!isLoading);
 
   // load the messages for the chosen tab
   const load = useCallback(async () => {
@@ -127,7 +130,10 @@ function EnquiriesPage() {
           )
         ) : (
           messages.map((message) => (
-            <div key={message.id} className={`card enquiry${message.status === 'NEW' ? ' is-new' : ''}`}>
+            <div
+              key={message.id}
+              className={`card enquiry${message.status === 'NEW' ? ' is-new' : ''}${message.id === highlightId ? ' row-highlight' : ''}`}
+            >
               <div className="flex-between">
                 <div>
                   <strong>{message.fullName}</strong>

@@ -61,6 +61,22 @@ const NOTIFICATION_STYLES = {
   ENROLMENT_AT_RISK: { icon: 'alertTriangle', badge: 'Urgent', tone: 'badge-danger' },
   ENROLMENT_RELEASED: { icon: 'xCircle', badge: null, tone: '' },
   SEAT_AVAILABLE: { icon: 'checkCircle', badge: 'Seats free', tone: 'badge-success' },
+  PAYMENT_DECLINED: { icon: 'xCircle', badge: 'Try again', tone: 'badge-danger' },
+  SLIP_RECEIVED: { icon: 'receipt', badge: null, tone: '' },
+  PAYOUT_FAILED: { icon: 'bank', badge: 'Failed', tone: 'badge-danger' },
+  CLASS_UPDATED: { icon: 'book', badge: null, tone: '' },
+  CLASS_CANCELLED: { icon: 'calendar', badge: 'Cancelled', tone: 'badge-danger' },
+  CLASS_ASSIGNED: { icon: 'book', badge: 'New', tone: 'badge-success' },
+  STUDENT_ENROLLED: { icon: 'users', badge: null, tone: '' },
+  STUDENT_LEFT: { icon: 'users', badge: null, tone: '' },
+  ABSENCE_MARKED: { icon: 'alertTriangle', badge: null, tone: '' },
+  FEEDBACK_NEW: { icon: 'chat', badge: 'New', tone: 'badge-warning' },
+  FEEDBACK_REPLY: { icon: 'chat', badge: null, tone: '' },
+  FEEDBACK_RESOLVED: { icon: 'checkCircle', badge: null, tone: '' },
+  ENQUIRY_NEW: { icon: 'inbox', badge: 'New', tone: 'badge-warning' },
+  WELCOME: { icon: 'spark', badge: null, tone: '' },
+  ACCOUNT_STATUS: { icon: 'user', badge: null, tone: '' },
+  PASSWORD_CHANGED: { icon: 'shield', badge: 'Security', tone: 'badge-warning' },
 };
 
 // icon for announcements

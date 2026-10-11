@@ -17,8 +17,22 @@ const {
   setSessionCookie,
 } = require('../../../../../shared/server/src/utils/sessionToken');
 const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
+const { createNotification } = require('../../../../../shared/server/src/utils/notifications');
 const { hashPassword, comparePassword, hashNow } = require('../../../../../shared/server/src/utils/passwordHasher');
 const repository = require('./auth.repository');
+
+// security notice - the owner is told (bell and email) whenever their password changes
+async function notifyPasswordChanged(userId, how) {
+  const when = new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  await createNotification({
+    recipientId: userId,
+    type: 'PASSWORD_CHANGED',
+    message:
+      `Your password was changed ${how} on ${when}. If this was not you, reset your password now and ` +
+      `contact the institute on ${config.institute.phone}.`,
+    link: '/profile',
+  }).catch(() => {});
+}
 
 // Same cost as real hashes
 const DUMMY_PASSWORD_HASH = hashNow('not-a-real-password', config.auth.bcryptSaltRounds);
@@ -102,6 +116,18 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     entityId: userId,
     details: consumedKey ? { enrollmentKeyId: consumedKey.id } : undefined,
   });
+
+  // welcome - in the bell and by email
+  await createNotification({
+    recipientId: userId,
+    type: 'WELCOME',
+    message:
+      targetRole === ROLES.TUTOR
+        ? `Welcome to ${config.institute.name}! Your tutor account is ready - your classes, attendance and students are on your dashboard.`
+        : `Welcome to ${config.institute.name}! Your account is ready. Browse the classes and enrol - pay for each class ` +
+          'at least a day before its first lesson to keep your place.',
+    link: targetRole === ROLES.TUTOR ? '/' : '/courses/classes',
+  }).catch(() => {});
 
   // reply with the safe user (no password hash)
   const user = await repository.findUserById(userId);
@@ -283,6 +309,7 @@ async function changePassword(userId, { currentPassword, newPassword }) {
     entityType: 'user',
     entityId: userId,
   });
+  await notifyPasswordChanged(userId, 'from your profile');
   return { ...user, password_hash: newHash };
 }
 
@@ -340,7 +367,7 @@ async function requestPasswordReset(email) {
   });
 
   try {
-    await sendMail({
+    const sent = await sendMail({
       to: user.email,
       subject: `${code} is your Brilliant Institute reset code`,
       text:
@@ -350,6 +377,11 @@ async function requestPasswordReset(email) {
         `Brilliant Institute\n${config.institute.address}\n${config.institute.email} | ${config.institute.phone}`,
       html: resetCodeEmail(user.full_name, code),
     });
+    // demo address that cannot receive mail - show the code in the dev log instead
+    if (sent && sent.skipped && !config.isProduction) {
+      // eslint-disable-next-line no-console
+      console.log(`[dev-only] reset code for ${user.email}: ${code} (this address cannot receive email)`);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error(`[mail] could not send the reset code to ${user.email}: ${error.message}`);
@@ -436,6 +468,7 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
     entityId: user.id,
     details: { method: 'email code' },
   });
+  await notifyPasswordChanged(user.id, 'with an emailed reset code');
 
   // log straight in with the new password
   const updatedUser = { ...user, password_hash: newHash };
@@ -479,6 +512,7 @@ async function resetPasswordWithToken(rawToken, newPassword) {
     entityType: 'user',
     entityId: resetToken.user_id,
   });
+  await notifyPasswordChanged(resetToken.user_id, 'with a reset link from the office');
 }
 
 module.exports = {

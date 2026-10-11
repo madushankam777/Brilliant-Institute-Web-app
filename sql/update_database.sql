@@ -184,5 +184,16 @@ CREATE TABLE IF NOT EXISTS class_waitlist (
   CONSTRAINT fk_waitlist_student FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- every bell notification is emailed too - when the email went out, and how many tries failed
+SET @add_email = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notification_log' AND COLUMN_NAME = 'emailed_at');
+SET @ddl = IF(@add_email,
+  'ALTER TABLE notification_log ADD COLUMN emailed_at DATETIME NULL AFTER dismissed_at, ADD COLUMN email_tries TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER emailed_at, ADD KEY idx_notification_email (emailed_at, sent_at)',
+  'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+-- older notifications are not emailed now (only the first time this runs)
+SET @ddl = IF(@add_email, 'UPDATE notification_log SET emailed_at = sent_at WHERE id > 0 AND sent_at <= NOW()', 'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- shows that the script finished
 SELECT 'database update complete' AS result;

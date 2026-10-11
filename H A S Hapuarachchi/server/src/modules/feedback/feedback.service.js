@@ -2,6 +2,7 @@
 const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { toSafeFeedback } = require('../../../../../shared/server/src/utils/sanitize');
+const { createNotification, findActiveAdminIds } = require('../../../../../shared/server/src/utils/notifications');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const { STATUSES } = require('./feedback.constants');
 const repository = require('./feedback.repository');
@@ -9,6 +10,32 @@ const repository = require('./feedback.repository');
 // tutors and admins are staff
 function isStaff(user) {
   return user.role === ROLES.TUTOR || user.role === ROLES.ADMIN;
+}
+
+// the sender and the staff a ticket is addressed to - each with the page they open it on
+async function ticketPeople(ticket) {
+  const people = [{ id: ticket.submitted_by, link: '/feedback' }];
+  if (ticket.recipient_type === 'ADMIN' || ticket.recipient_type === 'ADMIN_TUTOR') {
+    for (const adminId of await findActiveAdminIds()) people.push({ id: adminId, link: '/admin/feedback' });
+  }
+  if (ticket.recipient_tutor_id) people.push({ id: ticket.recipient_tutor_id, link: '/admin/feedback' });
+  return people;
+}
+
+// bell + email for everyone on a ticket except the person who acted
+async function notifyTicketPeople(ticket, actorId, { type, message }) {
+  const told = new Set([actorId]);
+  for (const person of await ticketPeople(ticket)) {
+    if (told.has(person.id)) continue;
+    told.add(person.id);
+    await createNotification({ recipientId: person.id, type, message, link: person.link, sentBy: actorId }).catch(() => {});
+  }
+}
+
+// a long message cut down for a notification
+function excerpt(text, length = 200) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  return clean.length > length ? `${clean.slice(0, length).replace(/\s+\S*$/, '')}...` : clean;
 }
 
 // check if ticket is addressed to this staff member
@@ -71,7 +98,14 @@ async function submitFeedback(user, { category, recipientType, recipientTutorId,
     details: { category, recipientType },
   });
 
+  // tell the staff it is addressed to
   const ticket = await repository.findTicketById(ticketId);
+  const senderName = (await repository.findUserFullName(user.id)) || user.email;
+  await notifyTicketPeople(ticket, user.id, {
+    type: 'FEEDBACK_NEW',
+    message: `New ticket ${ticketNumber} (${category}) from ${senderName}: "${subject}" - ${excerpt(message)}`,
+  });
+
   return toSafeFeedback(ticket);
 }
 
@@ -127,6 +161,12 @@ async function replyToTicket(user, ticketId, message) {
     entityId: ticketId,
   });
 
+  // the other side of the conversation hears about the reply
+  await notifyTicketPeople(ticket, user.id, {
+    type: 'FEEDBACK_REPLY',
+    message: `${authorName} replied to ${ticket.ticket_number} "${ticket.subject}": ${excerpt(message)}`,
+  });
+
   const updated = await repository.findTicketById(ticketId);
   return toSafeFeedback(updated);
 }
@@ -151,6 +191,19 @@ async function resolveTicket(staffUser, ticketId) {
     entityType: 'feedback_complaint',
     entityId: ticketId,
   });
+
+  // tell the person who sent it
+  if (ticket.submitted_by !== staffUser.id) {
+    await createNotification({
+      recipientId: ticket.submitted_by,
+      type: 'FEEDBACK_RESOLVED',
+      message:
+        `Your ticket ${ticket.ticket_number} "${ticket.subject}" was marked as resolved. ` +
+        'If the problem is still there, you can open a new ticket.',
+      link: '/feedback',
+      sentBy: staffUser.id,
+    }).catch(() => {});
+  }
 
   const updated = await repository.findTicketById(ticketId);
   return toSafeFeedback(updated);

@@ -10,6 +10,17 @@ function isSmtpReady() {
   return Boolean(config.mail.host && config.mail.user && config.mail.pass);
 }
 
+// made-up domains that can never receive mail (the demo accounts use @brilliant.test)
+const RESERVED_DOMAIN = /(\.test|\.example|\.invalid|\.localhost|\.local|^example\.(com|net|org)|^localhost)$/i;
+
+// can this address really receive an email?
+function canReceiveEmail(address) {
+  const email = String(address || '').trim().toLowerCase();
+  const domain = email.split('@')[1] || '';
+  if (!domain || RESERVED_DOMAIN.test(domain)) return false;
+  return !config.mail.skip.includes(email);
+}
+
 // Resend - used when RESEND_API_KEY is set
 async function sendWithResend({ to, subject, text, html }) {
   const response = await fetch('https://api.resend.com/emails', {
@@ -26,7 +37,10 @@ async function sendWithResend({ to, subject, text, html }) {
 // makes the email connection - Gmail when it is set up, else a free test inbox in development
 async function createMailer() {
   if (isSmtpReady()) {
+    // pooled - many notification emails reuse one Gmail login
     const transport = nodemailer.createTransport({
+      pool: true,
+      maxConnections: 2,
       host: config.mail.host,
       port: config.mail.port,
       secure: config.mail.secure,
@@ -58,8 +72,9 @@ function getMailer() {
   return mailerPromise;
 }
 
-// send one email - used for the password reset codes
+// send one email - reset codes and notifications ({ skipped: true } for an address that cannot receive mail)
 async function sendMail({ to, subject, text, html }) {
+  if (!canReceiveEmail(to)) return { skipped: true };
   // cloud hosting - send through Resend instead
   if (config.mail.resendApiKey) return sendWithResend({ to, subject, text, html });
   const mailer = await getMailer();
@@ -104,13 +119,26 @@ async function checkMailer() {
     console.log(`[mail] Ready - emails are sent from ${config.mail.user}`);
     return true;
   } catch (error) {
+    // Google's security check (534) - the password is right, but Google wants a browser sign-in first
+    const securityCheck = /WebLoginRequired|5\.7\.9/.test(String(error.message));
     // eslint-disable-next-line no-console
     console.warn(
-      `[setup] Gmail refused the login for ${config.mail.user} (${error.message}). ` +
-        'SMTP_PASS must be a 16-letter Google app password, not the normal Gmail password.'
+      securityCheck
+        ? `[setup] Google paused email from ${config.mail.user} for a security check. Sign in to that ` +
+            'Gmail account in a web browser, approve any "Was this you?" alert, then restart the server.'
+        : `[setup] Gmail refused the login for ${config.mail.user} (${error.message}). ` +
+            'SMTP_PASS must be a 16-letter Google app password, not the normal Gmail password.'
     );
     return false;
   }
 }
 
-module.exports = { sendMail, checkMailer, isSmtpReady };
+// close the Gmail connections (scripts call this so they can exit)
+async function closeMailer() {
+  if (!mailerPromise) return;
+  const mailer = await mailerPromise.catch(() => null);
+  mailerPromise = null;
+  if (mailer) mailer.transport.close();
+}
+
+module.exports = { sendMail, checkMailer, closeMailer, isSmtpReady, canReceiveEmail };

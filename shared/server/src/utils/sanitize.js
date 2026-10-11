@@ -190,6 +190,22 @@ const NOTIFICATION_TYPE_LABELS = {
   ENROLMENT_AT_RISK: 'Pay To Keep Your Place',
   ENROLMENT_RELEASED: 'Place Released',
   SEAT_AVAILABLE: 'Seat Available',
+  PAYMENT_DECLINED: 'Payment Declined',
+  SLIP_RECEIVED: 'Bank Slip Received',
+  PAYOUT_FAILED: 'Payout Failed',
+  CLASS_UPDATED: 'Class Update',
+  CLASS_CANCELLED: 'Class Cancelled',
+  CLASS_ASSIGNED: 'New Class',
+  STUDENT_ENROLLED: 'New Student',
+  STUDENT_LEFT: 'Student Left',
+  ABSENCE_MARKED: 'Attendance',
+  FEEDBACK_NEW: 'New Feedback',
+  FEEDBACK_REPLY: 'Feedback Reply',
+  FEEDBACK_RESOLVED: 'Feedback Resolved',
+  ENQUIRY_NEW: 'New Enquiry',
+  WELCOME: 'Welcome',
+  ACCOUNT_STATUS: 'Account',
+  PASSWORD_CHANGED: 'Security Notice',
 };
 
 // Scheduled reminders are CLASS_REMINDER rows whose message starts with this.

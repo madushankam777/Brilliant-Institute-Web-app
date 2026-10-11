@@ -90,6 +90,11 @@ function hasClassWaitlist() {
   return hasTable('class_waitlist');
 }
 
+// notifications remember when their email went out (so each is emailed once)
+async function hasNotificationEmails() {
+  return (await hasColumn('notification_log', 'emailed_at')) && (await hasColumn('notification_log', 'email_tries'));
+}
+
 // Setup steps belong in the server log - users only see a short message.
 function migrationRequired() {
   console.warn(`[setup] This action needs the database update. Run ${UPDATE_FILE} once as root in MySQL Workbench.`);
@@ -108,6 +113,7 @@ async function reportPendingUpdates() {
   if (!(await hasNotificationCentre())) missing.push('notification links and cleared notifications');
   if (!(await hasPaymentDeadlines())) missing.push('payment deadlines for new enrolments');
   if (!(await hasClassWaitlist())) missing.push('waiting list for full classes');
+  if (!(await hasNotificationEmails())) missing.push('emailing scheduled reminders and retrying failed emails');
 
   if (missing.length > 0) {
     console.warn(
@@ -129,6 +135,7 @@ module.exports = {
   hasFreeTextNotificationTypes,
   hasPaymentDeadlines,
   hasClassWaitlist,
+  hasNotificationEmails,
   migrationRequired,
   reportPendingUpdates,
 };

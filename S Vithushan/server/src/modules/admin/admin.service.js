@@ -13,16 +13,19 @@ const {
 } = require('../../../../../shared/server/src/utils/sanitize');
 const { USER_STATUS, ROLES } = require('../../../../../shared/server/src/config/roles');
 const { GRADES, nextGrade, isFinalGrade } = require('../../../../../shared/server/src/config/grades');
-const gateway = require('./notificationGateway');
 const repository = require('./admin.repository');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { defaultLinkFor } = require('../../../../../shared/server/src/utils/notifications');
+const { emailAnnouncement, emailPerson } = require('../../../../../shared/server/src/utils/notificationEmails');
 const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
 const enrollmentPayments = require('../../../../../C D Kumanan/server/src/modules/course/enrollmentPayments');
 
 // milliseconds in one day
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// how each role is named in messages
+const ROLE_NAMES = { ADMIN: 'Admin', TUTOR: 'Tutor', STUDENT_PARENT: 'Student / Parent' };
 
 // a number as two digits, e.g. 7 gives 07
 function pad2(value) {
@@ -50,6 +53,18 @@ async function createUser(adminUser, { fullName, email, password, role }) {
     entityType: 'user',
     entityId: userId,
     details: { role },
+  });
+
+  // welcome email - the password is never put in it (the office gives it in person)
+  await repository.logNotification({
+    recipientId: userId,
+    channel: 'EMAIL',
+    type: 'WELCOME',
+    message:
+      `Welcome to ${config.institute.name}! The office made a ${ROLE_NAMES[role] || 'new'} account for you with this ` +
+      'email address. Log in with the password the office gave you, then change it on your profile.',
+    sentBy: adminUser.id,
+    link: '/profile',
   });
 
   const created = await repository.findUserById(userId);
@@ -330,6 +345,19 @@ async function suspendUser(actingUser, userId, confirmName) {
     entityId: userId,
   });
 
+  // they cannot log in now, so the email is how they find out
+  await repository.logNotification({
+    recipientId: userId,
+    channel: 'EMAIL',
+    type: 'ACCOUNT_STATUS',
+    message:
+      `Your ${config.institute.name} account was suspended by ${actingUser.role === ROLES.TUTOR ? 'your tutor' : 'the office'}, ` +
+      `so you cannot log in for now. Please contact the institute on ${config.institute.phone} or ` +
+      `${config.institute.email} to have it reopened.`,
+    sentBy: actingUser.id,
+    link: '/contact',
+  });
+
   const updated = await repository.findUserById(userId);
   return toSafeUserForAdmin(updated);
 }
@@ -365,6 +393,15 @@ async function activateUser(actingUser, userId) {
     entityId: userId,
   });
 
+  await repository.logNotification({
+    recipientId: userId,
+    channel: 'EMAIL',
+    type: 'ACCOUNT_STATUS',
+    message: `Your ${config.institute.name} account is active again - you can log in as usual.`,
+    sentBy: actingUser.id,
+    link: '/',
+  });
+
   const updated = await repository.findUserById(userId);
   return toSafeUserForAdmin(updated);
 }
@@ -395,6 +432,16 @@ async function deleteUser(actingUser, userId) {
   for (const classId of freedClassIds) {
     await enrollmentPayments.notifyWaitlist(classId).catch(() => 0);
   }
+
+  // a closed account has no bell any more, so this one is only emailed
+  emailPerson({
+    to: targetUser.email,
+    name: targetUser.full_name,
+    heading: `Your ${config.institute.name} account was closed`,
+    message:
+      `Your ${config.institute.name} account has been closed by the office and can no longer be used. ` +
+      `If you think this is a mistake, please contact us on ${config.institute.phone} or ${config.institute.email}.`,
+  });
 }
 
 // Admin: one-time reset link to give the user in person
@@ -772,7 +819,9 @@ async function createAnnouncement(adminUser, { title, body, priority, targetAudi
     details: { targetAudience },
   });
 
+  // email it to everyone who sees it in their bell (sent in the background)
   const created = await repository.findAnnouncementById(announcementId);
+  await emailAnnouncement(created, { publisherId: adminUser.id }).catch(() => 0);
   return toSafeAnnouncement(created);
 }
 
@@ -801,7 +850,9 @@ async function updateAnnouncement(adminUser, announcementId, { title, body, prio
     details: { targetAudience },
   });
 
+  // it shows again in the bell as updated, so it is emailed again too
   const updated = await repository.findAnnouncementById(announcementId);
+  await emailAnnouncement(updated, { updated: true, publisherId: adminUser.id }).catch(() => 0);
   return toSafeAnnouncement(updated);
 }
 
@@ -882,21 +933,19 @@ async function sendReminders(adminUser, { type, studentIds }) {
   for (const recipient of recipients) {
     const message =
       type === 'FEE_DUE'
-        ? `Reminder: your fee balance of LKR ${Number(recipient.balance).toFixed(2)} for ${recipient.subject} is outstanding.`
-        : `Reminder: your attendance for ${recipient.subject} has fallen below ${config.business.lowAttendanceThresholdPercent}%. Please contact your tutor.`;
+        ? `Your fee balance of LKR ${Number(recipient.balance).toFixed(2)} for ${recipient.subject} is still outstanding. Please pay it soon.`
+        : `Your attendance for ${recipient.subject} has fallen below ${config.business.lowAttendanceThresholdPercent}%. Please contact your tutor.`;
 
-    // send it through the gateway (a mock that only prints to the log) and save it for the student's bell
-    const result = await gateway.sendNotification({ channel: 'EMAIL', message });
-    if (result.delivered) {
-      await repository.logNotification({
-        recipientId: recipient.student_id,
-        channel: 'EMAIL',
-        type,
-        message,
-        sentBy: adminUser.id,
-      });
-      sentCount += 1;
-    }
+    // saved for the student's bell - and emailed to them
+    await repository.logNotification({
+      recipientId: recipient.student_id,
+      channel: 'EMAIL',
+      type,
+      message,
+      sentBy: adminUser.id,
+      link: type === 'FEE_DUE' ? '/payments' : '/attendance/history',
+    });
+    sentCount += 1;
   }
 
   await recordAuditEvent({

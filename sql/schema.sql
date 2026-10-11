@@ -365,8 +365,11 @@ CREATE TABLE IF NOT EXISTS notification_log (
   sent_by       INT UNSIGNED NULL,
   sent_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   dismissed_at  DATETIME NULL,
+  emailed_at    DATETIME NULL,
+  email_tries   TINYINT UNSIGNED NOT NULL DEFAULT 0,
   KEY idx_notification_recipient (recipient_id),
   KEY idx_notification_type (type),
+  KEY idx_notification_email (emailed_at, sent_at),
   CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notification_sent_by FOREIGN KEY (sent_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -71,6 +71,10 @@ const config = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
+  // the website address used in email buttons
+  siteUrl: (process.env.PUBLIC_BASE_URL || String(process.env.CLIENT_ORIGIN || '').split(',')[0] || 'http://localhost:5173')
+    .trim()
+    .replace(/\/+$/, ''),
   // trust X-Forwarded-For only behind a real proxy
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   // cloud hosting - the API server also serves the built website (client/dist)
@@ -138,6 +142,13 @@ const config = {
     pass: (process.env.SMTP_PASS || '').replace(/\s+/g, ''),
     // cloud hosts that block email ports (Railway) - Resend sends over HTTPS instead
     resendApiKey: process.env.RESEND_API_KEY || '',
+    // addresses that are never emailed (comma-separated), e.g. someone else's inbox used as a demo login
+    skip: String(process.env.MAIL_SKIP || '')
+      .split(',')
+      .map((address) => address.trim().toLowerCase())
+      .filter(Boolean),
+    // NOTIFICATION_EMAILS=off keeps notifications in the bell only
+    notifications: process.env.NOTIFICATION_EMAILS !== 'off',
     from:
       process.env.MAIL_FROM ||
       `Brilliant Institute <${process.env.SMTP_USER || process.env.INSTITUTE_EMAIL || 'brilliantinstitute.edu@gmail.com'}>`,

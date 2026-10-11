@@ -2,15 +2,14 @@
 //
 // The rule: a new enrolment must be paid for at least 1 day before its first class.
 // - at enrolment: an urgent "pay to keep your place" notice
-// - 2 days before the first class: a pop-up warning (and an email) that the place will be released
+// - 2 days before the first class: a pop-up warning that the place will be released
 // - 1 day before the first class, still unpaid: the place is released, so a waiting student can join
 // A class that has any payment (or a bank slip waiting for the office) is never released.
+// Every notice here is emailed too (createNotification does that).
 const { pool } = require('../../../../../shared/server/src/config/db');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { createNotification } = require('../../../../../shared/server/src/utils/notifications');
-const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
-const config = require('../../../../../shared/server/src/config/env');
 
 const HOUR_MS = 60 * 60 * 1000;
 // the first class must be at least this far after enrolment, so there is always time to pay
@@ -71,14 +70,6 @@ function paymentDueFor(classRow, enrolledAt = new Date()) {
   return new Date(first.getTime() - RELEASE_BEFORE_CLASS_MS);
 }
 
-// email in the background - a mail problem never stops the notice itself
-function emailInBackground(to, subject, text) {
-  sendMail({ to, subject, text }).catch((error) => {
-    // eslint-disable-next-line no-console
-    console.warn(`[mail] could not email ${to}: ${error.message}`);
-  });
-}
-
 // right after enrolling - save the pay-by time and send the urgent payment notice
 async function startPaymentDeadline({ enrollmentId, studentId, classRow }) {
   if (Number(classRow.fee) <= 0 || !(await schema.hasPaymentDeadlines())) return null;
@@ -105,7 +96,7 @@ async function startPaymentDeadline({ enrollmentId, studentId, classRow }) {
 async function listUnpaidWithDeadline() {
   const [rows] = await pool.execute(
     `SELECT e.id, e.student_id, e.class_id, e.balance, e.payment_due_at, e.payment_warned_at,
-            c.subject, u.email, u.full_name
+            c.subject, c.tutor_id, u.full_name
      FROM enrollments e
      JOIN classes c ON c.id = e.class_id
      JOIN users u ON u.id = e.student_id
@@ -119,9 +110,11 @@ async function listUnpaidWithDeadline() {
   return rows;
 }
 
-// 2 days before the class - the pop-up warning (and an email)
+// 2 days before the class - the pop-up warning
 async function warnStudent(row) {
   const dueAt = new Date(row.payment_due_at);
+  // marked first, so a slow email never sends the warning twice
+  await pool.execute(`UPDATE enrollments SET payment_warned_at = NOW() WHERE id = ?`, [row.id]);
   await createNotification({
     recipientId: row.student_id,
     type: 'ENROLMENT_AT_RISK',
@@ -130,14 +123,6 @@ async function warnStudent(row) {
       `Pay ${lkr(row.balance)} now to keep it.`,
     link: `/payments?enrollment=${row.id}`,
   });
-  await pool.execute(`UPDATE enrollments SET payment_warned_at = NOW() WHERE id = ?`, [row.id]);
-  emailInBackground(
-    row.email,
-    `Pay for ${row.subject} to keep your place`,
-    `Hi ${row.full_name},\n\nYour place in ${row.subject} is not paid yet. Please pay ${lkr(row.balance)} ` +
-      `before ${friendly(dueAt)}, or the place will be released to a student on the waiting list.\n\n` +
-      `Log in and open Fees & Payments to pay.\n\nBrilliant Institute\n${config.institute.phone}`
-  );
 }
 
 // the pay-by time has passed - release the place (the record stays, marked dropped)
@@ -156,6 +141,13 @@ async function releaseSeat(row) {
       `Your place in ${row.subject} was released because it was not paid in time. ` +
       'You can enrol again if seats are still free.',
     link: `/courses/my-courses?highlight=${row.id}`,
+  });
+  // the tutor sees the seat is free again
+  await createNotification({
+    recipientId: row.tutor_id,
+    type: 'STUDENT_LEFT',
+    message: `${row.full_name}'s place in ${row.subject} was released because it was not paid in time.`,
+    link: '/students/mine',
   });
   await recordAuditEvent({
     actorId: null,
@@ -184,7 +176,7 @@ async function leaveWaitlist(studentId, classId) {
   await pool.execute(`DELETE FROM class_waitlist WHERE class_id = ? AND student_id = ?`, [classId, studentId]);
 }
 
-// a seat freed up - tell everyone waiting how many seats are left (pop-up and email)
+// a seat freed up - tell everyone waiting how many seats are left
 async function notifyWaitlist(classId) {
   if (!(await schema.hasClassWaitlist())) return 0;
 
@@ -201,7 +193,7 @@ async function notifyWaitlist(classId) {
 
   // waiting students who are not in the class already
   const [waiting] = await pool.execute(
-    `SELECT w.student_id, u.email, u.full_name
+    `SELECT w.student_id
      FROM class_waitlist w
      JOIN users u ON u.id = w.student_id AND u.status = 'ACTIVE'
      WHERE w.class_id = ?
@@ -217,20 +209,31 @@ async function notifyWaitlist(classId) {
     await createNotification({
       recipientId: student.student_id,
       type: 'SEAT_AVAILABLE',
-      message: `Good news - ${classRow.subject} now has ${seats} free. You can enrol now, before they are taken.`,
+      message:
+        `Good news - ${classRow.subject} now has ${seats} free. You joined its waiting list, so you can ` +
+        'enrol now. Places go to whoever enrols first.',
       link: `/courses/classes/${classId}`,
     });
-    emailInBackground(
-      student.email,
-      `${classRow.subject} has ${seats} free`,
-      `Hi ${student.full_name},\n\nYou tried to join ${classRow.subject} when it was full. It now has ` +
-        `${seats} free. Log in and open the class to enrol - places go to whoever enrols first.\n\n` +
-        `Brilliant Institute\n${config.institute.phone}`
-    );
   }
   if (waiting.length > 0) {
     await pool.execute(`UPDATE class_waitlist SET notified_at = NOW() WHERE class_id = ?`, [classId]);
   }
+  return waiting.length;
+}
+
+// the class was cancelled - tell the waiting students and empty its waiting list
+async function closeWaitlist(classId, subject) {
+  if (!(await schema.hasClassWaitlist())) return 0;
+  const [waiting] = await pool.execute(`SELECT student_id FROM class_waitlist WHERE class_id = ?`, [classId]);
+  for (const row of waiting) {
+    await createNotification({
+      recipientId: row.student_id,
+      type: 'CLASS_CANCELLED',
+      message: `${subject} was cancelled, so its waiting list is closed. Browse the other classes to find another one.`,
+      link: '/courses/classes',
+    });
+  }
+  await pool.execute(`DELETE FROM class_waitlist WHERE class_id = ?`, [classId]);
   return waiting.length;
 }
 
@@ -281,4 +284,5 @@ module.exports = {
   joinWaitlist,
   leaveWaitlist,
   notifyWaitlist,
+  closeWaitlist,
 };
