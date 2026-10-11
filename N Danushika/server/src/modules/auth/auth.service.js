@@ -20,6 +20,15 @@ const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
 const { createNotification } = require('../../../../../shared/server/src/utils/notifications');
 const { hashPassword, comparePassword, hashNow } = require('../../../../../shared/server/src/utils/passwordHasher');
 const repository = require('./auth.repository');
+const signupEmailCheck = require('./signupEmailCheck');
+
+// sign-up step 1 - email a code to a new address
+async function sendSignupCode({ email, fullName }) {
+  if (await repository.findUserByEmail(email)) {
+    throw ApiError.conflict('An account with this email already exists. Try logging in instead.');
+  }
+  await signupEmailCheck.sendSignupCode(email, fullName);
+}
 
 // security notice - the owner is told (bell and email) whenever their password changes
 async function notifyPasswordChanged(userId, how) {
@@ -43,13 +52,16 @@ function buildStudentCode(userId) {
 }
 
 // register btn - makes a student or tutor account (a tutor needs a one-time enrollment key)
-async function registerUser({ fullName, email, password, phone, role, enrollmentKey, grade }) {
+async function registerUser({ fullName, email, password, phone, role, enrollmentKey, grade, emailCode }) {
   // no two accounts with the same email
   const existing = await repository.findUserByEmail(email);
   if (existing) {
     // sign-up can say the email is taken
     throw ApiError.conflict('An account with this email already exists. Try logging in instead.');
   }
+
+  // the address must be confirmed with the code we emailed to it
+  signupEmailCheck.checkSignupCode(email, emailCode);
 
   // anyone who is not a tutor is a student - nobody can sign up as admin
   const targetRole = role === ROLES.TUTOR ? ROLES.TUTOR : ROLES.STUDENT_PARENT;
@@ -116,6 +128,8 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     entityId: userId,
     details: consumedKey ? { enrollmentKeyId: consumedKey.id } : undefined,
   });
+
+  signupEmailCheck.forgetSignupCode(email);
 
   // welcome - in the bell and by email
   await createNotification({
@@ -429,8 +443,8 @@ function resetCodeEmail(name, code) {
   </div>`;
 }
 
-// reset with code btn - check the emailed code, set the new password and log in
-async function resetPasswordWithCode({ email, code, newPassword }, res) {
+// check an emailed reset code - right user, not used, not expired; wrong codes are counted
+async function checkResetCode(email, code) {
   const invalid = 'That code is wrong or has expired. Check the latest email or ask for a new code.';
   // find the account
   const user = await repository.findUserByEmail(email);
@@ -438,7 +452,6 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
     throw ApiError.badRequest(invalid);
   }
 
-  // check the code - right user, not used, not expired
   const resetToken = await repository.findValidResetTokenForUser(user.id, hashResetCode(user.id, code));
   if (!resetToken) {
     // too many wrong codes - the current code stops working
@@ -451,6 +464,17 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
     }
     throw ApiError.badRequest(invalid);
   }
+  return { user, resetToken };
+}
+
+// verify code btn - the code is right, so the new password form can show (the code is not used up yet)
+async function verifyResetCode({ email, code }) {
+  await checkResetCode(email, code);
+}
+
+// reset with code btn - check the code again, set the new password and log in
+async function resetPasswordWithCode({ email, code, newPassword }, res) {
+  const { user, resetToken } = await checkResetCode(email, code);
 
   // save the new password and use up the code
   const newHash = await hashPassword(newPassword, config.auth.bcryptSaltRounds);
@@ -516,6 +540,8 @@ async function resetPasswordWithToken(rawToken, newPassword) {
 }
 
 module.exports = {
+  sendSignupCode,
+  verifyResetCode,
   registerUser,
   loginWithEmailAndPassword,
   logout,

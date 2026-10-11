@@ -4,9 +4,23 @@ const ApiError = require('../../../../../shared/server/src/utils/ApiError');
 const { saveUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('./auth.service');
 
+// POST /api/auth/register/send-code - email a sign-up code to the new address
+const sendSignupCode = asyncHandler(async (req, res) => {
+  const { email, fullName } = req.body;
+  await authService.sendSignupCode({ email, fullName });
+  res.status(200).json({ success: true, message: `We emailed a 6-digit code to ${email}.` });
+});
+
+// POST /api/auth/verify-reset-code - is the emailed reset code right?
+const verifyResetCode = asyncHandler(async (req, res) => {
+  const { email, code } = req.body;
+  await authService.verifyResetCode({ email, code });
+  res.status(200).json({ success: true, message: 'Code accepted. Choose your new password.' });
+});
+
 // POST /api/auth/register
 const register = asyncHandler(async (req, res) => {
-  const { fullName, email, password, phone, role, enrollmentKey, grade } = req.body;
+  const { fullName, email, password, phone, role, enrollmentKey, grade, emailCode } = req.body;
   const user = await authService.registerUser({
     fullName,
     email,
@@ -15,6 +29,7 @@ const register = asyncHandler(async (req, res) => {
     role,
     enrollmentKey,
     grade,
+    emailCode,
   });
   res.status(201).json({
     success: true,
@@ -124,6 +139,8 @@ const resetPassword = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  sendSignupCode,
+  verifyResetCode,
   register,
   login,
   logout,

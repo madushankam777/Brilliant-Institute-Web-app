@@ -17,6 +17,8 @@ const repository = require('./admin.repository');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { defaultLinkFor } = require('../../../../../shared/server/src/utils/notifications');
 const { emailAnnouncement, emailPerson } = require('../../../../../shared/server/src/utils/notificationEmails');
+const { sendMail, canReceiveEmail } = require('../../../../../shared/server/src/utils/mailer');
+const { renderEmail } = require('../../../../../shared/server/src/utils/emailLayout');
 const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
 const enrollmentPayments = require('../../../../../C D Kumanan/server/src/modules/course/enrollmentPayments');
@@ -80,12 +82,19 @@ function generateKeyCode() {
 }
 
 // generate key btn - make a new one-time tutor key, with the tutor's CV and certificates, and save it
-async function generateTutorKey(adminUser, { intendedFor, idNumber, cvPath, certificatePaths }) {
+async function generateTutorKey(adminUser, { intendedFor, idNumber, cvPath, certificatePaths, sendToEmail }) {
+  // a made-up address can never get the key
+  if (!canReceiveEmail(sendToEmail)) {
+    throw ApiError.badRequest('That email address cannot receive email. Please check it.', [
+      { field: 'sendToEmail', message: 'This address cannot receive email.' },
+    ]);
+  }
+
   // the new random key code
   const keyCode = generateKeyCode();
   const keyId = await repository.createTutorKey({
     keyCode,
-    intendedFor,
+    intendedFor: `${intendedFor} (${sendToEmail})`,
     idNumber,
     cvPath,
     certificatePaths,
@@ -97,11 +106,34 @@ async function generateTutorKey(adminUser, { intendedFor, idNumber, cvPath, cert
     action: 'TUTOR_KEY_GENERATED',
     entityType: 'tutor_enrollment_key',
     entityId: keyId,
-    details: { intendedFor: intendedFor || null, idNumber: idNumber || null },
+    details: { intendedFor: intendedFor || null, idNumber: idNumber || null, emailedTo: sendToEmail || null },
   });
 
   const created = await repository.findTutorKeyById(keyId);
-  return toSafeTutorKey(created, { includeCode: true });
+  const key = toSafeTutorKey(created, { includeCode: true });
+
+  // email the key with a link to the sign-up page
+  const { html, text } = renderEmail({
+    name: intendedFor,
+    heading: 'Your tutor enrollment key',
+    message:
+      `${config.institute.name} has approved you as a tutor. Use this one-time key to create your tutor account:\n\n` +
+      `${keyCode}\n\n` +
+      'Open the sign-up page, choose "Tutor / Instructor", enter this key and register with this email address. ' +
+      'The key works once. Keep it private - anyone with it can register as a tutor.',
+    buttonText: 'Create my tutor account',
+    buttonUrl: `${config.siteUrl}/register`,
+  });
+  try {
+    await sendMail({ to: sendToEmail, subject: `Your ${config.institute.name} tutor enrollment key`, html, text });
+    key.emailedTo = sendToEmail;
+  } catch (error) {
+    // the key is made - the admin can still copy it from the page
+    // eslint-disable-next-line no-console
+    console.error(`[mail] could not email the tutor key to ${sendToEmail}: ${error.message}`);
+    key.emailError = 'The key was created, but the email could not be sent. Copy the key and give it to the tutor.';
+  }
+  return key;
 }
 
 // where a key's CV or certificate is stored (for the admin to download)

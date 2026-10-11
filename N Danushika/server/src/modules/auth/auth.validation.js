@@ -113,7 +113,21 @@ const resetPasswordValidationRules = [
     .withMessage(PASSWORD_RULE_MESSAGE),
 ];
 
+// sign-up code rules - a valid email (the name is optional, for the greeting)
+const signupCodeValidationRules = [
+  body('email').trim().isEmail().withMessage('Please enter a valid email address.').normalizeEmail(),
+  body('fullName').optional({ checkFalsy: true }).trim().isLength({ max: 150 }).matches(NAME_REGEX).withMessage(NAME_MESSAGE),
+];
+
+// verify reset code rules - email and the 6-digit code
+const verifyResetCodeValidationRules = [
+  body('email').trim().isEmail().withMessage('Please enter a valid email address.').normalizeEmail(),
+  body('code').trim().matches(/^\d{6}$/).withMessage('Enter the 6-digit code from the email.'),
+];
+
 module.exports = {
+  signupCodeValidationRules,
+  verifyResetCodeValidationRules,
   registerValidationRules,
   loginValidationRules,
   updateProfileValidationRules,

@@ -28,7 +28,7 @@ const NAV_ITEMS = getNavItems('ADMIN');
 // a blank add user form
 const emptyForm = { fullName: '', email: '', password: '', role: 'TUTOR' };
 // a blank tutor key form
-const emptyKeyForm = { intendedFor: '', idNumber: '', cvFile: null, certificateFiles: [] };
+const emptyKeyForm = { intendedFor: '', idNumber: '', sendToEmail: '', cvFile: null, certificateFiles: [] };
 
 // badge colour for Active, Suspended or other
 function statusBadgeClass(status) {
@@ -99,11 +99,21 @@ function ManageUsersPage() {
     event.preventDefault();
     setKeysError('');
     setJustGeneratedKey(null);
+    const sendTo = keyForm.sendToEmail.trim();
+    if (!/^[A-Za-z][A-Za-z .'-]{1,119}$/.test(keyForm.intendedFor.trim())) {
+      setKeysError("Please enter the tutor's name (letters, spaces, apostrophes, periods and hyphens only).");
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(sendTo)) {
+      setKeysError("Please enter the tutor's email address - the key is sent there.");
+      return;
+    }
     setIsGeneratingKey(true);
     try {
       const key = await generateTutorKey({
-        intendedFor: keyForm.intendedFor.trim() || undefined,
+        intendedFor: keyForm.intendedFor.trim(),
         idNumber: keyForm.idNumber.trim() || undefined,
+        sendToEmail: sendTo,
         cvFile: keyForm.cvFile,
         certificateFiles: keyForm.certificateFiles,
       });
@@ -387,8 +397,8 @@ function ManageUsersPage() {
           <h2>Tutor Enrollment Keys</h2>
           <p className="muted" style={{ fontSize: '0.88rem' }}>
             A tutor can only self-register after you verify them (phone/email/in person) and generate
-            a one-time key here. Give them the key directly - it is shown only once, right after you
-            generate it.
+            a one-time key here. The key is emailed to the tutor, and shown here only once in case you need
+            to give it in person.
           </p>
 
           <Alert type="error" message={keysError} />
@@ -402,19 +412,29 @@ function ManageUsersPage() {
                 <code style={{ fontSize: '1.05rem', fontWeight: 700, userSelect: 'all' }}>
                   {justGeneratedKey.keyCode}
                 </code>
+                {justGeneratedKey.emailedTo && (
+                  <>
+                    <br />
+                    Emailed to <strong>{justGeneratedKey.emailedTo}</strong> with a link to the sign-up page.
+                  </>
+                )}
               </span>
             </div>
           )}
+          {justGeneratedKey && justGeneratedKey.emailError && <Alert type="error" message={justGeneratedKey.emailError} />}
 
           {/* new key form - who it is for, ID number, CV and certificates */}
           <form onSubmit={handleGenerateKey} style={{ marginBottom: '18px' }}>
             <div className="inline-form">
               <div style={{ flex: 1, minWidth: '220px' }}>
-                <label htmlFor="intendedFor">Intended for (name or email)</label>
+                <label htmlFor="intendedFor">
+                  Tutor name <span aria-hidden="true">*</span>
+                </label>
                 <input
                   id="intendedFor"
                   type="text"
-                  placeholder="e.g. Dr. Alan Turing / alan@example.com"
+                  placeholder="e.g. Kasun Perera"
+                  required
                   value={keyForm.intendedFor}
                   onChange={(e) => setKeyForm((prev) => ({ ...prev, intendedFor: e.target.value }))}
                   style={{ width: '100%' }}
@@ -430,6 +450,25 @@ function ManageUsersPage() {
                   onChange={(e) => setKeyForm((prev) => ({ ...prev, idNumber: e.target.value }))}
                   style={{ width: '100%' }}
                 />
+              </div>
+            </div>
+            <div className="inline-form">
+              <div style={{ flex: 1, minWidth: '220px' }}>
+                <label htmlFor="sendToEmail">
+                  Tutor email <span aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="sendToEmail"
+                  type="email"
+                  placeholder="tutor@gmail.com"
+                  required
+                  value={keyForm.sendToEmail}
+                  onChange={(e) => setKeyForm((prev) => ({ ...prev, sendToEmail: e.target.value }))}
+                  style={{ width: '100%' }}
+                />
+                <p className="field-help">
+                  The key is emailed here with a button to the sign-up page. The tutor must register with this email.
+                </p>
               </div>
             </div>
             <div className="inline-form">
@@ -460,7 +499,7 @@ function ManageUsersPage() {
               for your records and are only ever visible to Admin accounts.
             </p>
             <button type="submit" className="btn btn-primary" disabled={isGeneratingKey}>
-              {isGeneratingKey ? 'Generating...' : 'Generate Key'}
+              {isGeneratingKey ? 'Generating...' : 'Generate and Email Key'}
             </button>
           </form>
 
@@ -474,7 +513,7 @@ function ManageUsersPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Intended For</th>
+                    <th>Tutor</th>
                     <th>ID Number</th>
                     <th>Documents</th>
                     <th>Status</th>

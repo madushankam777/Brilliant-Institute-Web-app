@@ -12,6 +12,7 @@ export async function registerAccount({
   role,
   enrollmentKey,
   grade,
+  emailCode,
 }) {
   const response = await httpClient.post('/auth/register', {
     fullName,
@@ -22,8 +23,21 @@ export async function registerAccount({
     role,
     enrollmentKey,
     grade,
+    emailCode,
   });
   return response.data.data.user;
+}
+
+// sign-up - email a 6-digit code to confirm the address
+export async function sendSignupCode({ email, fullName }) {
+  const response = await httpClient.post('/auth/register/send-code', { email, fullName });
+  return response.data.message;
+}
+
+// forgot password - check the emailed code before the new password form shows
+export async function verifyResetCode({ email, code }) {
+  const response = await httpClient.post('/auth/verify-reset-code', { email, code });
+  return response.data.message;
 }
 
 /** READ + authenticate - log in and start a session (cookie is set by the server). */

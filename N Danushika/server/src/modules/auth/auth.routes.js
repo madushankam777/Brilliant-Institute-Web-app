@@ -12,11 +12,31 @@ const {
   changePasswordValidationRules,
   forgotPasswordValidationRules,
   resetPasswordValidationRules,
+  signupCodeValidationRules,
+  verifyResetCodeValidationRules,
 } = require('./auth.validation');
 
 const router = express.Router();
 
 // Public endpoints (no login required).
+// send code btn on sign-up - email a code to confirm the address
+router.post(
+  '/register/send-code',
+  resetRequestLimiter,
+  signupCodeValidationRules,
+  validateRequest,
+  controller.sendSignupCode
+);
+
+// verify code btn on forgot password - check the code before the new password form shows
+router.post(
+  '/verify-reset-code',
+  authLimiter,
+  verifyResetCodeValidationRules,
+  validateRequest,
+  controller.verifyResetCode
+);
+
 // register btn - make a student or tutor account
 router.post(
   '/register',

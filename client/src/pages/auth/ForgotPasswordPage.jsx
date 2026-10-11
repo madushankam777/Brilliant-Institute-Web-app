@@ -1,7 +1,7 @@
-// forgot password page - email a code, then type the code and a new password
+// forgot password page - email a code, verify the code, then choose a new password
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { requestPasswordReset, resetPasswordWithCode } from '../../api/authApi';
+import { requestPasswordReset, resetPasswordWithCode, verifyResetCode } from '../../api/authApi';
 import { useAuth } from '../../context/AuthContext';
 import FormField from '../../../../shared/client/src/components/common/FormField';
 import Alert from '../../../../shared/client/src/components/common/Alert';
@@ -15,11 +15,11 @@ const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/;
 // wait 60 seconds before asking for another code
 const RESEND_SECONDS = 60;
 
-// forgot password - step 1 asks for the email, step 2 takes the emailed 6-digit code and a new password
+// forgot password - step 1 the email, step 2 the emailed 6-digit code, step 3 the new password
 function ForgotPasswordPage() {
   const navigate = useNavigate();
   const { refreshProfile } = useAuth();
-  // which step is shown - email or code
+  // which step is shown - email, code or password
   const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -72,12 +72,32 @@ function ForgotPasswordPage() {
     }
   }
 
-  // reset password btn - checks the code, sets the password and logs in
+  // verify code btn - only a right code opens the new password form
+  async function handleVerify(event) {
+    event.preventDefault();
+    setErrorMessage('');
+    if (!/^\d{6}$/.test(code)) {
+      setErrors({ code: 'Enter the 6-digit code from the email.' });
+      return;
+    }
+    setErrors({});
+    setIsSubmitting(true);
+    try {
+      await verifyResetCode({ email: email.trim(), code });
+      setNotice('');
+      setStep('password');
+    } catch (error) {
+      showServerErrors(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // reset password btn - sets the password and logs in
   async function handleReset(event) {
     event.preventDefault();
     setErrorMessage('');
     const found = {};
-    if (!/^\d{6}$/.test(code)) found.code = 'Enter the 6-digit code from the email.';
     if (!STRONG_PASSWORD.test(newPassword)) {
       found.newPassword = 'Use 8-72 characters with an uppercase letter, a lowercase letter and a number.';
     }
@@ -91,45 +111,29 @@ function ForgotPasswordPage() {
       await refreshProfile();
       navigate('/', { replace: true });
     } catch (error) {
+      // the code ran out meanwhile - go back to the code step
+      if (/code/i.test(error.message || '')) {
+        setStep('code');
+        setCode('');
+      }
       showServerErrors(error);
       setIsSubmitting(false);
     }
   }
 
-  // step 2 - type the emailed code and a new password
-  if (step === 'code') {
+  // step 3 - the code was right, now choose the new password
+  if (step === 'password') {
     return (
       <AuthLayout backTo="/login" backLabel="Back to Login">
-        <h1>Enter your code</h1>
+        <h1>Choose a new password</h1>
         <p className="muted">
-          We sent a 6-digit code to <strong>{email.trim()}</strong>. It expires in 15 minutes. Check your spam folder
-          if you can&apos;t see it.
+          Code accepted for <strong>{email.trim()}</strong>. Pick a new password - you will be logged in straight away.
         </p>
 
-        <Alert type="success" message={notice} />
         <Alert type="error" message={errorMessage} />
 
-        {/* reset form - code, new password and confirmation */}
+        {/* new password form */}
         <form onSubmit={handleReset} noValidate>
-          <div className="form-field">
-            <label htmlFor="reset-code">6-digit code</label>
-            <input
-              id="reset-code"
-              className={`code-input${errors.code ? ' input-error' : ''}`}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="000000"
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value.replace(/\D/g, ''));
-                setErrors((prev) => ({ ...prev, code: undefined }));
-              }}
-              autoFocus
-            />
-            {errors.code && <p className="field-error">{errors.code}</p>}
-          </div>
-
           <FormField
             id="newPassword"
             label="New password"
@@ -155,7 +159,49 @@ function ForgotPasswordPage() {
           />
 
           <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
-            {isSubmitting ? 'Checking...' : 'Reset password and log in'}
+            {isSubmitting ? 'Saving...' : 'Reset password and log in'}
+          </button>
+        </form>
+      </AuthLayout>
+    );
+  }
+
+  // step 2 - type the emailed code
+  if (step === 'code') {
+    return (
+      <AuthLayout backTo="/login" backLabel="Back to Login">
+        <h1>Enter your code</h1>
+        <p className="muted">
+          We sent a 6-digit code to <strong>{email.trim()}</strong>. It expires in 15 minutes. Check your spam folder
+          if you can&apos;t see it.
+        </p>
+
+        <Alert type="success" message={notice} />
+        <Alert type="error" message={errorMessage} />
+
+        {/* code form - checked before the new password form shows */}
+        <form onSubmit={handleVerify} noValidate>
+          <div className="form-field">
+            <label htmlFor="reset-code">6-digit code</label>
+            <input
+              id="reset-code"
+              className={`code-input${errors.code ? ' input-error' : ''}`}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, ''));
+                setErrors((prev) => ({ ...prev, code: undefined }));
+              }}
+              autoFocus
+            />
+            {errors.code && <p className="field-error">{errors.code}</p>}
+          </div>
+
+          <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
+            {isSubmitting ? 'Checking...' : 'Verify code'}
           </button>
         </form>
 

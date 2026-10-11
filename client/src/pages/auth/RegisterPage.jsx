@@ -1,7 +1,7 @@
 // register page - the sign-up form for students and tutors
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { registerAccount } from '../../api/authApi';
+import { registerAccount, sendSignupCode } from '../../api/authApi';
 import FormField from '../../../../shared/client/src/components/common/FormField';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import PasswordStrength from '../../../../shared/client/src/components/common/PasswordStrength';
@@ -17,6 +17,9 @@ const PASSWORD_RULE_MESSAGE =
 function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
+
+// wait 60 seconds before asking for another code
+const RESEND_SECONDS = 60;
 
 // an empty form - student is the default role
 const initialFormState = {
@@ -38,6 +41,10 @@ function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // step 2 - the code emailed to confirm the address
+  const [step, setStep] = useState('form');
+  const [emailCode, setEmailCode] = useState('');
+  const [resendIn, setResendIn] = useState(0);
 
   // change one form field
   function updateField(field, value) {
@@ -71,7 +78,36 @@ function RegisterPage() {
     return errors;
   }
 
-  // register btn - validate, create the account, then go to the login page
+  // show the server's message and its field errors
+  function showServerError(error) {
+    setFormError(error.message);
+    if (error.details) {
+      const mapped = {};
+      error.details.forEach((detail) => {
+        mapped[detail.field] = detail.message;
+      });
+      setFieldErrors(mapped);
+    }
+  }
+
+  // send (or resend) the 6-digit code to the email address
+  async function sendCode() {
+    setIsSubmitting(true);
+    setFormError('');
+    try {
+      await sendSignupCode({ email: form.email.trim(), fullName: form.fullName.trim() });
+      setStep('verify');
+      setEmailCode('');
+      setResendIn(RESEND_SECONDS);
+      setFieldErrors({});
+    } catch (error) {
+      showServerError(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // create account btn - check the form, then email the code
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -81,23 +117,94 @@ function RegisterPage() {
     if (Object.keys(errors).length > 0) {
       return;
     }
+    await sendCode();
+  }
 
+  // verify btn - the right code creates the account, then the login page opens
+  async function handleVerify(event) {
+    event.preventDefault();
+    setFormError('');
+    if (!/^\d{6}$/.test(emailCode)) {
+      setFieldErrors({ emailCode: 'Enter the 6-digit code from the email.' });
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await registerAccount(form);
+      await registerAccount({ ...form, email: form.email.trim(), emailCode });
       navigate('/login', { replace: true, state: { justRegistered: true } });
     } catch (error) {
-      setFormError(error.message);
-      if (error.details) {
-        const mapped = {};
-        error.details.forEach((detail) => {
-          mapped[detail.field] = detail.message;
-        });
-        setFieldErrors(mapped);
-      }
-    } finally {
+      // a problem with the form itself (not the code) - back to the form to fix it
+      const codeProblem = (error.details || []).some((detail) => detail.field === 'emailCode');
+      if (!codeProblem) setStep('form');
+      showServerError(error);
       setIsSubmitting(false);
     }
+  }
+
+  // resend countdown
+  useEffect(() => {
+    if (resendIn <= 0) return undefined;
+    const timer = setTimeout(() => setResendIn((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  // step 2 - type the code that was emailed
+  if (step === 'verify') {
+    return (
+      <AuthLayout>
+        <h1>Check your email</h1>
+        <p className="muted">
+          We sent a 6-digit code to <strong>{form.email.trim()}</strong>. Enter it to confirm your email and create
+          your account. It expires in 15 minutes - check your spam folder if you can&apos;t see it.
+        </p>
+
+        <Alert type="error" message={formError} />
+
+        {/* verify form - the emailed code */}
+        <form onSubmit={handleVerify} noValidate>
+          <div className="form-field">
+            <label htmlFor="email-code">6-digit code</label>
+            <input
+              id="email-code"
+              className={`code-input${fieldErrors.emailCode ? ' input-error' : ''}`}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              value={emailCode}
+              onChange={(e) => {
+                setEmailCode(e.target.value.replace(/\D/g, ''));
+                setFieldErrors({});
+              }}
+              autoFocus
+            />
+            {fieldErrors.emailCode && <p className="field-error">{fieldErrors.emailCode}</p>}
+          </div>
+          <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating account...' : 'Verify and create account'}
+          </button>
+        </form>
+
+        <p className="auth-footer-note">
+          No code?{' '}
+          <button type="button" className="link-button" disabled={resendIn > 0 || isSubmitting} onClick={sendCode}>
+            {resendIn > 0 ? `Send again in ${resendIn}s` : 'Send a new code'}
+          </button>
+          {' · '}
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => {
+              setStep('form');
+              setFormError('');
+              setFieldErrors({});
+            }}
+          >
+            Change my details
+          </button>
+        </p>
+      </AuthLayout>
+    );
   }
 
   // the page - role choice, then the form
@@ -273,7 +380,7 @@ function RegisterPage() {
         </div>
 
         <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating account...' : 'Create Account'}
+          {isSubmitting ? 'Sending code...' : 'Create Account'}
         </button>
       </form>
 

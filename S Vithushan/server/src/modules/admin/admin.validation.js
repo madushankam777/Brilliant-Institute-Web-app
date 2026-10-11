@@ -12,16 +12,24 @@ const keyIdParamRules = [param('keyId').isInt({ min: 1 }).withMessage('Invalid k
 
 // generate key rules - an optional name or email and an optional ID number
 const generateTutorKeyRules = [
+  // the tutor's name - letters, spaces, apostrophes, periods and hyphens only
   body('intendedFor')
-    .optional({ checkFalsy: true })
     .trim()
-    .isLength({ max: 190 })
-    .withMessage('That name/email is too long.'),
+    .isLength({ min: 2, max: 120 })
+    .withMessage("Please enter the tutor's name.")
+    .matches(/^[A-Za-z][A-Za-z .'-]*$/)
+    .withMessage('Tutor name can only contain letters, spaces, apostrophes, periods and hyphens.'),
   body('idNumber')
     .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 50 })
     .withMessage('ID number is too long.'),
+  // the key is always emailed to the tutor
+  body('sendToEmail')
+    .trim()
+    .isEmail()
+    .withMessage('Please enter a valid email address to send the key to.')
+    .normalizeEmail(),
 ];
 
 // key id and which document: cv or certificate-0, certificate-1 ...

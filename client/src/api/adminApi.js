@@ -59,9 +59,10 @@ export async function fetchMyStudents() {
 }
 
 // generate key btn - make a tutor key and upload the tutor's CV and certificates
-export async function generateTutorKey({ intendedFor, idNumber, cvFile, certificateFiles }) {
+export async function generateTutorKey({ intendedFor, idNumber, cvFile, certificateFiles, sendToEmail }) {
   const formData = new FormData();
   if (intendedFor) formData.append('intendedFor', intendedFor);
+  if (sendToEmail) formData.append('sendToEmail', sendToEmail);
   if (idNumber) formData.append('idNumber', idNumber);
   if (cvFile) formData.append('cv', cvFile);
   (certificateFiles || []).forEach((file) => formData.append('certificates', file));

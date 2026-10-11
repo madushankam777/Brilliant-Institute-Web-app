@@ -70,7 +70,7 @@ const createPasswordResetLink = asyncHandler(async (req, res) => {
 
 // POST /admin/tutor-keys - make a key and save the uploaded CV and certificates
 const generateTutorKey = asyncHandler(async (req, res) => {
-  const { intendedFor, idNumber } = req.body;
+  const { intendedFor, idNumber, sendToEmail } = req.body;
   const files = req.files || {};
   // save the uploaded CV and certificates first
   const cvPath = files.cv && files.cv[0] ? await saveUpload(files.cv[0], 'TUTOR_DOCUMENT', req.user.id) : null;
@@ -81,7 +81,7 @@ const generateTutorKey = asyncHandler(async (req, res) => {
 
   let key;
   try {
-    key = await service.generateTutorKey(req.user, { intendedFor, idNumber, cvPath, certificatePaths });
+    key = await service.generateTutorKey(req.user, { intendedFor, idNumber, cvPath, certificatePaths, sendToEmail });
   } catch (error) {
     // key not made - don't keep the documents
     await Promise.all([cvPath, ...certificatePaths].filter(Boolean).map(deleteUpload));
@@ -89,7 +89,9 @@ const generateTutorKey = asyncHandler(async (req, res) => {
   }
   res.status(201).json({
     success: true,
-    message: 'Enrollment key generated. Copy it now - it will not be shown again.',
+    message: key.emailedTo
+      ? `Enrollment key generated and emailed to ${key.emailedTo}.`
+      : 'Enrollment key generated. Copy it now - it will not be shown again.',
     data: { key },
   });
 });

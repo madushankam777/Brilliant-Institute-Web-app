@@ -106,6 +106,8 @@ const config = {
     bcryptSaltRounds: toInt(process.env.BCRYPT_SALT_ROUNDS, 12),
     maxFailedLoginAttempts: toInt(process.env.MAX_FAILED_LOGIN_ATTEMPTS, 5),
     accountLockoutMinutes: toInt(process.env.ACCOUNT_LOCKOUT_MINUTES, 15),
+    // sign-up needs a code emailed to the address (SIGNUP_EMAIL_CHECK=off only for the automated tests)
+    verifySignupEmail: process.env.SIGNUP_EMAIL_CHECK !== 'off',
   },
 
   // how many requests are allowed in a time window
