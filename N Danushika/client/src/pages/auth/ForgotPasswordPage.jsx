@@ -1,4 +1,4 @@
-// forgot password page - ask for a reset link by email
+
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordReset } from '../../api/authApi';
@@ -7,7 +7,7 @@ import Alert from '../../../../../shared/client/src/components/common/Alert';
 import Icon from '../../../../../shared/client/src/components/common/Icon';
 import AuthLayout from '../../../../../shared/client/src/components/layout/AuthLayout';
 
-// forgot password - type the email, then a reset link is sent
+// forgot password 
 function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -15,7 +15,7 @@ function ForgotPasswordPage() {
   const [devOnlyResetToken, setDevOnlyResetToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // send btn - ask the server for a reset link
+  // send btn 
   async function handleSubmit(event) {
     event.preventDefault();
     setErrorMessage('');
@@ -25,7 +25,7 @@ function ForgotPasswordPage() {
       const result = await requestPasswordReset(email);
       setSubmitted(true);
       if (result.data && result.data.devOnlyResetToken) {
-        // old dev-only token (the server no longer sends it)
+
         setDevOnlyResetToken(result.data.devOnlyResetToken);
       }
     } catch (error) {
@@ -76,7 +76,7 @@ function ForgotPasswordPage() {
     );
   }
 
-  // step 1 - ask for the email address
+  
   return (
     <AuthLayout backTo="/login" backLabel="Back to Login">
       <h1>Forgot Password?</h1>

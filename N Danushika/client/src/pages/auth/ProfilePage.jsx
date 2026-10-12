@@ -1,4 +1,4 @@
-// Profile page: two separate forms
+
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -26,14 +26,14 @@ function isStrongPassword(password) {
   return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,72}$/.test(password);
 }
 
-// Letters, spaces, apostrophes, periods, and hyphens only
+
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
-// the message shown when the name has odd characters
+
 const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
 
-// Digits plus the punctuation real phone numbers are written with.
+
 const PHONE_REGEX = /^[0-9+\-\s()]+$/;
-// the message shown when the phone number has odd characters
+
 const PHONE_ERROR = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
 
 // the side menu
@@ -42,11 +42,11 @@ const NAV_ITEMS = [
   { to: '/profile', label: 'My Profile', icon: 'user' },
 ];
 
-// my profile page - picture, account details and change password
+
 function ProfilePage() {
   const { user, refreshProfile } = useAuth();
 
-  // account details form
+  
   const [fullName, setFullName] = useState(user.fullName);
   const [phone, setPhone] = useState(user.phone || '');
   const [bio, setBio] = useState(user.bio || '');
@@ -61,7 +61,7 @@ function ProfilePage() {
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const [isRemovingPicture, setIsRemovingPicture] = useState(false);
 
-  // delete btn - remove the current photo, back to the initials avatar
+  
   async function handleRemovePicture() {
     setPictureError('');
     setIsRemovingPicture(true);
@@ -75,7 +75,7 @@ function ProfilePage() {
     }
   }
 
-  // upload btn - check the file, then upload the picture
+  
   async function handlePictureSelected(event) {
     const file = event.target.files && event.target.files[0];
     event.target.value = '';
@@ -102,14 +102,14 @@ function ProfilePage() {
     }
   }
 
-  // refresh the form when the profile changes
+  
   useEffect(() => {
     setFullName(user.fullName);
     setPhone(user.phone || '');
     setBio(user.bio || '');
   }, [user]);
 
-  // save details btn - name, phone and bio
+  
   async function handleProfileSubmit(event) {
     event.preventDefault();
     setProfileError('');
@@ -148,7 +148,7 @@ function ProfilePage() {
   const [passwordError, setPasswordError] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
-  // change password btn - needs the current password and a strong new one
+  
   async function handlePasswordSubmit(event) {
     event.preventDefault();
     setPasswordError('');

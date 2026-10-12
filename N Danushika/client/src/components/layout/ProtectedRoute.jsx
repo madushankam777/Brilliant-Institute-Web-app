@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 
-// route guard - waits for the session check, sends visitors to login, and keeps other roles out
+
 function ProtectedRoute({ allowedRoles }) {
   const { isLoggedIn, isCheckingSession, user } = useAuth();
   const location = useLocation();
