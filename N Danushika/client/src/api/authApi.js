@@ -1,7 +1,6 @@
-// All the API calls for login/register/profile live here
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
-// register btn - create a student or tutor account
+// register btn
 export async function registerAccount({
   fullName,
   email,
@@ -25,36 +24,36 @@ export async function registerAccount({
   return response.data.data.user;
 }
 
-// Log in - the server sets the session cookie for us.
+// Log in 
 export async function login({ email, password }) {
   const response = await httpClient.post('/auth/login', { email, password });
   return response.data.data.user;
 }
 
-// POST /auth/logout - end the session
+
 export async function logout() {
   await httpClient.post('/auth/logout');
 }
 
-// Check if the user is already logged in (called when the app starts).
+
 export async function fetchCurrentSession() {
   const response = await httpClient.get('/auth/session');
   return response.data.data.user;
 }
 
-// Get the logged-in user's own profile.
+
 export async function fetchMyProfile() {
   const response = await httpClient.get('/auth/profile');
   return response.data.data.user;
 }
 
-// Update the logged-in user's own profile.
+
 export async function updateMyProfile({ fullName, phone, bio }) {
   const response = await httpClient.put('/auth/profile', { fullName, phone, bio });
   return response.data.data.user;
 }
 
-// Upload/replace the logged-in user's own profile picture.
+
 export async function uploadMyProfilePicture(file) {
   const formData = new FormData();
   formData.append('profilePicture', file);
@@ -76,13 +75,13 @@ export async function changeMyPassword({ currentPassword, newPassword }) {
   return response.data.message;
 }
 
-// Ask for a password-reset link to be sent by email.
+
 export async function requestPasswordReset(email) {
   const response = await httpClient.post('/auth/forgot-password', { email });
   return response.data;
 }
 
-// Finish a password reset using the token from the email.
+
 export async function resetPassword({ token, newPassword }) {
   const response = await httpClient.post('/auth/reset-password', { token, newPassword });
   return response.data.message;

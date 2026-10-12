@@ -1,4 +1,4 @@
-// Login page: check the user's email/password
+// Login page
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -6,25 +6,25 @@ import FormField from '../../../../../shared/client/src/components/common/FormFi
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import AuthLayout from '../../../../../shared/client/src/components/layout/AuthLayout';
 
-// login page - the email and password form
+
 function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // form fields and their errors
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // show a success message when the user has just registered
+  
   const justRegistered = Boolean(location.state && location.state.justRegistered);
-  // the page the user came from, to go back to after login
+  
   const redirectTo = location.state && location.state.from ? location.state.from.pathname : null;
 
-  // check the form before sending it
+  
   function validate() {
     const errors = {};
     if (!email.trim()) {
@@ -38,7 +38,7 @@ function LoginPage() {
     return errors;
   }
 
-  // login btn - check the form, log in, then go to the dashboard
+  
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -51,7 +51,7 @@ function LoginPage() {
 
     try {
       await login({ email, password });
-      // Go back to the page the user came from, or the dashboard.
+      
       navigate(redirectTo || '/', { replace: true });
     } catch (error) {
       setFormError(error.message);
