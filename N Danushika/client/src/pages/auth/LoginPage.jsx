@@ -25,7 +25,18 @@ function LoginPage() {
   const redirectTo = location.state && location.state.from ? location.state.from.pathname : null;
 
   
-
+  function validate() {
+    const errors = {};
+    if (!email.trim()) {
+      errors.email = 'Please enter your email.';
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+      errors.email = 'Please enter a valid email address.';
+    }
+    if (!password) {
+      errors.password = 'Please enter your password.';
+    }
+    return errors;
+  }
 
   
   async function handleSubmit(event) {
