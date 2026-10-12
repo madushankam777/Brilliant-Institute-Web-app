@@ -389,6 +389,17 @@ async function findStudentIdsWithKey(studentIds, academicYear) {
   return rows.map((row) => row.student_id);
 }
 
+// does this student have an unused key waiting (e.g. an A/L student the office is keeping for another year)
+async function hasUnusedReregistrationKey(studentId) {
+  const [rows] = await pool.execute(
+    `SELECT 1 FROM student_reregistration_keys
+     WHERE student_id = ? AND status = 'UNUSED' AND (expires_at IS NULL OR expires_at > NOW())
+     LIMIT 1`,
+    [studentId]
+  );
+  return rows.length > 0;
+}
+
 // one re-registration key by id
 async function findReregistrationKeyById(keyId) {
   const [rows] = await pool.execute(
@@ -869,6 +880,7 @@ module.exports = {
   listClassesForTutor,
   createReregistrationKey,
   findReregistrationKeyById,
+  hasUnusedReregistrationKey,
   findRedeemableKeyForStudent,
   markReregistrationKeyUsed,
   revokeReregistrationKey,

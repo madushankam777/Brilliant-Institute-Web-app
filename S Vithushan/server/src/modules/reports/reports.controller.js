@@ -20,6 +20,18 @@ const getHistory = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { history: await service.getHistory() } });
 });
 
+// delete btn - one recent report
+const removeHistoryEntry = asyncHandler(async (req, res) => {
+  await service.removeHistory(req.user, [Number(req.params.id)]);
+  res.status(200).json({ success: true, message: 'Report removed from the list.' });
+});
+
+// delete all btn - every recent report
+const clearHistory = asyncHandler(async (req, res) => {
+  const removed = await service.removeHistory(req.user, null);
+  res.status(200).json({ success: true, message: removed ? 'Recent reports cleared.' : 'There were no reports to clear.', data: { removed } });
+});
+
 // generate btn - report shown on screen
 const generateReport = asyncHandler(async (req, res) => {
   const report = await service.buildReport(req.params.type, req.query, req.user);
@@ -69,4 +81,4 @@ const downloadPeopleZip = asyncHandler(async (req, res) => {
   res.status(200).send(zip.buffer);
 });
 
-module.exports = { listReports, getOptions, getHistory, generateReport, downloadReportPdf, downloadReportExcel, downloadPeopleZip };
+module.exports = { listReports, getOptions, getHistory, removeHistoryEntry, clearHistory, generateReport, downloadReportPdf, downloadReportExcel, downloadPeopleZip };

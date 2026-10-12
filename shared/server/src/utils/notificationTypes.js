@@ -22,7 +22,6 @@ const LEGACY_TYPE = {
   WELCOME: 'ANNOUNCEMENT',
   ACCOUNT_STATUS: 'ACCOUNT_CLOSED',
   PASSWORD_CHANGED: 'ACCOUNT_CLOSED',
-  NEW_MESSAGE: 'ANNOUNCEMENT',
 };
 
 // the page a notification saved without a link should open
@@ -43,7 +42,6 @@ function defaultLinkFor(type, role) {
   if (type === 'ENQUIRY_NEW') return '/admin/enquiries';
   if (type === 'ACCOUNT_STATUS' || type === 'PASSWORD_CHANGED') return '/profile';
   if (type === 'WELCOME') return isAdmin ? '/admin/dashboard' : '/';
-  if (type === 'NEW_MESSAGE') return '/messages';
   if (['CLASS_REMINDER', 'REMINDER', 'CLASS_UPDATED'].includes(type)) return '/calendar';
   return null;
 }

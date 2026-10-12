@@ -82,7 +82,6 @@ const NOTIFICATION_STYLES = {
   WELCOME: { icon: 'spark', badge: null, tone: '' },
   ACCOUNT_STATUS: { icon: 'user', badge: null, tone: '' },
   PASSWORD_CHANGED: { icon: 'shield', badge: 'Security', tone: 'badge-warning' },
-  NEW_MESSAGE: { icon: 'mail', badge: 'Message', tone: 'badge-success' },
   ANNOUNCEMENT: { icon: 'chat', badge: null, tone: '' },
 };
 
@@ -165,13 +164,6 @@ function MemberNavbar() {
   useEffect(() => {
     setIsNotifOpen(false);
   }, [location.pathname]);
-
-  // a chat was read or sent - the bell catches up
-  useEffect(() => {
-    if (!isLoggedIn) return undefined;
-    window.addEventListener('brilliant:messages-changed', loadNotifications);
-    return () => window.removeEventListener('brilliant:messages-changed', loadNotifications);
-  }, [isLoggedIn, loadNotifications]);
 
   // check again every minute
   useEffect(() => {

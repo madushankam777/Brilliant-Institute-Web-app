@@ -9,7 +9,6 @@ const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const { CHECKIN_CODE_VALID_MINUTES } = require('./attendance.constants');
 const repository = require('./attendance.repository');
 
-// only the class's own tutor (or an admin) may manage its attendance
 async function assertTutorOwnsClass(tutorUser, classRow) {
   if (!classRow) {
     throw ApiError.notFound('Class not found.');
@@ -20,7 +19,6 @@ async function assertTutorOwnsClass(tutorUser, classRow) {
   }
 }
 
-// class picker list - own classes for a tutor, every class for admin
 async function getMyTaughtClasses(user) {
   const rows =
     user.role === ROLES.ADMIN
@@ -29,7 +27,6 @@ async function getMyTaughtClasses(user) {
   return rows.map(toSafeClass);
 }
 
-// the sessions of a class, for its tutor
 async function listClassSessions(tutorUser, classId) {
   const classRow = await repository.findClassById(classId);
   await assertTutorOwnsClass(tutorUser, classRow);
@@ -37,7 +34,6 @@ async function listClassSessions(tutorUser, classId) {
   return { classSubject: classRow.subject, sessions };
 }
 
-// local date (toISOString gives the UTC date)
 function todayDateString() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -45,7 +41,6 @@ function todayDateString() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-// mark attendance btn - find or make today's session
 async function getOrCreateTodaySession(tutorUser, classId) {
   const classRow = await repository.findClassById(classId);
   await assertTutorOwnsClass(tutorUser, classRow);
@@ -53,7 +48,6 @@ async function getOrCreateTodaySession(tutorUser, classId) {
     throw ApiError.badRequest('This class has been cancelled.');
   }
 
-  // use today's session if it exists, else make it from the class timetable
   const today = todayDateString();
   const existing = await repository.findSessionByClassAndDate(classId, today);
   if (existing) {
@@ -69,21 +63,18 @@ async function getOrCreateTodaySession(tutorUser, classId) {
   return { sessionId };
 }
 
-// make a random 6-digit key, e.g. "042371"
 function generateCheckinCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 }
 
 // generate key btn
 async function startSelfCheckIn(tutorUser, sessionId) {
-  // find the session and check the tutor owns its class
   const session = await repository.findSessionWithClass(sessionId);
   if (!session) {
     throw ApiError.notFound('Class session not found.');
   }
   await assertTutorOwnsClass(tutorUser, { tutor_id: session.tutor_id });
 
-  // regenerate on the rare chance another live session already has this code
   let code = generateCheckinCode();
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const clash = await repository.findSessionByActiveCheckinCode(code);
@@ -91,11 +82,9 @@ async function startSelfCheckIn(tutorUser, sessionId) {
     code = generateCheckinCode();
   }
 
-  // the key stops working after CHECKIN_CODE_VALID_MINUTES
   const expiresAt = new Date(Date.now() + CHECKIN_CODE_VALID_MINUTES * 60 * 1000);
   await repository.setSessionCheckinCode(sessionId, code, expiresAt);
 
-  // audit log - check-in opened
   await recordAuditEvent({
     actorId: tutorUser.id,
     action: 'ATTENDANCE_CHECKIN_OPENED',
@@ -108,26 +97,22 @@ async function startSelfCheckIn(tutorUser, sessionId) {
 
 // student enters the key the tutor read out / displayed
 async function selfCheckIn(studentUser, code) {
-  // find the live session this key belongs to
   const session = await repository.findSessionByActiveCheckinCode(code);
   if (!session) {
     throw ApiError.badRequest('That key is invalid or has expired. Ask your tutor for the current key.');
   }
 
-  // only students enrolled in that class may check in
   const enrolledStudents = await repository.listActiveStudentsForClass(session.class_id);
   const isEnrolled = enrolledStudents.some((student) => student.student_id === studentUser.id);
   if (!isEnrolled) {
     throw ApiError.forbidden('You can only check in to a class you are enrolled in.');
   }
 
-  // already present or late? then just say so
   const existing = await repository.findAttendanceRecord(session.id, studentUser.id);
   if (existing && existing.status !== 'ABSENT') {
     return { alreadyCheckedIn: true, subject: session.subject };
   }
 
-  // marked absent, but here with the live key - they did come, so mark them present
   if (existing) {
     await repository.updateAttendanceRecord(existing.id, {
       status: 'PRESENT',
@@ -144,7 +129,6 @@ async function selfCheckIn(studentUser, code) {
     return { alreadyCheckedIn: false, subject: session.subject };
   }
 
-  // mark the student PRESENT
   await repository.createAttendanceRecord({
     sessionId: session.id,
     studentId: studentUser.id,
@@ -153,7 +137,6 @@ async function selfCheckIn(studentUser, code) {
     markedBy: studentUser.id,
   });
 
-  // audit log - checked in with a key
   await recordAuditEvent({
     actorId: studentUser.id,
     action: 'ATTENDANCE_CODE_CHECKIN',
@@ -164,7 +147,7 @@ async function selfCheckIn(studentUser, code) {
   return { alreadyCheckedIn: false, subject: session.subject };
 }
 
-// the sheet - every enrolled student with their mark for this session (null = not marked yet)
+// the sheet - every enrolled student with their mark for this session
 async function getAttendanceSheet(tutorUser, sessionId) {
   const session = await repository.findSessionWithClass(sessionId);
   if (!session) {
@@ -172,17 +155,14 @@ async function getAttendanceSheet(tutorUser, sessionId) {
   }
   await assertTutorOwnsClass(tutorUser, { tutor_id: session.tutor_id });
 
-  // who is enrolled and what is already marked
   const students = await repository.listActiveStudentsForClass(session.class_id);
   const existingRecords = await repository.listAttendanceForSession(sessionId);
 
-  // marks by student, for quick lookup
   const recordsByStudentId = new Map();
   existingRecords.forEach((record) => {
     recordsByStudentId.set(record.student_id, record);
   });
 
-  // one row per student
   const sheetRows = students.map((student) => {
     const existing = recordsByStudentId.get(student.student_id);
     return {
@@ -223,7 +203,6 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     throw ApiError.badRequest('No attendance entries were provided.');
   }
 
-  // only enrolled students can be marked
   const enrolledStudents = await repository.listActiveStudentsForClass(session.class_id);
   const enrolledStudentIds = new Set(enrolledStudents.map((student) => student.student_id));
   const hasUnenrolledStudent = records.some((record) => !enrolledStudentIds.has(record.studentId));
@@ -231,17 +210,14 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     throw ApiError.badRequest('One or more students are not enrolled in this class.');
   }
 
-  // save each mark - new ones are created, existing ones are corrected and audited
   let createdCount = 0;
   let updatedCount = 0;
-  // students to tell: newly marked absent, or an absent mark that was corrected
   const markedAbsent = [];
   const absenceCorrected = [];
 
   for (const record of records) {
     const existing = await repository.findAttendanceRecord(sessionId, record.studentId);
 
-    // nothing changed for this student - leave the record (and the audit log) alone
     if (
       existing &&
       existing.status === record.status &&
@@ -280,7 +256,6 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     }
   }
 
-  // audit log - one entry for the whole sheet (only when something changed)
   if (createdCount + updatedCount > 0) await recordAuditEvent({
     actorId: tutorUser.id,
     action: 'ATTENDANCE_MARKED',
@@ -289,7 +264,6 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
     details: { createdCount, updatedCount },
   });
 
-  // tell the students (bell and email) - a mail problem never stops the save
   const day = new Date(`${String(session.session_date).slice(0, 10)}T00:00:00`).toLocaleDateString('en-GB', {
     weekday: 'short',
     day: 'numeric',
@@ -319,7 +293,6 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
   return getAttendanceSheet(tutorUser, sessionId);
 }
 
-// attendance rate per class, flagged when under the low-attendance limit (80% by default)
 function withLowAttendanceFlag(summaryRows) {
   const threshold = config.business.lowAttendanceThresholdPercent;
   return summaryRows.map((row) => {
@@ -338,7 +311,6 @@ function withLowAttendanceFlag(summaryRows) {
   });
 }
 
-// student view - every mark plus the rate per class
 async function getMyAttendanceHistory(studentUser, classId) {
   const history = await repository.listAttendanceHistoryForStudent(studentUser.id, classId);
   const summary = await repository.getAttendanceSummaryByClass(studentUser.id);
@@ -348,7 +320,6 @@ async function getMyAttendanceHistory(studentUser, classId) {
   };
 }
 
-// tutor view - one student's marks in one class
 async function getStudentAttendanceHistoryForTutor(tutorUser, studentId, classId) {
   if (!classId) {
     throw ApiError.badRequest('A classId is required to view a specific student record.');

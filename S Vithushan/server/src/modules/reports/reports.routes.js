@@ -6,7 +6,7 @@ const validateRequest = require('../../../../../shared/server/src/middleware/val
 const { reportLimiter } = require('../../../../../shared/server/src/middleware/rateLimiters');
 const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const controller = require('./reports.controller');
-const { reportTypeRules, reportQueryRules } = require('./reports.validation');
+const { reportTypeRules, reportQueryRules, historyIdRules } = require('./reports.validation');
 
 const router = express.Router();
 
@@ -19,6 +19,10 @@ router.get('/', controller.listReports);
 router.get('/options', controller.getOptions);
 // recent reports (read from the audit log)
 router.get('/history', controller.getHistory);
+// delete all btn - clears the recent reports list
+router.post('/history/clear', controller.clearHistory);
+// delete btn - removes one recent report
+router.delete('/history/:id', historyIdRules, validateRequest, controller.removeHistoryEntry);
 // generate btn - build the report and show it on screen (60 reports per 10 minutes)
 router.get('/:type', reportLimiter, reportTypeRules, reportQueryRules, validateRequest, controller.generateReport);
 // download PDF btn

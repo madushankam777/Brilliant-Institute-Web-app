@@ -1,12 +1,10 @@
-// payment simulator - used when PayHere is not set up (no real money moves)
+// payment simulator
 const { randomUUID } = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 
-// test cards, like a real gateway's sandbox - every other card and every amount is approved
 const DECLINED_CARD_LAST4 = '0002';
 const TIMEOUT_CARD_LAST4 = '0119';
 
-// the stored payment details may come back from MySQL as text
 function detailsOf(paymentDetails) {
   if (!paymentDetails) return {};
   if (typeof paymentDetails === 'string') {
@@ -19,9 +17,8 @@ function detailsOf(paymentDetails) {
   return paymentDetails;
 }
 
-// pretend to charge - a card ending 0002 is declined, one ending 0119 times out, the rest are approved
+// pretend to charge
 async function chargePaymentToken({ amount, paymentMethod, paymentDetails }) {
-  // a fake transaction id
   const gatewayTransactionId = `${config.paymentGateway.providerName}_${randomUUID()}`;
 
   if (!(amount > 0)) {

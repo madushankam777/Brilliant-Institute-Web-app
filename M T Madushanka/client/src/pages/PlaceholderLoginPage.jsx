@@ -15,7 +15,6 @@ function PlaceholderLoginPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // login btn - sign in, then go to the dashboard
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -44,7 +43,6 @@ function PlaceholderLoginPage() {
 
       {error && <Alert type="error" message={error} />}
 
-      {/* login form - email, password and the forgot password link */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="email"

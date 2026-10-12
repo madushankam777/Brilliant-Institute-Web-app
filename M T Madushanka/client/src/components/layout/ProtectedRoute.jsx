@@ -1,9 +1,9 @@
-// Frontend route guard 
+// Frontend route guard
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import LoadingSpinner from '../../../../../shared/client/src/components/common/LoadingSpinner';
 
-// route guard - waits for the session check, sends visitors to login, and keeps other roles out
+// route guard - waits for the session check
 function ProtectedRoute({ allowedRoles }) {
   const { isLoggedIn, isCheckingSession, user } = useAuth();
   const location = useLocation();

@@ -9,8 +9,11 @@ import {
   downloadReportPdf,
   downloadReportExcel,
   downloadReportZip,
+  deleteReportHistory,
+  clearReportHistory,
 } from '../../api/reportsApi';
 import Alert from '../../../../shared/client/src/components/common/Alert';
+import ConfirmDialog from '../../../../shared/client/src/components/common/ConfirmDialog';
 import Icon from '../../../../shared/client/src/components/common/Icon';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import PortalShell from '../../../../shared/client/src/components/layout/PortalShell';
@@ -73,6 +76,9 @@ function ReportsPage() {
   const [options, setOptions] = useState(null);
   const [history, setHistory] = useState([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  // the recent report being deleted ('all' for delete all)
+  const [toDelete, setToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -238,6 +244,24 @@ function ReportsPage() {
       captureError(error);
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  // delete / delete all btn - removes recent reports from the list
+  async function removeHistory() {
+    setNotice('');
+    clearErrors();
+    setIsDeleting(true);
+    try {
+      const message = toDelete === 'all' ? await clearReportHistory() : await deleteReportHistory(toDelete.id);
+      setNotice(message);
+      setToDelete(null);
+      loadHistory();
+    } catch (error) {
+      setToDelete(null);
+      captureError(error);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -434,7 +458,8 @@ function ReportsPage() {
                           error={fieldErrors.tutorId}
                           onChange={changeFilter}
                           allLabel="All tutors"
-                          options={(options?.tutors || []).map((item) => ({ value: item.id, label: item.name }))}
+                          searchable
+                          options={(options?.tutors || []).map((item) => ({ value: item.id, label: item.name, search: `${item.name} ${item.email || ''}` }))}
                         />
                       )}
                       {/* student filter */}
@@ -446,8 +471,10 @@ function ReportsPage() {
                           error={fieldErrors.studentId}
                           onChange={changeFilter}
                           allLabel="All students"
+                          searchable
                           options={(options?.students || []).map((item) => ({
                             value: item.id,
+                            search: `${item.name} ${item.code || ''} ${item.email || ''} ${item.grade || ''}`,
                             label: `${item.name}${item.code ? ` (${item.code})` : ''}`,
                           }))}
                         />
@@ -461,8 +488,10 @@ function ReportsPage() {
                           error={fieldErrors.userId}
                           onChange={changeFilter}
                           allLabel="Everyone"
+                          searchable
                           options={(options?.people || []).map((item) => ({
                             value: item.id,
+                            search: `${item.name} ${item.email || ''} ${ROLE_NAMES[item.role] || item.role}`,
                             label: `${item.name} (${ROLE_NAMES[item.role] || item.role})`,
                           }))}
                         />
@@ -578,9 +607,17 @@ function ReportsPage() {
               <div className="card">
                 <div className="flex-between">
                   <h2 style={{ margin: 0 }}>Recent reports</h2>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={loadHistory}>
-                    <Icon name="refresh" size={15} /> Refresh
-                  </button>
+                  <div className="report-history-actions">
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={loadHistory}>
+                      <Icon name="refresh" size={15} /> Refresh
+                    </button>
+                    {/* delete all btn */}
+                    {history.length > 0 && (
+                      <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setToDelete('all')}>
+                        <Icon name="trash" size={15} /> Delete all
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {/* an empty message, or the recent reports table */}
                 {history.length === 0 ? (
@@ -616,28 +653,41 @@ function ReportsPage() {
                               </span>
                             </td>
                             <td>
-                              {catalog.some((item) => item.type === entry.type) && (
-                                <div className="report-history-actions">
-                                  <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => reopen(entry)}>
-                                    Open
-                                  </button>
-                                  {entry.format === 'zip' && (
-                                    <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => downloadZip(entry.query, entry.type)}>
-                                      ZIP
+                              <div className="report-history-actions">
+                                {catalog.some((item) => item.type === entry.type) && (
+                                  <>
+                                    <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => reopen(entry)}>
+                                      Open
                                     </button>
-                                  )}
-                                  {entry.format === 'xlsx' && (
-                                    <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => downloadExcel(entry.query, entry.type)}>
-                                      Excel
-                                    </button>
-                                  )}
-                                  {entry.format !== 'zip' && entry.format !== 'xlsx' && (
-                                    <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => downloadPdf(entry.query, entry.type)}>
-                                      PDF
-                                    </button>
-                                  )}
-                                </div>
-                              )}
+                                    {entry.format === 'zip' && (
+                                      <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => downloadZip(entry.query, entry.type)}>
+                                        ZIP
+                                      </button>
+                                    )}
+                                    {entry.format === 'xlsx' && (
+                                      <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => downloadExcel(entry.query, entry.type)}>
+                                        Excel
+                                      </button>
+                                    )}
+                                    {entry.format !== 'zip' && entry.format !== 'xlsx' && (
+                                      <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => downloadPdf(entry.query, entry.type)}>
+                                        PDF
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                                {/* delete btn */}
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  disabled={busy}
+                                  onClick={() => setToDelete(entry)}
+                                  aria-label={`Delete ${entry.title} from recent reports`}
+                                  title="Delete from the list"
+                                >
+                                  <Icon name="trash" size={15} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -655,16 +705,59 @@ function ReportsPage() {
             </div>
           </div>
         )}
+
+        {/* are you sure? (deleting recent reports) */}
+        {toDelete && (
+          <ConfirmDialog
+            title={toDelete === 'all' ? 'Delete all recent reports?' : 'Delete this report from the list?'}
+            text={
+              toDelete === 'all'
+                ? 'Every report is removed from the Recent reports list. Reports can still be generated again at any time.'
+                : `${toDelete.title} is removed from the Recent reports list. You can generate it again at any time.`
+            }
+            confirmLabel={toDelete === 'all' ? 'Delete all' : 'Delete'}
+            isBusy={isDeleting}
+            onConfirm={removeHistory}
+            onCancel={() => setToDelete(null)}
+          />
+        )}
       </div>
     </PortalShell>
   );
 }
 
-// dropdown filter with an "all" choice
-function FilterSelect({ id, label, value, error, onChange, options, allLabel }) {
+// dropdown filter with an "all" choice (searchable ones get a search box above the list)
+function FilterSelect({ id, label, value, error, onChange, options, allLabel, searchable = false }) {
+  const [search, setSearch] = useState('');
+  const words = search.trim().toLowerCase();
+  // options whose name, code or email has the search words
+  const matches = words ? options.filter((item) => (item.search || item.label).toLowerCase().includes(words)) : options;
+  // the chosen one stays in the list even when it does not match
+  const shown = words ? options.filter((item) => matches.includes(item) || String(item.value) === String(value)) : options;
+
+  // search box - picks the person straight away when only one matches
+  function changeSearch(text) {
+    setSearch(text);
+    const typed = text.trim().toLowerCase();
+    if (!typed) return;
+    const found = options.filter((item) => (item.search || item.label).toLowerCase().includes(typed));
+    if (found.length === 1 && String(found[0].value) !== String(value)) onChange(id, String(found[0].value));
+  }
+
   return (
     <div className="form-field">
       <label htmlFor={`report-${id}`}>{label}</label>
+      {searchable && (
+        <input
+          type="search"
+          className="report-filter-search"
+          value={search}
+          onChange={(e) => changeSearch(e.target.value)}
+          placeholder="Search name, code or email"
+          aria-label={`Search ${label.toLowerCase()}`}
+          aria-controls={`report-${id}`}
+        />
+      )}
       <select
         id={`report-${id}`}
         value={value || ''}
@@ -673,12 +766,18 @@ function FilterSelect({ id, label, value, error, onChange, options, allLabel }) 
         aria-describedby={error ? `report-${id}-error` : undefined}
       >
         {allLabel && <option value="">{allLabel}</option>}
-        {options.map((item) => (
+        {shown.map((item) => (
           <option key={item.value} value={item.value}>
             {item.label}
           </option>
         ))}
       </select>
+      {/* how many match the search */}
+      {searchable && words && (
+        <p className="report-filter-count" aria-live="polite">
+          {matches.length === 0 ? 'No one matches that search.' : `${matches.length} match${matches.length === 1 ? '' : 'es'}`}
+        </p>
+      )}
       {error && <p className="field-error" id={`report-${id}-error`}>{error}</p>}
     </div>
   );

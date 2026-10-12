@@ -3,12 +3,9 @@ const crypto = require('crypto');
 const config = require('../../../shared/server/src/config/env');
 const payhere = require('../src/modules/payment/payhereGateway');
 
-// PayHere signs with upper-case md5
 const md5Upper = (value) => crypto.createHash('md5').update(String(value)).digest('hex').toUpperCase();
 
-// how many self-tests failed
 let failures = 0;
-// print PASS or FAIL for one self-test
 function check(label, actual, expected) {
   const ok = actual === expected;
   if (!ok) failures += 1;
@@ -16,10 +13,8 @@ function check(label, actual, expected) {
   if (!ok) console.log(`          expected: ${expected}\n          actual:   ${actual}`);
 }
 
-// show the PayHere settings in use
 console.log('\nPayHere configuration');
 console.log('---------------------');
-// PayHere is not set up - say how to switch it on, then stop
 if (!payhere.isConfigured()) {
   console.log('  Online payments are OFF - the app will use the built-in simulator.');
   console.log('  To switch them on, set these in server/.env:');
@@ -32,16 +27,13 @@ console.log(`  Merchant ID:   ${config.payhere.merchantId}`);
 console.log(`  Currency:      ${config.payhere.currency}`);
 console.log(`  Public URL:    ${config.payhere.publicBaseUrl}`);
 console.log(`  Notify URL:    ${payhere.notifyUrl()}`);
-// reminder - the public address must be reachable and registered with PayHere
 console.log('\n  The Public URL must be reachable from the internet and must match a');
 console.log('  domain you added under PayHere -> Settings -> Domains & Credentials,');
 console.log('  otherwise PayHere rejects the checkout as an unauthorised request.');
 
-// signing self-test - the checkout hash and the incoming payment notices
 console.log('\nSigning self-test');
 console.log('-----------------');
 
-// build a sample checkout request
 const checkout = payhere.buildCheckoutRequest({
   paymentId: 1,
   amount: 1500.5,
@@ -49,13 +41,11 @@ const checkout = payhere.buildCheckoutRequest({
   student: { fullName: 'Test Student', email: 'test@example.com', phone: '0771234567' },
 });
 
-// the amount must have exactly two decimals
 check(
   'amount is sent with exactly two decimals',
   checkout.fields.amount,
   '1500.50'
 );
-// the checkout hash must follow PayHere's formula
 check(
   'checkout hash matches PayHere formula',
   checkout.fields.hash,
@@ -68,7 +58,6 @@ check(
   )
 );
 
-// a sample payment notice from PayHere, signed with our secret
 const signedBody = {
   merchant_id: config.payhere.merchantId,
   order_id: 'BI-1',
@@ -87,15 +76,12 @@ signedBody.md5sig = md5Upper(
     md5Upper(config.payhere.merchantSecret)
 );
 
-// a correctly signed notice must be accepted
 check('a correctly signed notification is accepted', payhere.verifyNotification(signedBody).valid, true);
-// a notice with a changed amount must be rejected
 check(
   'a notification with a tampered amount is rejected',
   payhere.verifyNotification({ ...signedBody, payhere_amount: '1.00' }).valid,
   false
 );
-// an unsigned notice must be rejected
 check(
   'an unsigned notification is rejected',
   payhere.verifyNotification({ ...signedBody, md5sig: undefined }).valid,
@@ -113,5 +99,4 @@ if (failures === 0) {
 } else {
   console.log(`\n${failures} check(s) FAILED - do not take real payments until this is fixed.\n`);
 }
-// exit code 0 when everything passed
 process.exit(failures === 0 ? 0 : 1);

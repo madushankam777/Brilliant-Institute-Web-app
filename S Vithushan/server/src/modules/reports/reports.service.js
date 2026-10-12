@@ -5,6 +5,7 @@ const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { recordAuditEvent } = require('../../../../../shared/server/src/utils/auditLogger');
 const { GRADES } = require('../../../../../shared/server/src/config/grades');
 const { zipSync } = require('fflate');
+const { pool } = require('../../../../../shared/server/src/config/db');
 const parts = require('./reportParts');
 const { renderReportPdfInWorker } = require('./reportPdf');
 
@@ -86,10 +87,10 @@ async function getCatalog() {
 // dropdown choices for the report form
 async function getOptions() {
   const tutors = await parts.rows(
-    `SELECT id, full_name, status FROM users WHERE role = 'TUTOR' AND status <> 'DELETED' ORDER BY full_name`
+    `SELECT id, full_name, email, status FROM users WHERE role = 'TUTOR' AND status <> 'DELETED' ORDER BY full_name`
   );
   const students = await parts.rows(
-    `SELECT id, full_name, student_code, grade, status FROM users
+    `SELECT id, full_name, email, student_code, grade, status FROM users
      WHERE role = 'STUDENT_PARENT' AND status <> 'DELETED' ORDER BY full_name`
   );
   const classes = await parts.rows(
@@ -97,13 +98,13 @@ async function getOptions() {
      FROM classes c JOIN users u ON u.id = c.tutor_id ORDER BY c.status, c.subject`
   );
   const people = await parts.rows(
-    `SELECT id, full_name, role FROM users WHERE status <> 'DELETED' ORDER BY FIELD(role, 'ADMIN', 'TUTOR', 'STUDENT_PARENT'), full_name`
+    `SELECT id, full_name, email, role FROM users WHERE status <> 'DELETED' ORDER BY FIELD(role, 'ADMIN', 'TUTOR', 'STUDENT_PARENT'), full_name`
   );
   const year = new Date().getFullYear();
   return {
-    people: people.map((item) => ({ id: item.id, name: item.full_name, role: item.role })),
-    tutors: tutors.map((item) => ({ id: item.id, name: item.full_name, status: item.status })),
-    students: students.map((item) => ({ id: item.id, name: item.full_name, code: item.student_code, grade: item.grade, status: item.status })),
+    people: people.map((item) => ({ id: item.id, name: item.full_name, email: item.email, role: item.role })),
+    tutors: tutors.map((item) => ({ id: item.id, name: item.full_name, email: item.email, status: item.status })),
+    students: students.map((item) => ({ id: item.id, name: item.full_name, email: item.email, code: item.student_code, grade: item.grade, status: item.status })),
     classes: classes.map((item) => ({ id: item.id, subject: item.subject, status: item.status, tutorName: item.tutor_name })),
     grades: GRADES,
     years: [year - 1, year, year + 1],
@@ -184,11 +185,15 @@ async function recordUse(adminUser, report, format) {
 
 // the 40 most recent report runs and downloads, from the audit log
 async function getHistory() {
+  // skip the entries an admin removed from the list
+  const hidden = (await schema.hasReportHistoryHidden())
+    ? 'AND NOT EXISTS (SELECT 1 FROM report_history_hidden h WHERE h.audit_id = a.id)'
+    : '';
   const list = await parts.rows(
     `SELECT a.id, a.action, a.details, a.created_at, u.full_name AS actor_name
      FROM audit_log a
      LEFT JOIN users u ON u.id = a.actor_id
-     WHERE a.action IN ('REPORT_GENERATED', 'REPORT_DOWNLOADED')
+     WHERE a.action IN ('REPORT_GENERATED', 'REPORT_DOWNLOADED') ${hidden}
      ORDER BY a.created_at DESC, a.id DESC
      LIMIT 40`
   );
@@ -214,6 +219,32 @@ async function getHistory() {
       createdAt: item.created_at,
     };
   });
+}
+
+// delete btn - removes report entries from the Recent reports list (all of them when ids is null)
+async function removeHistory(adminUser, ids) {
+  if (!(await schema.hasReportHistoryHidden())) {
+    throw ApiError.badRequest('Deleting recent reports is not available right now.');
+  }
+  const where = ids ? 'AND a.id IN (' + ids.map(() => '?').join(', ') + ')' : '';
+  const [result] = await pool.query(
+    `INSERT IGNORE INTO report_history_hidden (audit_id, hidden_by)
+     SELECT a.id, ? FROM audit_log a
+     WHERE a.action IN ('REPORT_GENERATED', 'REPORT_DOWNLOADED') ${where}`,
+    [adminUser.id, ...(ids || [])]
+  );
+  if (ids && result.affectedRows === 0) {
+    const [found] = await pool.query('SELECT 1 FROM report_history_hidden WHERE audit_id IN (?)', [ids]);
+    if (found.length === 0) throw ApiError.notFound('That report is not in the list.');
+  }
+  await recordAuditEvent({
+    actorId: adminUser.id,
+    action: 'REPORT_HISTORY_REMOVED',
+    entityType: 'report',
+    entityId: null,
+    details: { removed: result.affectedRows, all: !ids },
+  });
+  return result.affectedRows;
 }
 
 // Tutor-Report-RPT-TUT-20261002-1530-4F2A.pdf
@@ -281,4 +312,4 @@ async function buildPeopleZip(type, query, adminUser) {
   return { buffer: Buffer.from(zip), filename: `${label}-Reports-${stamp}.zip`, count: list.length };
 }
 
-module.exports = { REPORT_TYPES, getCatalog, getOptions, buildReport, recordUse, getHistory, pdfFileName, buildPeopleZip };
+module.exports = { REPORT_TYPES, getCatalog, getOptions, buildReport, recordUse, getHistory, removeHistory, pdfFileName, buildPeopleZip };

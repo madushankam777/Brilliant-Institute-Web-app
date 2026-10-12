@@ -2584,6 +2584,11 @@ input[type='number'] {
     align-items: stretch;
   }
 
+  /* text only as tall as it needs */
+  .cookie-consent-banner p {
+    flex: none;
+  }
+
   .cookie-consent-actions {
     margin-left: 0;
   }
@@ -4741,6 +4746,23 @@ input.switch:focus-visible {
 .report-history-actions {
   display: inline-flex;
   gap: 6px;
+}
+
+/* search box above a report picker */
+.form-field input.report-filter-search {
+  margin-bottom: 6px;
+}
+
+/* how many people match the search */
+.report-filter-count {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+/* recent reports title row - buttons wrap on phones */
+.report-history-actions {
+  flex-wrap: wrap;
 }
 
 /* keep a table cell on one line */

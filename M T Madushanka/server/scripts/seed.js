@@ -3,17 +3,14 @@ const bcrypt = require('bcryptjs');
 const config = require('../../../shared/server/src/config/env');
 const { pool } = require('../../../shared/server/src/config/db');
 
-// password for every demo account (SEED_DEMO_PASSWORD overrides it)
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Demo@1234';
 
-// create the demo user if the email is new, else reuse it
 async function upsertDemoUser({ fullName, email, role }) {
   const [existingRows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
   if (existingRows[0]) {
     return existingRows[0].id;
   }
 
-  // the demo password is saved hashed, like any other
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, config.auth.bcryptSaltRounds);
   const [result] = await pool.execute(
     `INSERT INTO users (full_name, email, password_hash, role, status, created_at)
@@ -23,7 +20,6 @@ async function upsertDemoUser({ fullName, email, role }) {
   return result.insertId;
 }
 
-// create the demo Saturday maths class if it does not exist
 async function upsertDemoClass(tutorId) {
   const [existingRows] = await pool.execute(
     "SELECT id FROM classes WHERE subject = 'Combined Mathematics (Demo)' AND tutor_id = ?",
@@ -41,7 +37,6 @@ async function upsertDemoClass(tutorId) {
   return result.insertId;
 }
 
-// create two demo sessions - last week and today
 async function upsertDemoSessions(classId) {
   const [existingRows] = await pool.execute(
     'SELECT id FROM class_sessions WHERE class_id = ?',
@@ -59,7 +54,6 @@ async function upsertDemoSessions(classId) {
   );
 }
 
-// enrol the demo student in the demo class
 async function upsertDemoEnrollment(studentId, classId) {
   const [existingRows] = await pool.execute(
     'SELECT id FROM enrollments WHERE student_id = ? AND class_id = ?',
@@ -102,7 +96,6 @@ async function run() {
   process.exit(0);
 }
 
-// run it, and exit with an error code if it fails
 run().catch((error) => {
   console.error('[seed] Failed:', error);
   process.exit(1);

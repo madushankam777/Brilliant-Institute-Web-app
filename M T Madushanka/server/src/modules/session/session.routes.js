@@ -1,4 +1,4 @@
-// placeholder login for this module's standalone app (the combined site uses the auth module instead)
+// placeholder login for this module's standalone app
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../../../../../shared/server/src/config/db');
@@ -14,16 +14,11 @@ const bcrypt = require('bcryptjs');
 
 const router = express.Router();
 
-
-// a fake hash, so a wrong email takes as long to check as a wrong password
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
 
-// Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
-// Digits plus the punctuation real phone numbers are written with.
 const PHONE_REGEX = /^[0-9+\-\s()]+$/;
 
-// start a session - a signed token in an httpOnly cookie
 function issueSessionCookie(res, user) {
   const token = jwt.sign({ sub: user.id, role: user.role }, config.auth.jwtSecret, {
     algorithm: 'HS256',
@@ -37,8 +32,7 @@ function issueSessionCookie(res, user) {
   });
 }
 
-
-// register btn - Student/Parent, or Tutor with an Admin-issued enrollment key
+// register btn
 router.post(
   '/register',
   authLimiter,
@@ -46,7 +40,6 @@ router.post(
     const { fullName, email, phone, password, grade, role, enrollmentKey } = req.body;
     const targetRole = role === 'TUTOR' ? 'TUTOR' : 'STUDENT_PARENT';
 
-    // check each field - name, phone, email, password and grade
     const trimmedFullName = String(fullName || '').trim();
     if (trimmedFullName.length < 2 || trimmedFullName.length > 150) {
       throw ApiError.badRequest('Full name must be between 2 and 150 characters.');
@@ -69,7 +62,6 @@ router.post(
       throw ApiError.badRequest('Please select your grade.');
     }
 
-    // tutor sign-up needs a one-time key an Admin generated for them
     let tutorKey = null;
     if (targetRole === 'TUTOR') {
       const normalizedKey = String(enrollmentKey || '').trim().toUpperCase();
@@ -90,13 +82,11 @@ router.post(
       }
     }
 
-    // no two accounts with the same email
     const [existingRows] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
     if (existingRows[0]) {
       throw ApiError.conflict('An account with this email already exists. Try logging in instead.');
     }
 
-    // save the account with a hashed password
     const passwordHash = await bcrypt.hash(password, config.auth.bcryptSaltRounds);
     const [result] = await pool.execute(
       `INSERT INTO users (full_name, email, password_hash, phone, role, grade, status, created_at)
@@ -105,13 +95,11 @@ router.post(
     );
     const userId = result.insertId;
 
-    // students get their ST code
     if (targetRole === 'STUDENT_PARENT') {
       const studentCode = `ST${String(userId).padStart(7, '0')}`;
       await pool.execute('UPDATE users SET student_code = ? WHERE id = ?', [studentCode, userId]);
     }
 
-    // tutor key used - tie it to the new account
     if (tutorKey) {
       await pool.execute(
         `UPDATE tutor_enrollment_keys SET status = 'USED', used_by = ?, used_at = NOW() WHERE id = ?`,
@@ -119,7 +107,6 @@ router.post(
       );
     }
 
-    // audit log - who registered
     await recordAuditEvent({
       actorId: userId,
       action: targetRole === 'TUTOR' ? 'TUTOR_REGISTERED' : 'USER_REGISTERED',
@@ -133,7 +120,6 @@ router.post(
     );
     const user = rows[0];
 
-    // log the new user in straight away
     issueSessionCookie(res, user);
     res.status(201).json({
       success: true,
@@ -143,13 +129,12 @@ router.post(
   })
 );
 
-// login btn - check email and password, lock the account after too many wrong tries
+// login btn - check email and password
 router.post(
   '/login',
   authLimiter,
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    // find the account by email
     const [rows] = await pool.execute(
       `SELECT id, full_name, email, password_hash, role, status,
               failed_login_attempts, locked_until
@@ -158,24 +143,20 @@ router.post(
     );
     const user = rows[0];
 
-    // same error for "no such user" and "wrong password" - don't leak which emails exist
     const genericError = 'Invalid email or password.';
     const isAccountUsable = Boolean(user) && user.status === 'ACTIVE';
 
-    // stop if the account is still locked
     if (isAccountUsable && user.locked_until && new Date(user.locked_until) > new Date()) {
       throw ApiError.tooMany(
         'This account is temporarily locked due to repeated failed logins. Please try again later.'
       );
     }
 
-    // check the password
     const passwordMatches = await bcrypt.compare(
       password || '',
       isAccountUsable ? user.password_hash : DUMMY_PASSWORD_HASH
     );
 
-    // wrong password - count the failure and lock the account after too many
     if (!isAccountUsable || !passwordMatches) {
       if (user) {
         const attempts = (user.failed_login_attempts || 0) + 1;
@@ -197,7 +178,6 @@ router.post(
       throw new ApiError(401, genericError);
     }
 
-    // right password - clear the failed tries
     await pool.execute(
       `UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = NOW()
        WHERE id = ?`,
@@ -210,7 +190,6 @@ router.post(
       entityId: user.id,
     });
 
-    // start the session
     issueSessionCookie(res, user);
     res.status(200).json({
       success: true,
@@ -219,7 +198,6 @@ router.post(
   })
 );
 
-// logout btn - remove the session cookie
 router.post('/logout', (req, res) => {
   res.clearCookie(SESSION_COOKIE_NAME);
   res.status(200).json({ success: true, message: 'Logged out.' });
@@ -229,11 +207,9 @@ router.post('/logout', (req, res) => {
 router.get(
   '/me',
   asyncHandler(async (req, res) => {
-    // read the session token
     const token = req.cookies[SESSION_COOKIE_NAME];
     if (!token) throw new ApiError(401, 'Not logged in.');
 
-    // check the token signature and expiry
     let payload;
     try {
       payload = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] });
@@ -241,7 +217,6 @@ router.get(
       throw new ApiError(401, 'Session expired.');
     }
 
-    // load the account - it must still be active
     const [rows] = await pool.execute(
       'SELECT id, full_name, email, role, status FROM users WHERE id = ?',
       [payload.sub]

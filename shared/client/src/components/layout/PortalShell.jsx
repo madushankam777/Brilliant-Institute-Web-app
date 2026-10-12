@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import httpClient from '../../api/httpClient';
+import { isInFinalGrade } from '../../utils/currentStudent';
 import Icon from '../common/Icon';
 
 // overflow nav items go behind a "More" tab on mobile
@@ -9,7 +10,7 @@ const MAX_VISIBLE_TABS = 4;
 // check the badges every minute
 const BADGE_POLL_MS = 60 * 1000;
 // where each badge number comes from
-const BADGE_SOURCES = { messages: '/messages/unread-count', feedback: '/feedback/unread-count' };
+const BADGE_SOURCES = { feedback: '/feedback/unread-count' };
 
 // the small number on a menu item, e.g. unread chats
 function NavBadge({ count }) {
@@ -22,7 +23,9 @@ function NavBadge({ count }) {
 }
 
 // portal shell - the page frame for logged-in users
-function PortalShell({ navItems, children }) {
+function PortalShell({ navItems: allNavItems, children }) {
+  // A/L students have nothing to re-register for
+  const navItems = allNavItems.filter((item) => !(item.notForFinalGrade && isInFinalGrade()));
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [badges, setBadges] = useState({});
   const moreRef = useRef(null);
@@ -50,13 +53,11 @@ function PortalShell({ navItems, children }) {
     }
     loadBadges();
     const timer = setInterval(loadBadges, BADGE_POLL_MS);
-    window.addEventListener('brilliant:messages-changed', loadBadges);
     window.addEventListener('brilliant:feedback-changed', loadBadges);
     window.addEventListener('focus', loadBadges);
     return () => {
       isCurrent = false;
       clearInterval(timer);
-      window.removeEventListener('brilliant:messages-changed', loadBadges);
       window.removeEventListener('brilliant:feedback-changed', loadBadges);
       window.removeEventListener('focus', loadBadges);
     };

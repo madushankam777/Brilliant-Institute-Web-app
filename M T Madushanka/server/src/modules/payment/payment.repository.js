@@ -1,9 +1,8 @@
-// payment queries - balances, payments, receipts, bank details, tutor payouts and settings
+// payment queries
 const { pool } = require('../../../../../shared/server/src/config/db');
 const notifications = require('../../../../../shared/server/src/utils/notifications');
 const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 
-// one enrolment (a student in a class) with its balance and subject
 async function findEnrollmentById(enrollmentId, executor = pool) {
   const [rows] = await executor.execute(
     `SELECT e.id, e.student_id, e.class_id, e.balance, e.status, c.subject
@@ -16,7 +15,6 @@ async function findEnrollmentById(enrollmentId, executor = pool) {
   return rows[0] || null;
 }
 
-// the same, but locked until the transaction ends so two payments cannot change the balance together
 async function findEnrollmentByIdForUpdate(enrollmentId, connection) {
   const [rows] = await connection.execute(
     `SELECT e.id, e.student_id, e.class_id, e.balance, e.status, c.subject
@@ -29,9 +27,7 @@ async function findEnrollmentByIdForUpdate(enrollmentId, connection) {
   return rows[0] || null;
 }
 
-// what a student still owes on each active class
 async function listBalancesForStudent(studentId, executor = pool) {
-  // the pay-by time only exists after the database update
   const dueColumn = (await schema.hasPaymentDeadlines()) ? 'e.payment_due_at' : 'NULL';
   const [rows] = await executor.execute(
     `SELECT e.id AS enrollment_id, e.class_id, c.subject, e.balance, e.payment_status,
@@ -46,7 +42,6 @@ async function listBalancesForStudent(studentId, executor = pool) {
   return rows;
 }
 
-// update balance after payment (marks as paid)
 async function updateEnrollmentBalance(enrollmentId, newBalance, executor = pool) {
   await executor.execute(
     `UPDATE enrollments SET balance = ?, payment_status = IF(? <= 0, 'PAID', 'UNPAID') WHERE id = ?`,
@@ -54,7 +49,6 @@ async function updateEnrollmentBalance(enrollmentId, newBalance, executor = pool
   );
 }
 
-// save a new payment as PENDING (the balance is unchanged until it succeeds)
 async function createPendingPayment(
   { studentId, enrollmentId, amount, balanceBefore, paymentMethod, paymentDetails },
   executor = pool
@@ -77,7 +71,6 @@ async function createPendingPayment(
   return result.insertId;
 }
 
-// mark a payment SUCCESSFUL with its gateway id, the balance after and the paid time
 async function markPaymentSuccessful(
   paymentId,
   { gatewayTransactionId, balanceAfter },
@@ -91,7 +84,6 @@ async function markPaymentSuccessful(
   );
 }
 
-// approve slip - uses the amount admin read off the slip
 async function approveBankTransfer(
   paymentId,
   { amount, balanceBefore, balanceAfter, gatewayTransactionId, paymentDetails },
@@ -106,7 +98,6 @@ async function approveBankTransfer(
   );
 }
 
-// mark a payment FAILED
 async function markPaymentFailed(paymentId, { gatewayTransactionId }, executor = pool) {
   await executor.execute(
     `UPDATE payments SET status = 'FAILED', gateway_transaction_id = ? WHERE id = ?`,
@@ -114,7 +105,6 @@ async function markPaymentFailed(paymentId, { gatewayTransactionId }, executor =
   );
 }
 
-// edit btn - update a pending bank transfer's reference/receipt
 async function updatePaymentDetails(paymentId, paymentDetails, executor = pool) {
   await executor.execute(`UPDATE payments SET payment_details = ? WHERE id = ?`, [
     JSON.stringify(paymentDetails),
@@ -122,7 +112,6 @@ async function updatePaymentDetails(paymentId, paymentDetails, executor = pool) 
   ]);
 }
 
-// save the method the payer actually used
 async function updatePaymentMethodAndDetails(
   paymentId,
   { paymentMethod, paymentDetails },
@@ -134,7 +123,6 @@ async function updatePaymentMethodAndDetails(
   );
 }
 
-// save the receipt number for a payment
 async function createReceipt(paymentId, receiptNumber, executor = pool) {
   await executor.execute(
     `INSERT INTO receipts (payment_id, receipt_number, issued_at) VALUES (?, ?, NOW())`,
@@ -142,7 +130,6 @@ async function createReceipt(paymentId, receiptNumber, executor = pool) {
   );
 }
 
-// one payment by id
 async function findPaymentById(paymentId, executor = pool) {
   const [rows] = await executor.execute(`SELECT * FROM payments WHERE id = ? LIMIT 1`, [
     paymentId,
@@ -150,7 +137,6 @@ async function findPaymentById(paymentId, executor = pool) {
   return rows[0] || null;
 }
 
-// FOR UPDATE locks the row so two simultaneous retries can't both succeed.
 async function findPaymentByIdForUpdate(paymentId, connection) {
   const [rows] = await connection.execute(`SELECT * FROM payments WHERE id = ? FOR UPDATE`, [
     paymentId,
@@ -158,7 +144,6 @@ async function findPaymentByIdForUpdate(paymentId, connection) {
   return rows[0] || null;
 }
 
-// bank transfers waiting for admin approval, oldest first
 async function listPendingBankTransfers(executor = pool) {
   const [rows] = await executor.execute(
     `SELECT p.id, p.enrollment_id, p.amount, p.balance_before, p.payment_details, p.created_at,
@@ -192,7 +177,6 @@ async function findPaymentWithDetailsById(paymentId, executor = pool) {
   return rows[0] || null;
 }
 
-// a student's payments with receipt numbers, newest first
 async function listPaymentHistoryForStudent(studentId, executor = pool) {
   const [rows] = await executor.execute(
     `SELECT p.id, p.enrollment_id, c.subject, p.amount, p.balance_before, p.balance_after,
@@ -209,7 +193,6 @@ async function listPaymentHistoryForStudent(studentId, executor = pool) {
   return rows;
 }
 
-// admin dashboard - recent payments
 async function listRecentPayments(limit) {
   const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : 20;
   const [rows] = await pool.query(
@@ -225,12 +208,10 @@ async function listRecentPayments(limit) {
   return rows;
 }
 
-// notify everyone who needs to react to a payment event
 async function createNotification({ recipientId, type, message, sentBy, link }) {
   await notifications.createNotification({ recipientId, type, message, sentBy: sentBy || null, link, channel: 'EMAIL' });
 }
 
-// admin record payment - find students by registration number, name or email
 async function searchStudents(term) {
   const like = `%${term}%`;
   const [rows] = await pool.execute(
@@ -244,7 +225,6 @@ async function searchStudents(term) {
   return rows;
 }
 
-// the active classes (with balance) of several students at once
 async function listActiveEnrollmentsForStudents(studentIds) {
   if (studentIds.length === 0) return [];
   const [rows] = await pool.execute(
@@ -259,21 +239,16 @@ async function listActiveEnrollmentsForStudents(studentIds) {
   return rows;
 }
 
-// ids of the active admins - they are told about new bank transfers
 async function findActiveAdminIds() {
   const [rows] = await pool.execute(`SELECT id FROM users WHERE role = 'ADMIN' AND status = 'ACTIVE'`);
   return rows.map((row) => row.id);
 }
 
-// a person's name, for notification messages
 async function findUserName(userId) {
   const [rows] = await pool.execute(`SELECT full_name FROM users WHERE id = ? LIMIT 1`, [userId]);
   return rows[0] ? rows[0].full_name : null;
 }
 
-// --- Tutor payouts (Admin paying a Tutor their share/salary) ---
-
-// tutor picker list
 async function listActiveTutors() {
   const [rows] = await pool.execute(
     `SELECT id, full_name, email, profile_picture_path,
@@ -285,7 +260,6 @@ async function listActiveTutors() {
   return rows;
 }
 
-// tutor's own bank details - the full, unmasked record
 async function findBankDetails(tutorId) {
   const [rows] = await pool.execute(
     `SELECT bank_name, bank_account_holder, bank_account_number, bank_branch
@@ -295,7 +269,6 @@ async function findBankDetails(tutorId) {
   return rows[0] || null;
 }
 
-// save a tutor's bank details
 async function updateBankDetails(tutorId, { bankName, accountHolder, accountNumber, branch }) {
   await pool.execute(
     `UPDATE users
@@ -305,7 +278,6 @@ async function updateBankDetails(tutorId, { bankName, accountHolder, accountNumb
   );
 }
 
-// one active tutor by id
 async function findActiveTutorById(tutorId) {
   const [rows] = await pool.execute(
     `SELECT id, full_name FROM users WHERE id = ? AND role = 'TUTOR' AND status = 'ACTIVE' LIMIT 1`,
@@ -330,7 +302,6 @@ async function createTutorPayout({
   providerReference,
   settledAt,
 }) {
-  // before the database update only the basic columns exist
   if (!(await schema.hasPayoutTracking())) {
     const [legacy] = await pool.execute(
       `INSERT INTO tutor_payouts (tutor_id, amount, note, period_label, paid_by, paid_at)
@@ -366,7 +337,6 @@ async function createTutorPayout({
   return result.insertId;
 }
 
-// one payout with the tutor's name
 async function findTutorPayoutById(payoutId) {
   const [rows] = await pool.execute(
     `SELECT tp.*, t.full_name AS tutor_name
@@ -379,7 +349,6 @@ async function findTutorPayoutById(payoutId) {
   return rows[0] || null;
 }
 
-// Queued payouts joined to the tutor's CURRENT full account number
 async function listPayoutsAwaitingTransfer() {
   if (!(await schema.hasPayoutTracking())) return [];
   const [rows] = await pool.execute(
@@ -394,7 +363,6 @@ async function listPayoutsAwaitingTransfer() {
   return rows;
 }
 
-// mark queued payouts as put into a bank file
 async function markPayoutsExported(payoutIds) {
   if (!payoutIds.length) return 0;
   const placeholders = payoutIds.map(() => '?').join(', ');
@@ -406,7 +374,6 @@ async function markPayoutsExported(payoutIds) {
   return result.affectedRows;
 }
 
-// mark a payout SENT with the bank reference (only from QUEUED or FAILED)
 async function markPayoutSent(payoutId, providerReference, settledAt) {
   const [result] = await pool.execute(
     `UPDATE tutor_payouts
@@ -417,7 +384,6 @@ async function markPayoutSent(payoutId, providerReference, settledAt) {
   return result.affectedRows > 0;
 }
 
-// mark a payout FAILED with the reason (only from QUEUED or SENT)
 async function markPayoutFailed(payoutId, reason) {
   const [result] = await pool.execute(
     `UPDATE tutor_payouts SET status = 'FAILED', failure_reason = ?
@@ -427,7 +393,7 @@ async function markPayoutFailed(payoutId, reason) {
   return result.affectedRows > 0;
 }
 
-// all payouts, newest first - uses the older columns when the database update has not been run
+// all payouts, newest first
 async function listTutorPayouts() {
   if (!(await schema.hasPayoutTracking())) {
     const [legacyRows] = await pool.execute(
@@ -453,7 +419,6 @@ async function listTutorPayouts() {
   return rows;
 }
 
-// Per tutor: total paid, paid this month, and the last payment date
 async function sumPayoutsByTutor() {
   const tracking = await schema.hasPayoutTracking();
   const paidOn = tracking ? 'COALESCE(settled_at, paid_at)' : 'paid_at';
@@ -470,15 +435,12 @@ async function sumPayoutsByTutor() {
   return rows;
 }
 
-// --- Institute payment settings (Admin-editable, shown to students at checkout) ---
-
-// the institute's bank and wallet details (a single row)
 async function getPaymentSettings() {
   const [rows] = await pool.execute(`SELECT * FROM payment_settings WHERE id = 1 LIMIT 1`);
   return rows[0] || null;
 }
 
-// save the institute's receiving details - creates the row the first time
+// save the institute's receiving details
 async function upsertPaymentSettings(
   { bankName, bankAccountName, bankAccountNumber, bankBranch, bankSwift, ezCashNumber, mcashNumber },
   updatedBy
@@ -511,7 +473,6 @@ async function upsertPaymentSettings(
   );
 }
 
-// payment methods the admin switched on - kept as the latest PAYMENT_METHODS_SET entry in audit_log
 async function findEnabledMethods() {
   const [rows] = await pool.execute(
     `SELECT details FROM audit_log WHERE action = 'PAYMENT_METHODS_SET' ORDER BY id DESC LIMIT 1`
@@ -521,7 +482,6 @@ async function findEnabledMethods() {
   return details && Array.isArray(details.methods) ? details.methods : null;
 }
 
-// remember which payment methods are switched on (kept as an audit log entry)
 async function saveEnabledMethods(methods, adminId) {
   await pool.execute(
     `INSERT INTO audit_log (actor_id, action, entity_type, entity_id, details, created_at)

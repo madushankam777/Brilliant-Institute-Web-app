@@ -24,9 +24,7 @@ export default defineConfig({
     fs: {
       allow: [path.resolve(__dirname, '../..')],
     },
-    // send /api and /uploads to the backend
     proxy: {
-      // Strip Origin on the proxy hop
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

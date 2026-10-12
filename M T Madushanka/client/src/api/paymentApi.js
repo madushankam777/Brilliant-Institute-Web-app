@@ -1,13 +1,11 @@
 // payment api calls - balances, payments and tutor payouts
 import httpClient from '../../../../shared/client/src/api/httpClient';
 
-// what I still owe on each class
 export async function fetchMyBalances() {
   const response = await httpClient.get('/payments/balance');
   return response.data.data.balances;
 }
 
-// pay btn - instant payment through the payment simulator (used when PayHere is off)
 export async function makePayment({ enrollmentId, amount, paymentMethod, paymentDetails }) {
   const response = await httpClient.post('/payments', {
     enrollmentId,
@@ -18,13 +16,11 @@ export async function makePayment({ enrollmentId, amount, paymentMethod, payment
   return response.data.data.payment;
 }
 
-// pay online btn
 export async function startOnlineCheckout({ enrollmentId, amount }) {
   const response = await httpClient.post('/payments/checkout/online', { enrollmentId, amount });
   return response.data.data.checkout;
 }
 
-// Polled on the way back from the gateway
 export async function fetchPaymentStatus(paymentId) {
   const response = await httpClient.get(`/payments/${paymentId}/status`);
   return response.data.data.payment;
@@ -49,19 +45,16 @@ export function redirectToGateway({ actionUrl, fields }) {
   form.submit();
 }
 
-// retry btn - try a pending payment again
 export async function retryPayment(paymentId) {
   const response = await httpClient.patch(`/payments/${paymentId}/retry`);
   return response.data.data.payment;
 }
 
-// my payments with receipt numbers
 export async function fetchMyPaymentHistory() {
   const response = await httpClient.get('/payments/history');
   return response.data.data.payments;
 }
 
-// check if bank transfer is open this month
 export async function fetchBankTransferAvailability() {
   const response = await httpClient.get('/payments/bank-transfer/availability');
   return response.data.data;
@@ -81,7 +74,6 @@ export async function payByBankTransfer({ enrollmentId, amount, bankReference, r
   return response.data.data.payment;
 }
 
-// edit btn - correct reference/receipt on a pending bank transfer
 export async function editBankTransferPayment(paymentId, { bankReference, receiptFile }) {
   const formData = new FormData();
   if (bankReference) formData.append('bankReference', bankReference);
@@ -93,43 +85,36 @@ export async function editBankTransferPayment(paymentId, { bankReference, receip
   return response.data.data.payment;
 }
 
-// the address of a bank slip image
 export function getReceiptImageUrl(paymentId) {
   const base = (httpClient.defaults.baseURL || '').replace(/\/$/, '');
   return `${base}/payments/${paymentId}/receipt-image`;
 }
 
-// admin - bank transfers waiting for approval
 export async function fetchPendingBankTransfers() {
   const response = await httpClient.get('/payments/admin/pending-bank-transfers');
   return response.data.data.payments;
 }
 
-// admin dashboard - a real ledger of individual payments, any method/status
 export async function fetchRecentPayments() {
   const response = await httpClient.get('/payments/admin/recent-payments');
   return response.data.data.payments;
 }
 
-// verify btn - approve a student's bank slip
 export async function approveBankTransfer(paymentId) {
   const response = await httpClient.patch(`/payments/admin/${paymentId}/approve`);
   return response.data.data.payment;
 }
 
-// reject btn - refuse a bank transfer
 export async function rejectBankTransfer(paymentId) {
   const response = await httpClient.patch(`/payments/admin/${paymentId}/reject`);
   return response.data.data.payment;
 }
 
-// all tutor payouts with totals
 export async function fetchTutorPayouts() {
   const response = await httpClient.get('/payments/admin/tutor-payouts');
   return response.data.data;
 }
 
-// pay btn - record a payout to a tutor
 export async function payTutor({ tutorId, amount, note, periodLabel }) {
   const response = await httpClient.post('/payments/admin/tutor-payouts', {
     tutorId,
@@ -140,13 +125,11 @@ export async function payTutor({ tutorId, amount, note, periodLabel }) {
   return response.data.data.payout;
 }
 
-// checkout - the institute's own receiving details (any logged-in role can read)
 export async function fetchPaymentSettings() {
   const response = await httpClient.get('/payments/settings');
   return response.data.data.settings;
 }
 
-// admin only - edit the institute's receiving details
 export async function updatePaymentSettings(payload) {
   const response = await httpClient.put('/payments/admin/settings', payload);
   return response.data.data.settings;

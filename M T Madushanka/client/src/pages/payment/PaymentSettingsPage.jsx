@@ -7,12 +7,9 @@ import FormField from '../../../../../shared/client/src/components/common/FormFi
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
-// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
-// Digits, spaces, and dashes only
 const ACCOUNT_NUMBER_REGEX = /^[0-9 -]{4,34}$/;
-// Sri Lankan mobile number - what eZ Cash / mCash are actually tied to.
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
 // a blank settings form
@@ -26,7 +23,7 @@ const EMPTY_FORM = {
   mcashNumber: '',
 };
 
-// payment settings - the institute's bank and wallet details shown at checkout
+// payment settings
 function PaymentSettingsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +33,6 @@ function PaymentSettingsPage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // load the saved settings when the page opens
   useEffect(() => {
     let isMounted = true;
     fetchPaymentSettings()
@@ -63,12 +59,10 @@ function PaymentSettingsPage() {
     };
   }, []);
 
-  // change one field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
-  // check the bank and wallet fields before saving
   function validate() {
     const errors = {};
     if (form.bankAccountNumber.trim() && !ACCOUNT_NUMBER_REGEX.test(form.bankAccountNumber.trim())) {
@@ -83,7 +77,6 @@ function PaymentSettingsPage() {
     return errors;
   }
 
-  // save btn - save the payment settings
   async function handleSubmit(event) {
     event.preventDefault();
     setSaveError('');
@@ -120,7 +113,6 @@ function PaymentSettingsPage() {
 
         <Alert type="error" message={loadError} />
 
-        {/* a spinner, or the settings form */}
         {isLoading ? (
           <LoadingSpinner label="Loading payment settings..." />
         ) : (
@@ -169,7 +161,6 @@ function PaymentSettingsPage() {
                 />
               </div>
 
-              {/* mobile wallet numbers - eZ Cash and mCash */}
               <h2 style={{ fontSize: '0.95rem', marginTop: '24px' }}>Mobile wallets</h2>
               <p className="field-help" style={{ marginTop: '-8px' }}>
                 Shown to students so they know which number to send their eZ Cash / mCash payment to.
@@ -196,7 +187,6 @@ function PaymentSettingsPage() {
                 />
               </div>
 
-              {/* save btn */}
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
                 {isSaving ? 'Saving...' : 'Save payment settings'}
               </button>

@@ -18,14 +18,10 @@ const initialForm = {
   enrollmentKey: '',
 };
 
-// Letters, spaces, apostrophes, periods, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
-// the message shown when the name has odd characters
 const NAME_ERROR = 'Full name can only contain letters, spaces, apostrophes, periods, and hyphens - no numbers or symbols.';
 
-// Digits plus the punctuation real phone numbers are written with.
 const PHONE_REGEX = /^[0-9+\-\s()]+$/;
-// the message shown when the phone number has odd characters
 const PHONE_ERROR = 'Phone number can only contain digits, spaces, and the symbols + - ( ).';
 
 // register page - name, email, phone, role and password
@@ -37,12 +33,10 @@ function PlaceholderRegisterPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // change one form field
   function updateField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
-  // check the form before sending it
   function validate() {
     const errors = {};
     if (form.fullName.trim().length < 2) {
@@ -56,7 +50,6 @@ function PlaceholderRegisterPage() {
     return errors;
   }
 
-  // register btn - check the form, then create the account
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -76,7 +69,6 @@ function PlaceholderRegisterPage() {
     }
   }
 
-  // the page - role choice, then the form
   return (
     <AuthLayout
       quote={{
@@ -110,7 +102,6 @@ function PlaceholderRegisterPage() {
 
       {error && <Alert type="error" message={error} />}
 
-      {/* register form - name, email, phone, grade or key, password and terms */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="fullName"

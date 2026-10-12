@@ -1,4 +1,4 @@
-// Tutor: view one of their own students' attendance history for a class (ATP-02)
+// Tutor: view one of their own students' attendance history for a class
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { fetchStudentAttendanceHistory } from '../../api/attendanceApi';
@@ -9,7 +9,6 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
-// badge colour for Present, Late or Absent
 function statusBadgeClass(status) {
   if (status === 'PRESENT') return 'badge badge-success';
   if (status === 'LATE') return 'badge badge-warning';
@@ -25,17 +24,14 @@ function TutorStudentHistoryPage() {
   const classId = searchParams.get('classId');
   const location = useLocation();
 
-  // Passed from MarkAttendancePage's "View history" link
   const studentName = location.state && location.state.studentName;
 
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // load the history for this student and class
   useEffect(() => {
     let isMounted = true;
-    // fetch the history and the summary
     async function load() {
       try {
         const data = await fetchStudentAttendanceHistory(studentId, classId);
@@ -52,14 +48,12 @@ function TutorStudentHistoryPage() {
     };
   }, [studentId, classId]);
 
-  // present or late counts as attended
   const presentCount = history.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
   const absentCount = history.filter((r) => r.status === 'ABSENT').length;
 
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        {/* breadcrumb back to the attendance list */}
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link to="/attendance/classes">Mark Attendance</Link>
           <span className="breadcrumb-sep">/</span>
@@ -84,7 +78,6 @@ function TutorStudentHistoryPage() {
               <StatCard icon="xCircle" label="Absent" value={absentCount} tone="danger" />
             </div>
 
-            {/* session history table */}
             <div className="card">
               <h2>Session history</h2>
               {history.length === 0 ? (

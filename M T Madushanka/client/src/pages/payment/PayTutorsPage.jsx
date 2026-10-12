@@ -1,4 +1,4 @@
-// Admin: pay Tutors - a manual payout ledger, not automatic payroll.
+// Admin: pay Tutors - a manual payout ledger, not automatic payroll
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchTutorPayouts, payTutor } from '../../api/paymentApi';
 import { fetchAllTutors } from '../../api/courseApi';
@@ -9,7 +9,6 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../components/layout/navItems';
 import TutorPicker from '../../../../../shared/client/src/components/common/TutorPicker';
 
-// the side menu for an admin
 const NAV_ITEMS = getNavItems('ADMIN');
 
 // a number as LKR money
@@ -20,7 +19,7 @@ function formatCurrency(amount) {
 // a blank payout form
 const EMPTY_PAYOUT_FORM = { amount: '', note: '', periodLabel: '' };
 
-// pay tutors - each tutor's bank account, a Pay btn, the bank file and the payment history
+// pay tutors - each tutor's bank account
 function PayTutorsPage() {
   const [tutors, setTutors] = useState([]);
   const [payouts, setPayouts] = useState([]);
@@ -29,19 +28,17 @@ function PayTutorsPage() {
   const [loadError, setLoadError] = useState('');
 
   const [selectedTutorId, setSelectedTutorId] = useState(null);
-  const [payingTutor, setPayingTutor] = useState(null); // the tutor the modal is open for
+  const [payingTutor, setPayingTutor] = useState(null);
   const [form, setForm] = useState(EMPTY_PAYOUT_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // the tutor being paid
   const selectedTutor = useMemo(
     () => tutors.find((tutor) => tutor.id === selectedTutorId) || null,
     [tutors, selectedTutorId]
   );
 
-  // load the tutors and their payouts
   const load = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -54,16 +51,13 @@ function PayTutorsPage() {
       setLoadError(error.message);
     } finally {
       setIsLoading(false);
-    // fail silently, not critical
     }
   }, []);
 
-  // load them when the page opens
   useEffect(() => {
     load();
   }, [load]);
 
-  // pay btn - open the payout pop-up
   function openPayModal(tutor) {
     setPayingTutor(tutor);
     setForm(EMPTY_PAYOUT_FORM);
@@ -71,13 +65,11 @@ function PayTutorsPage() {
     setSuccessMessage('');
   }
 
-  // close the payout pop-up
   function closePayModal() {
     if (isSubmitting) return;
     setPayingTutor(null);
   }
 
-  // save btn - record the payout to the tutor
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -121,7 +113,6 @@ function PayTutorsPage() {
           <Alert type="error" message={loadError} />
           <Alert type="success" message={successMessage} />
 
-          {/* a spinner, or the page content */}
           {isLoading ? (
             <LoadingSpinner label="Loading tutors..." />
           ) : (
@@ -218,7 +209,6 @@ function PayTutorsPage() {
               )}
             </div>
 
-            {/* payout form - amount, month, note and how it is paid */}
             <form onSubmit={handleSubmit} noValidate>
               <div className="card-field-row">
                 <div className="form-field">

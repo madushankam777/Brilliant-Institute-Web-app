@@ -106,19 +106,6 @@ const contactLimiter = rateLimit({
   },
 });
 
-// chat messages - stops one account flooding someone's inbox
-const messageLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  keyGenerator: perUserKey,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'You are sending messages too fast. Please wait a moment and try again.',
-  },
-});
-
 // reports - building a PDF is heavy work, so cap how often one admin can do it
 const reportLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
@@ -139,6 +126,5 @@ module.exports = {
   checkinLimiter,
   keyRedemptionLimiter,
   contactLimiter,
-  messageLimiter,
   reportLimiter,
 };

@@ -7,7 +7,6 @@ import StatCard from '../../../../../shared/client/src/components/common/StatCar
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
-// the side menu for a student
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
 // badge colour for Present, Late or Absent
@@ -17,17 +16,15 @@ function statusBadgeClass(status) {
   return 'badge badge-danger';
 }
 
-// my attendance - the rate per class and every session I attended or missed
+// my attendance
 function AttendanceHistoryPage() {
   const [history, setHistory] = useState([]);
   const [summaryByClass, setSummaryByClass] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // load my attendance history when the page opens
   useEffect(() => {
     let isMounted = true;
-    // fetch the history and the summary per class
     async function load() {
       try {
         const data = await fetchMyAttendanceHistory();
@@ -47,10 +44,8 @@ function AttendanceHistoryPage() {
     };
   }, []);
 
-  // present or late counts as attended
   const presentCount = history.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
   const absentCount = history.filter((r) => r.status === 'ABSENT').length;
-  // classes under the low-attendance limit
   const lowAttendanceClasses = summaryByClass.filter((s) => s.isLowAttendance);
 
   return (
@@ -106,7 +101,6 @@ function AttendanceHistoryPage() {
               </div>
             )}
 
-            {/* session history table */}
             <div className="card">
               <h2>Session history</h2>
               {history.length === 0 ? (

@@ -286,9 +286,7 @@ const sendTutorMessage = asyncHandler(async (req, res) => {
   if (result.toOffice) people.push('the office');
   res.status(201).json({
     success: true,
-    message: result.viaMessages
-      ? `Message sent to ${people.join(' and ')}. Replies arrive in your Messages.`
-      : `Message sent to ${people.join(' and ')}.`,
+    message: `Notice sent to ${people.join(' and ')}.`,
     data: { result },
   });
 });

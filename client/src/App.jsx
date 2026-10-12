@@ -51,7 +51,6 @@ const SubmitFeedbackPage = lazy(() => import('./pages/feedback/SubmitFeedbackPag
 const StaffFeedbackPage = lazy(() => import('./pages/feedback/StaffFeedbackPage'));
 
 // messages, reminders and the calendar
-const MessagesPage = lazy(() => import('./pages/messages/MessagesPage'));
 const NotifyStudentsPage = lazy(() => import('./pages/notifications/NotifyStudentsPage'));
 const RemindersPage = lazy(() => import('./pages/notifications/RemindersPage'));
 const CalendarPage = lazy(() => import('./pages/calendar/CalendarPage'));
@@ -190,8 +189,6 @@ function App() {
           {/* Any logged-in user */}
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/messages" element={<MessagesPage />} />
-            <Route path="/messages/:conversationId" element={<MessagesPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/courses/classes" element={<BrowseClassesPage />} />
             <Route path="/courses/classes/:classId" element={<ClassDetailsPage />} />

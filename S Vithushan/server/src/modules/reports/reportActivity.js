@@ -72,6 +72,7 @@ const ACTIONS = {
   YEARLY_ROLLOVER_RUN: 'Yearly roll-over run',
   REPORT_GENERATED: 'Report viewed',
   REPORT_DOWNLOADED: 'Report downloaded',
+  REPORT_HISTORY_REMOVED: 'Recent reports deleted',
 };
 
 // which part of the site an action belongs to

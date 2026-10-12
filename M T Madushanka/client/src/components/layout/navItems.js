@@ -7,7 +7,6 @@ const STUDENT_NAV = [
   { to: '/payments/history', label: 'History', icon: 'receipt' },
 ];
 
-// the tutor's side menu
 const TUTOR_NAV = [
   { to: '/', label: 'Dashboard', icon: 'home', end: true },
   { to: '/attendance/classes', label: 'Mark Attendance', icon: 'calendar' },
@@ -22,7 +21,6 @@ const ADMIN_NAV = [
   { to: '/admin/payments/settings', label: 'Payment Settings', icon: 'edit' },
 ];
 
-// the side menu for a role
 export function getNavItems(role) {
   if (role === 'TUTOR') return TUTOR_NAV;
   if (role === 'ADMIN') return ADMIN_NAV;

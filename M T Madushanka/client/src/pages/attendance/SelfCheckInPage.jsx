@@ -7,16 +7,15 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
-// check-in page - the student types the 6-digit key the tutor shows in class
+// check-in page
 function SelfCheckInPage() {
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState(null); // { success, message }
+  const [result, setResult] = useState(null);
 
-  // check in btn - send the 6-digit key to the server
   async function handleSubmit(event) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -67,7 +66,6 @@ function SelfCheckInPage() {
             </button>
           </form>
 
-          {/* back to the dashboard link */}
           <p className="auth-footer-note">
             <Link to="/">Back to Dashboard</Link>
           </p>

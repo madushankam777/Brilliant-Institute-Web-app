@@ -17,13 +17,12 @@ const STATUS_OPTIONS = ['PRESENT', 'LATE', 'ABSENT'];
 const STATUS_LABEL = { PRESENT: 'Present', LATE: 'Late', ABSENT: 'Absent' };
 const STATUS_BADGE = { PRESENT: 'badge-success', LATE: 'badge-warning', ABSENT: 'badge-danger' };
 
-// attendance sheet - mark each student present, late or absent, or open a check-in key
+// attendance sheet
 function MarkAttendancePage() {
   const { sessionId } = useParams();
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
 
-  // the sheet - the session details and one row per student
   const [sessionInfo, setSessionInfo] = useState(null);
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,14 +32,12 @@ function MarkAttendancePage() {
   const [saveError, setSaveError] = useState('');
   const [search, setSearch] = useState('');
 
-  // the attendance key panel
   const [showCheckin, setShowCheckin] = useState(false);
   const [checkinCode, setCheckinCode] = useState('');
   const [checkinExpiresAt, setCheckinExpiresAt] = useState('');
   const [isStartingCheckin, setIsStartingCheckin] = useState(false);
   const [checkinError, setCheckinError] = useState('');
 
-  // load the sheet - students without a saved mark stay unmarked
   const loadSheet = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -55,19 +52,16 @@ function MarkAttendancePage() {
     }
   }, [sessionId]);
 
-  // load the sheet when the page opens
   useEffect(() => {
     loadSheet();
   }, [loadSheet]);
 
-  // change one student's mark or remarks
   function updateRow(studentId, field, value) {
     setRows((previousRows) =>
       previousRows.map((row) => (row.studentId === studentId ? { ...row, [field]: value } : row))
     );
   }
 
-  // quick action - mark visible students who do not have a mark yet
   function markAllVisible(status) {
     const visibleIds = new Set(filteredRows.filter((row) => !row.status).map((row) => row.studentId));
     setRows((previousRows) =>
@@ -75,7 +69,6 @@ function MarkAttendancePage() {
     );
   }
 
-  // generate key btn
   async function handleStartCheckin() {
     setShowCheckin(true);
     setIsStartingCheckin(true);
@@ -91,7 +84,6 @@ function MarkAttendancePage() {
     }
   }
 
-  // save btn - save the whole sheet
   async function handleSave(event) {
     event.preventDefault();
     setSaveMessage('');
@@ -126,12 +118,10 @@ function MarkAttendancePage() {
     }
   }
 
-  // the students matching the search box
   const filteredRows = rows.filter((row) =>
     row.studentName.toLowerCase().includes(search.trim().toLowerCase())
   );
 
-  // how many students have each mark
   const counts = STATUS_OPTIONS.reduce((acc, status) => {
     acc[status] = rows.filter((row) => row.status === status).length;
     return acc;
@@ -157,7 +147,6 @@ function MarkAttendancePage() {
           </button>
         </div>
 
-        {/* attendance key panel - the 6-digit key students type to check in */}
         {showCheckin && (
           <div className="card" style={{ textAlign: 'center' }}>
             <h3 style={{ marginTop: 0 }}>Attendance Key</h3>

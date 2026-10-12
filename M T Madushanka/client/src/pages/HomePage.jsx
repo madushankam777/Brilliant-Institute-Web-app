@@ -11,7 +11,6 @@ import PortalShell from '../../../../shared/client/src/components/layout/PortalS
 import { getNavItems } from '../components/layout/navItems';
 import heroMediaImg from '../../../../shared/client/src/assets/hero-media.png';
 
-// the feature cards on the public page
 const FEATURES = [
   {
     icon: 'calendar',
@@ -33,18 +32,16 @@ const FEATURES = [
   },
 ];
 
-// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
-// student dashboard - attendance rate, fee balance, next class, timetable and shortcuts
+// student dashboard
 function StudentDashboard({ user }) {
   const [summaryByClass, setSummaryByClass] = useState([]);
   const [balances, setBalances] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // load my attendance and fee balance together
   useEffect(() => {
     let isMounted = true;
     Promise.all([fetchMyAttendanceHistory(), fetchMyBalances()])
@@ -54,7 +51,6 @@ function StudentDashboard({ user }) {
         setBalances(balanceList || []);
       })
       .catch(() => {
-        /* Dashboard degrades gracefully - the dedicated pages surface the real error. */
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -64,15 +60,11 @@ function StudentDashboard({ user }) {
     };
   }, []);
 
-  // attendance rate over all classes, and the fees still owed
   const totalAttended = summaryByClass.reduce((sum, s) => sum + s.attendedSessions, 0);
-  // my attendance rate over all my classes
   const totalSessions = summaryByClass.reduce((sum, s) => sum + s.totalSessions, 0);
   const overallRate = totalSessions > 0 ? Math.round((totalAttended / totalSessions) * 100) : null;
-  // the fees I still owe
   const pendingFees = balances.reduce((sum, b) => sum + Number(b.balance), 0);
 
-  // the dashboard - welcome, stat cards, the timetable and shortcut cards
   return (
     <div className="page">
       <div className="page-header">
@@ -129,7 +121,6 @@ function StudentDashboard({ user }) {
 // tutor dashboard - shortcuts to attendance and classes
 function TutorDashboard({ user }) {
   const isAdmin = user.role === 'ADMIN';
-  // the dashboard - welcome, stat cards, the timetable and shortcut cards
   return (
     <div className="page">
       <div className="page-header">
@@ -179,7 +170,6 @@ function HomePage() {
   if (!isLoggedIn) {
     return (
       <>
-        {/* hero - headline and sign-up buttons */}
         <section className="container hero">
           <div className="hero-copy">
             <span className="eyebrow">Revolutionizing EdTech Operations</span>

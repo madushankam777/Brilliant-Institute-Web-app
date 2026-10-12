@@ -18,7 +18,6 @@ const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const { defaultLinkFor } = require('../../../../../shared/server/src/utils/notifications');
 const { emailAnnouncement, emailPerson } = require('../../../../../shared/server/src/utils/notificationEmails');
 const { sendMail, canReceiveEmail } = require('../../../../../shared/server/src/utils/mailer');
-const messagesService = require('../../../../../H A S Hapuarachchi/server/src/modules/messages/messages.service');
 const { renderEmail } = require('../../../../../shared/server/src/utils/emailLayout');
 const { deleteUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const authService = require('../../../../../N Danushika/server/src/modules/auth/auth.service');
@@ -821,8 +820,11 @@ async function getMyReregistrationStatus(studentUser) {
     throw ApiError.notFound('Account not found.');
   }
   const nextYear = currentAcademicYear() + 1;
+  const isOpen = await schema.hasReregistration();
   return {
-    isOpen: await schema.hasReregistration(),
+    isOpen,
+    // a key from the office is waiting (an A/L student only re-registers when the office gives them one)
+    hasKeyWaiting: isOpen ? await repository.hasUnusedReregistrationKey(studentUser.id) : false,
     grade: user.grade,
     nextYear,
     confirmedForYear: user.reregistered_for_year || null,
@@ -1001,7 +1003,7 @@ async function listMyClassesForMessaging(tutorUser) {
   return rows.map((row) => ({ id: row.id, subject: row.subject, level: row.level }));
 }
 
-// Tutor -> their own students and/or the office - each gets it as a chat message they can reply to
+// Tutor -> their own students and/or the office - a notice in each person's bell
 async function sendTutorMessage(tutorUser, { audience, classId, subject, message }) {
   // the students it goes to
   let studentIds = [];
@@ -1027,29 +1029,18 @@ async function sendTutorMessage(tutorUser, { audience, classId, subject, message
     throw ApiError.badRequest('No active Admin account was found to send this to.');
   }
 
-  // after the database update - into Messages, so students and the office can reply
-  let viaMessages = false;
-  if (await schema.hasMessaging()) {
-    await messagesService.sendFromTutorToMany(tutorUser, {
-      studentIds,
-      includeOffice: adminIds.length > 0,
-      body: `${subject.trim()}\n\n${message.trim()}`,
+  // a bell notification (and an email) for each person - a click opens it in full
+  const sender = await repository.findUserById(tutorUser.id);
+  const senderName = sender ? sender.full_name : 'your tutor';
+  const body = `${subject.trim()} - ${message.trim()} (from ${senderName})`;
+  for (const recipientId of new Set([...studentIds, ...adminIds])) {
+    await repository.logNotification({
+      recipientId,
+      channel: 'EMAIL',
+      type: 'ANNOUNCEMENT',
+      message: body.slice(0, 500),
+      sentBy: tutorUser.id,
     });
-    viaMessages = true;
-  } else {
-    // before it - a bell notification only
-    const sender = await repository.findUserById(tutorUser.id);
-    const senderName = sender ? sender.full_name : 'your tutor';
-    const body = `${subject.trim()} - ${message.trim()} (from ${senderName})`;
-    for (const recipientId of new Set([...studentIds, ...adminIds])) {
-      await repository.logNotification({
-        recipientId,
-        channel: 'EMAIL',
-        type: 'ANNOUNCEMENT',
-        message: body.slice(0, 500),
-        sentBy: tutorUser.id,
-      });
-    }
   }
 
   await recordAuditEvent({
@@ -1059,7 +1050,7 @@ async function sendTutorMessage(tutorUser, { audience, classId, subject, message
     details: { audience, classId: classId || null, students: studentIds.length, office: adminIds.length > 0 },
   });
 
-  return { studentCount: studentIds.length, toOffice: adminIds.length > 0, audience, viaMessages };
+  return { studentCount: studentIds.length, toOffice: adminIds.length > 0, audience };
 }
 
 // notification bell - personal reminders for this user, each with the page a click opens

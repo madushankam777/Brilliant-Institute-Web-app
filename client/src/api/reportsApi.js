@@ -19,6 +19,18 @@ export async function fetchReportHistory() {
   return response.data.data.history;
 }
 
+// delete btn - removes one recent report from the list
+export async function deleteReportHistory(id) {
+  const response = await httpClient.delete(`/admin/reports/history/${id}`);
+  return response.data.message;
+}
+
+// delete all btn - clears the recent reports list
+export async function clearReportHistory() {
+  const response = await httpClient.post('/admin/reports/history/clear');
+  return response.data.message;
+}
+
 // generate btn - the report shown on screen
 export async function generateReport(type, params) {
   const response = await httpClient.get(`/admin/reports/${type}`, { params, timeout: 60000 });

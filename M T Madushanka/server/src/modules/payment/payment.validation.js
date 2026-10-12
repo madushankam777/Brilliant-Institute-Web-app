@@ -1,9 +1,8 @@
-// payment form rules - amounts, payment details, bank references and payout fields
+// payment form rules
 const { body } = require('express-validator');
 const { param, query } = require('express-validator');
 const { INSTANT_PAYMENT_METHODS } = require('./payment.constants');
 
-// money amount - plain digits with up to 2 decimals (no "-", no "1e3")
 function amountRule(field, message) {
   return body(field)
     .customSanitizer((value) => (value === undefined || value === null ? value : String(value).trim()))
@@ -14,21 +13,17 @@ function amountRule(field, message) {
     .withMessage(message);
 }
 
-// Sri Lankan mobile number
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
-// Letters, spaces, apostrophes, and hyphens only - no digits or symbols.
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 
-// Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
-// apply a rule only when the chosen payment method is one of these
 function isMethod(...methods) {
   return (value, { req }) => methods.includes(req.body.paymentMethod);
 }
 
-// pay form rules - class, amount, method, and the card or wallet details for that method
+// pay form rules
 const makePaymentRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
   amountRule('amount', 'Amount must be a positive number.'),
@@ -64,13 +59,11 @@ const makePaymentRules = [
     .withMessage('Enter a valid mobile number registered for this wallet (e.g. 07XXXXXXXX).'),
 ];
 
-// Online checkout only needs what we sign
 const onlineCheckoutRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
   amountRule('amount', 'Amount must be a positive number.'),
 ];
 
-// bank transfer form rules - class, amount and the bank reference
 const bankTransferRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
   amountRule('amount', 'Amount must be a positive number.'),
@@ -82,12 +75,10 @@ const bankTransferRules = [
     .withMessage('Reference can only contain letters, numbers, spaces, hyphens, and slashes - no other symbols.'),
 ];
 
-// payment id in the address must be a number
 const paymentIdParamRules = [
   param('paymentId').isInt({ min: 1 }).withMessage('Invalid payment id.'),
 ];
 
-// amount = what admin read off the slip (optional - defaults to what the student entered)
 const approveBankTransferRules = [
   ...paymentIdParamRules,
   body('amount')
@@ -100,10 +91,8 @@ const approveBankTransferRules = [
     .withMessage('Enter the amount shown on the bank slip.'),
 ];
 
-// a date written as YYYY-MM-DD
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-// edit btn - bank reference is optional
 const editBankTransferRules = [
   ...paymentIdParamRules,
   body('bankReference')
@@ -115,7 +104,7 @@ const editBankTransferRules = [
     .withMessage('Reference can only contain letters, numbers, spaces, hyphens, and slashes - no other symbols.'),
 ];
 
-// pay tutor form rules - tutor, amount, note, period, method, and the bank reference for a bank transfer
+// pay tutor form rules
 const payTutorRules = [
   body('tutorId').isInt({ min: 1 }).withMessage('Please select a Tutor.'),
   amountRule('amount', 'Amount must be a positive number.'),
@@ -146,10 +135,8 @@ const payTutorRules = [
     .withMessage('Pick the date of the transfer.'),
 ];
 
-// tutor id in the address must be a number
 const tutorIdParamRules = [param('tutorId').isInt({ min: 1 }).withMessage('Invalid tutor id.')];
 
-// tutor's own payout bank details
 const bankDetailsRules = [
   body('bankName').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bank name is too long.'),
   body('accountHolder')
@@ -197,12 +184,10 @@ const paymentSettingsRules = [
     .withMessage('Enter a valid mCash mobile number (e.g. 0771234567).'),
 ];
 
-// payout id in the address must be a number
 const payoutIdParamRules = [
   param('payoutId').isInt({ min: 1 }).withMessage('Invalid payout id.'),
 ];
 
-// paid btn rules - the bank's reference number and an optional transfer date
 const confirmPayoutRules = [
   param('payoutId').isInt({ min: 1 }).withMessage('Invalid payout id.'),
   body('providerReference')
@@ -221,7 +206,6 @@ const confirmPayoutRules = [
     .withMessage('Pick the date of the transfer.'),
 ];
 
-// failed btn rules - a reason is required
 const failPayoutRules = [
   param('payoutId').isInt({ min: 1 }).withMessage('Invalid payout id.'),
   body('reason')
@@ -233,12 +217,10 @@ const failPayoutRules = [
     .withMessage('Keep the reason under 255 characters.'),
 ];
 
-// record payment - admin
 const studentSearchRules = [
   query('search').trim().isLength({ min: 1, max: 60 }).withMessage('Type a registration number or name.'),
 ];
 
-// record payment form rules - class, amount, cash or bank deposit, optional reference and note
 const recordPaymentRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Choose the class being paid for.'),
   amountRule('amount', 'Enter the amount the student paid.'),

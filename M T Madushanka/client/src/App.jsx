@@ -23,7 +23,7 @@ import PaymentVerificationPage from './pages/payment/PaymentVerificationPage';
 import PayTutorsPage from './pages/payment/PayTutorsPage';
 import PaymentSettingsPage from './pages/payment/PaymentSettingsPage';
 
-// the whole website - the top bar, then the page that matches the address
+// the whole website
 function App() {
   return (
     <AuthProvider>
@@ -31,36 +31,30 @@ function App() {
       <CookieConsentBanner />
       <main className="app-content">
         <Routes>
-          {/* Public routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<PlaceholderLoginPage />} />
           <Route path="/register" element={<PlaceholderRegisterPage />} />
 
-          {/* Tutor / Admin only - Attendance marking */}
           <Route element={<ProtectedRoute allowedRoles={['TUTOR', 'ADMIN']} />}>
             <Route path="/attendance/classes" element={<ClassSessionsPage />} />
             <Route path="/attendance/sessions/:sessionId" element={<MarkAttendancePage />} />
             <Route path="/attendance/students/:studentId" element={<TutorStudentHistoryPage />} />
           </Route>
 
-          {/* Student / Parent only - Attendance history + Payments */}
           <Route element={<ProtectedRoute allowedRoles={['STUDENT_PARENT']} />}>
             <Route path="/attendance/history" element={<AttendanceHistoryPage />} />
             <Route path="/attendance/checkin" element={<SelfCheckInPage />} />
             <Route path="/payments" element={<FeeBalancePage />} />
             <Route path="/payments/history" element={<PaymentHistoryPage />} />
-            {/* where PayHere sends the payer back to */}
             <Route path="/payments/return" element={<PaymentReturnPage />} />
           </Route>
 
-          {/* Admin only - verify bank transfer receipts + pay tutors */}
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route path="/admin/payments/verify" element={<PaymentVerificationPage />} />
             <Route path="/admin/payments/tutors" element={<PayTutorsPage />} />
             <Route path="/admin/payments/settings" element={<PaymentSettingsPage />} />
           </Route>
 
-          {/* Catch-all */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

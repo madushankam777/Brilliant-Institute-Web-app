@@ -1,4 +1,4 @@
-//Navbar.jsx
+// Navbar.jsx
 
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -13,15 +13,12 @@ function Navbar() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // log out btn - end the session and go to the login page
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
   }
 
-  // top bar for a logged-in user
   if (isLoggedIn) {
-    // top bar for a visitor - Home, About, Classes, Contact, Log in and Register
     return (
       <header className="navbar">
         <div className="navbar-brand">
@@ -51,7 +48,6 @@ function Navbar() {
     );
   }
 
-  // top bar for a visitor - Home, About, Classes, Contact, Log in and Register
   return (
     <header className="navbar">
       <div className="navbar-brand">

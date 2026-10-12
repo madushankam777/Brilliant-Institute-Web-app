@@ -58,6 +58,7 @@ const ACTIVITY_LABELS = {
   REREGISTRATION_COMPLETED: 'Student re-registered',
   REPORT_GENERATED: 'Report viewed',
   REPORT_DOWNLOADED: 'Report downloaded (PDF)',
+  REPORT_HISTORY_REMOVED: 'Recent reports deleted',
 };
 
 // the words for one activity, or its action name made readable

@@ -206,7 +206,6 @@ const NOTIFICATION_TYPE_LABELS = {
   WELCOME: 'Welcome',
   ACCOUNT_STATUS: 'Account',
   PASSWORD_CHANGED: 'Security Notice',
-  NEW_MESSAGE: 'New Message',
 };
 
 // Scheduled reminders are CLASS_REMINDER rows whose message starts with this.

@@ -10,21 +10,19 @@ import PortalShell from '../../../../../shared/client/src/components/layout/Port
 import { getNavItems } from '../../components/layout/navItems';
 import { useAuth } from '../../context/AuthContext';
 
-// mark attendance page - the classes I teach, one click opens today's attendance sheet
+// mark attendance page
 function ClassSessionsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const NAV_ITEMS = getNavItems(user.role);
   const isAdmin = user.role === 'ADMIN';
 
-  // my classes and the page state
   const [classes, setClasses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [openingId, setOpeningId] = useState(null);
   const [openError, setOpenError] = useState('');
 
-  // load the classes I teach
   useEffect(() => {
     let isMounted = true;
     fetchMyTaughtClasses()
@@ -42,7 +40,6 @@ function ClassSessionsPage() {
     };
   }, []);
 
-  // mark attendance btn
   async function handleMarkToday(classId) {
     setOpenError('');
     setOpeningId(classId);
@@ -70,7 +67,6 @@ function ClassSessionsPage() {
         <Alert type="error" message={loadError} />
         <Alert type="error" message={openError} />
 
-        {/* a spinner, an empty message, or the classes table */}
         {isLoading ? (
           <LoadingSpinner label="Loading your classes..." />
         ) : classes.length === 0 ? (
@@ -100,7 +96,6 @@ function ClassSessionsPage() {
                       </td>
                       {isAdmin && <td>{classItem.tutorName}</td>}
                       <td>
-                        {/* mark attendance btn - opens today's attendance sheet */}
                         <button
                           type="button"
                           className="btn btn-primary btn-sm"

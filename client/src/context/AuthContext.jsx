@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as authApi from '../api/authApi';
 import { setSessionExpiredHandler } from '../../../shared/client/src/api/httpClient';
+import { setCurrentGrade } from '../../../shared/client/src/utils/currentStudent';
 
 // shared login state - who is logged in
 const AuthContext = createContext(null);
@@ -67,6 +68,8 @@ async function isFreshBrowserSession() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  // the side menu reads the grade (A/L students have no Re-register)
+  setCurrentGrade(user ? user.grade : null);
 
   // when the website opens, ask the server if the session is still valid
   useEffect(() => {

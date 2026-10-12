@@ -16,10 +16,8 @@ import Icon from '../../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
-// the side menu for a student
 const NAV_ITEMS = getNavItems("STUDENT_PARENT");
 
-// demo simulator tabs
 const PAYMENT_METHODS = [
   { value: 'CARD', label: 'Card' },
   { value: 'EZ_CASH', label: 'eZ Cash' },
@@ -27,22 +25,17 @@ const PAYMENT_METHODS = [
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
-// Shown when PayHere IS configured
 const LIVE_PAYMENT_METHODS = [
   { value: 'ONLINE', label: 'Card / eZ Cash / mCash' },
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
-// wallet phone number format
 const WALLET_PHONE_REGEX = /^(?:\+94|0)7\d{8}$/;
 
-// Letters, spaces, apostrophes, and hyphens only
 const NAME_REGEX = /^[A-Za-z][A-Za-z .'-]*$/;
 
-// Letters, numbers, spaces, hyphens, and slashes
 const BANK_REFERENCE_REGEX = /^[A-Za-z0-9 \-/]+$/;
 
-// a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
@@ -88,7 +81,6 @@ function formatExpiryInput(rawValue, previousFormatted) {
   return digits;
 }
 
-// a blank card form
 const emptyCardDetails = { cardholderName: '', cardNumber: '', expiryDate: '', cvv: '' };
 
 // fees & payments - what I owe per class, and the checkout
@@ -96,7 +88,6 @@ function FeeBalancePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const autoStartedRef = useRef(false);
-  // the balances and the page state
   const [balances, setBalances] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -111,18 +102,15 @@ function FeeBalancePage() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [isPaying, setIsPaying] = useState(false);
   const [payError, setPayError] = useState('');
-  const [outcome, setOutcome] = useState(null); // { status: 'SUCCESSFUL' | 'FAILED' | 'PENDING' | 'AWAITING_VERIFICATION', payment? }
+  const [outcome, setOutcome] = useState(null);
 
-  // bank transfer open or closed, and the payment settings from the server
   const [bankTransferAvailable, setBankTransferAvailable] = useState(true);
   const [bankTransferClosedMessage, setBankTransferClosedMessage] = useState('');
   const [paymentSettings, setPaymentSettings] = useState(null);
 
-  // gateway switch from the server
   const onlinePaymentsEnabled = Boolean(paymentSettings && paymentSettings.onlinePaymentsEnabled);
   const methodTabs = onlinePaymentsEnabled ? LIVE_PAYMENT_METHODS : PAYMENT_METHODS;
 
-  // load what I owe for each class
   const loadBalances = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
@@ -133,11 +121,9 @@ function FeeBalancePage() {
       setLoadError(error.message);
     } finally {
       setIsLoading(false);
-    // fail silently, not critical
     }
   }, []);
 
-  // on open - load the balances, whether bank transfer is open, and the payment settings
   useEffect(() => {
     loadBalances();
     fetchBankTransferAvailability()
@@ -146,16 +132,13 @@ function FeeBalancePage() {
         setBankTransferClosedMessage(message || '');
       })
       .catch(() => {
-        // ignore - server still checks this on submit
       });
     fetchPaymentSettings()
       .then(setPaymentSettings)
       .catch(() => {
-        // checkout still works without this - the callouts just stay hidden
       });
   }, [loadBalances]);
 
-  // Settings arrive a moment after the balances do
   useEffect(() => {
     if (!onlinePaymentsEnabled) return;
     setPaymentMethod((current) =>
@@ -163,7 +146,6 @@ function FeeBalancePage() {
     );
   }, [onlinePaymentsEnabled]);
 
-  // pay btn - open the checkout for a class with a blank form
   function startPayment(enrollment) {
     setActiveEnrollment(enrollment);
     setAmount(String(enrollment.balance));
@@ -177,11 +159,9 @@ function FeeBalancePage() {
     setOutcome(null);
   }
 
-  // auto-open payment for the class just enrolled in
   useEffect(() => {
     const targetEnrollmentId = location.state && location.state.enrollmentId;
     if (!targetEnrollmentId || autoStartedRef.current || balances.length === 0) return;
-    // the class I just enrolled in
     const target = balances.find((b) => b.enrollmentId === targetEnrollmentId);
     if (target) {
       autoStartedRef.current = true;
@@ -189,12 +169,10 @@ function FeeBalancePage() {
     }
   }, [location.state, balances]);
 
-  // change one card form field
   function updateCardField(field, value) {
     setCardDetails((previous) => ({ ...previous, [field]: value }));
   }
 
-  // check the card, wallet or bank transfer fields before paying
   function validatePaymentFields() {
     const errors = {};
 
@@ -212,7 +190,7 @@ function FeeBalancePage() {
         errors.expiryDate = 'Use MM/YY format.';
       } else {
         const [mm, yy] = cardDetails.expiryDate.split('/').map(Number);
-        const firstDayAfterExpiry = new Date(2000 + yy, mm); // month is 0-indexed, so this is the 1st of the month AFTER expiry
+        const firstDayAfterExpiry = new Date(2000 + yy, mm);
         if (firstDayAfterExpiry <= new Date()) {
           errors.expiryDate = 'This card has expired.';
         }
@@ -242,7 +220,6 @@ function FeeBalancePage() {
     return errors;
   }
 
-  // the details sent to the server - only the last 4 card digits, never the full card
   function buildPaymentDetailsPayload() {
     if (paymentMethod === 'CARD') {
       const digits = cardDetails.cardNumber.replace(/\D/g, '');
@@ -261,7 +238,6 @@ function FeeBalancePage() {
     return {};
   }
 
-  // pay btn - check the amount, then pay online, by card, wallet or bank transfer
   async function handlePaySubmit(event) {
     event.preventDefault();
     setPayError('');
@@ -272,7 +248,6 @@ function FeeBalancePage() {
       return;
     }
 
-    // Real gateway: reserve the payment
     if (paymentMethod === 'ONLINE') {
       setIsPaying(true);
       try {
@@ -321,7 +296,6 @@ function FeeBalancePage() {
       if (error.details) {
         const mapped = {};
         error.details.forEach((detail) => {
-          // match server field name to form field name
           const key = detail.field.split('.').pop();
           mapped[key] = detail.message;
         });
@@ -332,14 +306,12 @@ function FeeBalancePage() {
     }
   }
 
-  // the total I still owe
   const totalOutstanding = balances.reduce((sum, b) => sum + Number(b.balance), 0);
   const inCheckout = Boolean(activeEnrollment);
 
   return (
     <PortalShell navItems={NAV_ITEMS}>
       <div className="page">
-        {/* breadcrumb - Dashboard / Fees & Payments / Checkout */}
         <nav className="breadcrumb" aria-label="Breadcrumb">
           <Link to="/">Dashboard</Link>
           <span className="breadcrumb-sep">/</span>
@@ -358,7 +330,6 @@ function FeeBalancePage() {
           )}
         </nav>
 
-        {/* page title - changes while in the checkout */}
         <div className="page-header">
           {inCheckout ? (
             <>
@@ -375,12 +346,10 @@ function FeeBalancePage() {
 
         <Alert type="error" message={loadError} />
 
-        {/* a spinner, or the page content */}
         {isLoading ? (
           <LoadingSpinner label="Loading your fee balance..." />
         ) : (
           <>
-            {/* total outstanding card with the Pay Bill Now btn */}
             {!inCheckout && (
               <div
                 className="card"
@@ -412,7 +381,6 @@ function FeeBalancePage() {
               </div>
             )}
 
-            {/* payment result - successful */}
             {outcome && outcome.status === 'SUCCESSFUL' && (
               <div className="card auth-result">
                 <div className="auth-result-icon">
@@ -443,7 +411,6 @@ function FeeBalancePage() {
               </div>
             )}
 
-            {/* payment result - declined */}
             {outcome && outcome.status === 'FAILED' && (
               <div className="card auth-result">
                 <div className="auth-result-icon" style={{ background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}>
@@ -452,7 +419,6 @@ function FeeBalancePage() {
                 <h2>Payment Declined</h2>
                 <p className="muted">{outcome.reason || 'Your payment could not be processed. Please check your details and try again.'}</p>
                 <div className="result-actions">
-                  {/* send to selected btn */}
                   <button
                     type="button"
                     className="btn btn-primary btn-block"
@@ -470,7 +436,6 @@ function FeeBalancePage() {
               </div>
             )}
 
-            {/* payment result - the gateway did not answer in time */}
             {outcome && outcome.status === 'PENDING' && (
               <Alert
                 type="warning"
@@ -478,7 +443,6 @@ function FeeBalancePage() {
               />
             )}
 
-            {/* payment result - bank transfer waiting for the office to check the receipt */}
             {outcome && outcome.status === 'AWAITING_VERIFICATION' && (
               <div className="card auth-result">
                 <div className="auth-result-icon" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
@@ -501,7 +465,6 @@ function FeeBalancePage() {
               </div>
             )}
 
-            {/* active bills - a message when there are none, else the bills table */}
             {!inCheckout && (balances.length === 0 ? (
               <p className="muted">You have no active enrollments yet.</p>
             ) : (
@@ -525,7 +488,6 @@ function FeeBalancePage() {
                           </td>
                           <td>{formatCurrency(enrollment.balance)}</td>
                           <td>
-                            {/* pay btn - only while something is owed */}
                             {enrollment.balance > 0 && (
                               <button
                                 type="button"
@@ -544,10 +506,8 @@ function FeeBalancePage() {
               </div>
             ))}
 
-            {/* checkout - order summary and the payment form */}
             {activeEnrollment && (
               <div className="checkout-grid">
-                {/* order summary */}
                 <div className="card">
                   <div className="flex-between" style={{ marginBottom: '4px' }}>
                     <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Order Summary</h3>
@@ -566,12 +526,10 @@ function FeeBalancePage() {
                   </div>
                 </div>
 
-                {/* payment details - method tabs, the fields and the pay btn */}
                 <div className="card">
                   <h3 style={{ fontSize: '0.95rem', marginTop: 0 }}>Payment Details</h3>
                   <Alert type="error" message={payError} />
                   <form onSubmit={handlePaySubmit} noValidate>
-                    {/* method tabs - a closed method is disabled */}
                     <div className="payment-tabs">
                       {methodTabs.map((method) => {
                         const isDisabled = method.value === 'BANK_TRANSFER' && !bankTransferAvailable;
@@ -594,7 +552,6 @@ function FeeBalancePage() {
                       })}
                     </div>
 
-                    {/* online - the student finishes on the PayHere page */}
                     {paymentMethod === 'ONLINE' && (
                       <div className="callout" style={{ marginBottom: '16px' }}>
                         <span>
@@ -606,12 +563,10 @@ function FeeBalancePage() {
                       </div>
                     )}
 
-                    {/* bank transfer is closed - show why */}
                     {paymentMethod === 'BANK_TRANSFER' && !bankTransferAvailable && (
                       <Alert type="warning" message={bankTransferClosedMessage} />
                     )}
 
-                    {/* card fields - name, number, expiry and CVV */}
                     {paymentMethod === 'CARD' && (
                       <>
                         <div className="form-field">
@@ -678,7 +633,6 @@ function FeeBalancePage() {
                       </>
                     )}
 
-                    {/* wallet fields - our number to send to and my mobile number */}
                     {(paymentMethod === 'EZ_CASH' || paymentMethod === 'MCASH') && (
                       <>
                         {(paymentMethod === 'EZ_CASH' ? paymentSettings?.ezCashNumber : paymentSettings?.mcashNumber) && (
@@ -780,7 +734,6 @@ function FeeBalancePage() {
                       />
                     </div>
 
-                    {/* pay btn - Submit for Verification for a bank transfer */}
                     <button type="submit" className="btn btn-primary btn-block" disabled={isPaying}>
                       {isPaying && <span className="btn-spinner" aria-hidden="true" />}
                       {isPaying
@@ -791,7 +744,6 @@ function FeeBalancePage() {
                           ? 'Submit for Verification'
                           : `Pay ${formatCurrency(amount || 0)}`}
                     </button>
-                    {/* cancel btn - back to the bills */}
                     <button
                       type="button"
                       className="btn btn-secondary btn-block"
@@ -800,7 +752,6 @@ function FeeBalancePage() {
                     >
                       Cancel
                     </button>
-                    {/* privacy note */}
                     <p className="secure-note">
                       {paymentMethod === 'BANK_TRANSFER'
                         ? 'Your receipt is only ever visible to you and to Administrators reviewing your transfer.'

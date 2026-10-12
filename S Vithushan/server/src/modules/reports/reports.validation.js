@@ -39,4 +39,7 @@ const reportQueryRules = [
   query('academicYear').optional({ values: 'falsy' }).isInt({ min: 2020, max: 2100 }).withMessage('Choose a valid year.'),
 ];
 
-module.exports = { reportTypeRules, reportQueryRules };
+// a recent report id
+const historyIdRules = [param('id').isInt({ min: 1 }).withMessage('That report does not exist.')];
+
+module.exports = { reportTypeRules, reportQueryRules, historyIdRules };

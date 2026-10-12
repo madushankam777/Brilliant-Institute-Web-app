@@ -2,13 +2,11 @@
 const crypto = require('crypto');
 const config = require('../../../../../shared/server/src/config/env');
 
-// where the browser sends the payer - PayHere's sandbox (testing) or live checkout
 const CHECKOUT_URLS = {
   sandbox: 'https://sandbox.payhere.lk/pay/checkout',
   live: 'https://www.payhere.lk/pay/checkout',
 };
 
-// PayHere's own status codes, straight from their docs.
 const STATUS = Object.freeze({
   SUCCESS: '2',
   PENDING: '0',
@@ -17,7 +15,6 @@ const STATUS = Object.freeze({
   CHARGEDBACK: '-3',
 });
 
-// PayHere reports which instrument was actually used
 const METHOD_MAP = Object.freeze({
   VISA: 'CARD',
   MASTER: 'CARD',
@@ -26,33 +23,27 @@ const METHOD_MAP = Object.freeze({
   MCASH: 'MCASH',
 });
 
-// MD5 is required by PayHere's signature rules
 function md5Upper(value) {
   return crypto.createHash('md5').update(String(value)).digest('hex').toUpperCase();
 }
 
-// are the PayHere settings complete?
 function isConfigured() {
   return config.payhere.isConfigured;
 }
 
-/** PayHere wants "1000.00" - two decimals, dot separator, no grouping. */
 function formatAmount(amount) {
   return Number(amount).toFixed(2);
 }
 
-// order id sent to PayHere, e.g. BI-15 for payment 15
 function orderIdForPayment(paymentId) {
   return `BI-${paymentId}`;
 }
 
-// get our payment id back from a PayHere order id
 function paymentIdFromOrderId(orderId) {
   const match = /^BI-(\d+)$/.exec(String(orderId || ''));
   return match ? Number(match[1]) : null;
 }
 
-// the address PayHere calls when a payment finishes
 function notifyUrl() {
   return (
     config.payhere.notifyUrlOverride ||
@@ -70,7 +61,6 @@ function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
   const formattedAmount = formatAmount(amount);
   const currency = config.payhere.currency;
 
-  // checkout signature = md5(merchant id + order id + amount + currency + md5(secret))
   const hash = md5Upper(
     config.payhere.merchantId +
       orderId +
@@ -79,7 +69,6 @@ function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
       md5Upper(config.payhere.merchantSecret)
   );
 
-  // PayHere needs a first and a last name
   const nameParts = String(student.fullName || '').trim().split(/\s+/);
   const firstName = nameParts[0] || 'Student';
   const lastName = nameParts.slice(1).join(' ') || '-';
@@ -95,12 +84,10 @@ function buildCheckoutRequest({ paymentId, amount, itemDescription, student }) {
       items: itemDescription,
       currency,
       amount: formattedAmount,
-      // signature so the amount can't be changed in the browser
       hash,
       first_name: firstName,
       last_name: lastName,
       email: student.email,
-      // PayHere needs an address - use the institute's
       phone: student.phone || '',
       address: 'Brilliant Institute',
       city: 'Colombo',
@@ -120,7 +107,6 @@ function verifyNotification(body = {}) {
     md5sig: signature,
   } = body;
 
-  // the signature PayHere should have sent (same idea, plus the status code)
   const expected = md5Upper(
     String(merchantId) +
       String(orderId) +
@@ -131,7 +117,6 @@ function verifyNotification(body = {}) {
   );
 
   const provided = String(signature || '').toUpperCase();
-  // Both sides are fixed-length hex, so a constant-time compare is cheap.
   const valid =
     provided.length === expected.length &&
     crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected)) &&
@@ -150,7 +135,6 @@ function verifyNotification(body = {}) {
     mappedMethod: METHOD_MAP[String(body.method || '').toUpperCase()] || 'ONLINE',
     statusMessage: String(body.status_message || ''),
     cardHolderName: body.card_holder_name ? String(body.card_holder_name).slice(0, 100) : null,
-    // PayHere sends the number already masked (************1234).
     cardLast4: cardNo ? cardNo.replace(/\D/g, '').slice(-4) : null,
   };
 }

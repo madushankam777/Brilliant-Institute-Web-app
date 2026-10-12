@@ -104,19 +104,14 @@ function NotifyStudentsPage() {
           <div>
             <h1>Notify Students</h1>
             <p className="muted">
-              Send one message to the students in your classes, the institute office, or both. Each person gets it in
-              their Messages (with a notification and an email) and can reply to you there. Want it to arrive later?
-              Schedule a reminder instead.
+              Send a notice to the students in your classes, the institute office, or both. It arrives in their
+              notification bell and by email, and they can open it in full. Want it to arrive later? Schedule a
+              reminder instead.
             </p>
           </div>
-          <div className="flex-between" style={{ gap: '8px' }}>
-            <Link to="/messages" className="btn btn-secondary">
-              <Icon name="mail" size={16} /> Messages
-            </Link>
-            <Link to="/reminders" className="btn btn-secondary">
-              <Icon name="clock" size={16} /> Scheduled Reminders
-            </Link>
-          </div>
+          <Link to="/reminders" className="btn btn-secondary">
+            <Icon name="clock" size={16} /> Scheduled Reminders
+          </Link>
         </div>
 
         <Alert type="error" message={loadError} />
@@ -209,7 +204,7 @@ function NotifyStudentsPage() {
 
               {/* send btn */}
               <button type="submit" className="btn btn-primary" disabled={isSending}>
-                <Icon name="send" size={15} /> {isSending ? 'Sending...' : 'Send message'}
+                <Icon name="send" size={15} /> {isSending ? 'Sending...' : 'Send notice'}
               </button>
             </form>
           </div>

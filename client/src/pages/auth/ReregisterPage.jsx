@@ -100,10 +100,10 @@ function ReregisterPage() {
                   <strong>{status.nextGrade || 'your next grade'}</strong> on 1 January - nothing
                   else to do.
                 </p>
-              ) : status?.isFinalGrade ? (
+              ) : status?.isFinalGrade && !status?.hasKeyWaiting ? (
                 <p className="callout">
-                  You are in the final grade, so you finish at the end of this year. Talk to the
-                  office if you are continuing with us.
+                  You are an A/L student, so there is nothing to re-register - you finish at the end of
+                  this year. Talk to the office if you are continuing with us.
                 </p>
               ) : (
                 <p className="callout">
@@ -117,7 +117,10 @@ function ReregisterPage() {
               <p className="callout">Re-registration is not open yet. The office will let you know when it is.</p>
             )}
 
-            {status?.isOpen !== false && !status?.isConfirmedForNextYear && (
+            {/* the key form - not for A/L students, unless the office gave them a key */}
+            {status?.isOpen !== false &&
+              !status?.isConfirmedForNextYear &&
+              (!status?.isFinalGrade || status?.hasKeyWaiting) && (
               <div className="card">
                 <h2>Enter your key</h2>
 

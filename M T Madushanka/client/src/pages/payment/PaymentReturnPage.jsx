@@ -8,19 +8,17 @@ import Icon from '../../../../../shared/client/src/components/common/Icon';
 import PortalShell from '../../../../../shared/client/src/components/layout/PortalShell';
 import { getNavItems } from '../../components/layout/navItems';
 
-// the side menu for a student
 const NAV_ITEMS = getNavItems('STUDENT_PARENT');
 
-// ask the server for the payment status every 2 seconds
 const POLL_INTERVAL_MS = 2000;
-const MAX_POLLS = 15; // ~30s, then stop and let them check their history
+const MAX_POLLS = 15;
 
 // a number as LKR money
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(amount);
 }
 
-// payment return page - where PayHere sends the student back; it only shows the result
+// payment return page
 function PaymentReturnPage() {
   const [searchParams] = useSearchParams();
   const paymentId = searchParams.get('payment');
@@ -31,7 +29,6 @@ function PaymentReturnPage() {
   const [stillWaiting, setStillWaiting] = useState(true);
   const pollCountRef = useRef(0);
 
-  // ask the server for the payment status (only the server decides the result)
   const load = useCallback(async () => {
     if (!paymentId) {
       setErrorMessage('No payment reference was supplied.');
@@ -41,7 +38,6 @@ function PaymentReturnPage() {
     try {
       const latest = await fetchPaymentStatus(paymentId);
       setPayment(latest);
-      // PENDING means the gateway's confirmation hasn't reached us yet.
       if (latest.status !== 'PENDING') {
         setStillWaiting(false);
         return true;
@@ -54,12 +50,10 @@ function PaymentReturnPage() {
     return false;
   }, [paymentId]);
 
-  // keep checking while the payment is still pending (about 30 seconds)
   useEffect(() => {
     let timerId;
     let cancelled = false;
 
-    // check once, then again after 2 seconds until it is settled
     async function poll() {
       const done = await load();
       if (cancelled || done) return;
@@ -87,7 +81,6 @@ function PaymentReturnPage() {
         <div className="card" style={{ maxWidth: '520px', margin: '32px auto', textAlign: 'center' }}>
           <Alert type="error" message={errorMessage} />
 
-          {/* waiting - a spinner while the payment is confirmed */}
           {stillWaiting && (
             <>
               <LoadingSpinner label="Confirming your payment with the bank..." />
@@ -97,7 +90,6 @@ function PaymentReturnPage() {
             </>
           )}
 
-          {/* successful - class, amount and receipt number */}
           {!stillWaiting && status === 'SUCCESSFUL' && (
             <>
               <div className="auth-result-icon">
@@ -131,7 +123,6 @@ function PaymentReturnPage() {
             </>
           )}
 
-          {/* failed or cancelled - nothing was charged */}
           {!stillWaiting && (status === 'FAILED' || wasCancelled) && (
             <>
               <div
@@ -152,7 +143,6 @@ function PaymentReturnPage() {
             </>
           )}
 
-          {/* still pending - the bank has not confirmed yet */}
           {!stillWaiting && status === 'PENDING' && !wasCancelled && (
             <>
               <div
@@ -172,7 +162,6 @@ function PaymentReturnPage() {
             </>
           )}
 
-          {/* back to the dashboard link */}
           <p className="auth-footer-note">
             <Link to="/">Back to Dashboard</Link>
           </p>
