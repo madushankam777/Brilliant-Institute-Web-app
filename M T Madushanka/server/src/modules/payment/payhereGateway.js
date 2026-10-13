@@ -23,6 +23,7 @@ const METHOD_MAP = Object.freeze({
   MCASH: 'MCASH',
 });
 
+// MD5 in capitals
 function md5Upper(value) {
   return crypto.createHash('md5').update(String(value)).digest('hex').toUpperCase();
 }

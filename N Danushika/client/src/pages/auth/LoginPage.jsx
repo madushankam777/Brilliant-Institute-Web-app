@@ -6,25 +6,24 @@ import FormField from '../../../../../shared/client/src/components/common/FormFi
 import Alert from '../../../../../shared/client/src/components/common/Alert';
 import AuthLayout from '../../../../../shared/client/src/components/layout/AuthLayout';
 
-
+// Show the login form and handle signing in.
 function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  
+  // Store the form values, validation errors and submit status.
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  
+  // Show a welcome message after registration and remember the page to return to.
   const justRegistered = Boolean(location.state && location.state.justRegistered);
-  
   const redirectTo = location.state && location.state.from ? location.state.from.pathname : null;
 
-  
+  // Check that the email and password have been entered correctly.
   function validate() {
     const errors = {};
     if (!email.trim()) {
@@ -38,7 +37,7 @@ function LoginPage() {
     return errors;
   }
 
-  
+  // Validate the form, sign in and send the user to the right page.
   async function handleSubmit(event) {
     event.preventDefault();
     setFormError('');
@@ -51,7 +50,6 @@ function LoginPage() {
 
     try {
       await login({ email, password });
-      
       navigate(redirectTo || '/', { replace: true });
     } catch (error) {
       setFormError(error.message);
@@ -72,12 +70,14 @@ function LoginPage() {
       <h1>Welcome Back</h1>
       <p className="muted">Please enter your credentials to access your tuition dashboard</p>
 
+      {/* Confirm successful registration before login. */}
       {justRegistered && (
         <Alert type="success" message="Account created successfully. Please log in." />
       )}
+      {/* Show login errors returned by the server. */}
       <Alert type="error" message={formError} />
 
-      {/* login form - email, password and the forgot password link */}
+      {/* Enter email and password, or open the password recovery page. */}
       <form onSubmit={handleSubmit} noValidate>
         <FormField
           id="email"
@@ -104,18 +104,20 @@ function LoginPage() {
           required
         />
 
+        {/* Open the password recovery page. */}
         <p className="center-text" style={{ textAlign: 'right', marginTop: '-8px' }}>
           <Link to="/forgot-password" style={{ fontSize: '0.85rem', fontWeight: 600 }}>
             Forgot Password?
           </Link>
         </p>
 
+        {/* Submit the login form and show progress while signing in. */}
         <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
           {isSubmitting ? 'Logging in...' : 'Login'}
         </button>
       </form>
 
-      {/* link to the register page */}
+      {/* Open the registration page for users without an account. */}
       <div className="form-divider">Or</div>
 
       <p className="auth-footer-note">

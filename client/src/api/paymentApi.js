@@ -188,6 +188,12 @@ export async function updatePaymentSettings(payload) {
   return response.data.data.settings;
 }
 
+// admin only - turn payment methods on or off straight away
+export async function updatePaymentMethods(payload) {
+  const response = await httpClient.put('/payments/admin/methods', payload);
+  return response.data.data.settings;
+}
+
 // --- Tutor payouts ---
 // { bulkFileAvailable, apiAvailable, apiName, sourceAccount }
 export async function fetchPayoutOptions() {

@@ -105,6 +105,11 @@ function hasReportHistoryHidden() {
   return hasTable('report_history_hidden');
 }
 
+// card payments have their own settlement bank account
+function hasCardAccount() {
+  return hasColumn('payment_settings', 'card_account_number');
+}
+
 // notifications remember when their email went out (so each is emailed once)
 async function hasNotificationEmails() {
   return (await hasColumn('notification_log', 'emailed_at')) && (await hasColumn('notification_log', 'email_tries'));
@@ -132,6 +137,7 @@ async function reportPendingUpdates() {
   if (!(await hasNotificationReadState())) missing.push('read / unread notifications');
   if (!(await hasFeedbackReads())) missing.push('read / delete for feedback tickets');
   if (!(await hasReportHistoryHidden())) missing.push('deleting recent reports');
+  if (!(await hasCardAccount())) missing.push('a separate bank account for card payments');
 
   if (missing.length > 0) {
     console.warn(
@@ -157,6 +163,7 @@ module.exports = {
   hasNotificationReadState,
   hasFeedbackReads,
   hasReportHistoryHidden,
+  hasCardAccount,
   migrationRequired,
   reportPendingUpdates,
 };

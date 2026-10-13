@@ -13,18 +13,21 @@ const listClassSessions = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+// today session request
 const getOrCreateTodaySession = asyncHandler(async (req, res) => {
   const classId = Number(req.params.classId);
   const data = await service.getOrCreateTodaySession(req.user, classId);
   res.status(200).json({ success: true, data });
 });
 
+// sheet request
 const getAttendanceSheet = asyncHandler(async (req, res) => {
   const sessionId = Number(req.params.sessionId);
   const data = await service.getAttendanceSheet(req.user, sessionId);
   res.status(200).json({ success: true, data });
 });
 
+// save sheet request
 const markAttendance = asyncHandler(async (req, res) => {
   const sessionId = Number(req.params.sessionId);
   const { records } = req.body;
@@ -36,6 +39,7 @@ const markAttendance = asyncHandler(async (req, res) => {
   });
 });
 
+// generate key request
 const startSelfCheckIn = asyncHandler(async (req, res) => {
   const sessionId = Number(req.params.sessionId);
   const data = await service.startSelfCheckIn(req.user, sessionId);
@@ -55,12 +59,14 @@ const selfCheckIn = asyncHandler(async (req, res) => {
   });
 });
 
+// history request
 const getMyHistory = asyncHandler(async (req, res) => {
   const classId = req.query.classId ? Number(req.query.classId) : undefined;
   const data = await service.getMyAttendanceHistory(req.user, classId);
   res.status(200).json({ success: true, data });
 });
 
+// student history request
 const getStudentHistoryForTutor = asyncHandler(async (req, res) => {
   const studentId = Number(req.params.studentId);
   const classId = req.query.classId ? Number(req.query.classId) : undefined;

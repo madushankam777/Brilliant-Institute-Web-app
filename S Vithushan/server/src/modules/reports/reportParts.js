@@ -21,7 +21,7 @@ const TONES = {
 const LABELS = {
   STUDENT_PARENT: 'Student', TUTOR: 'Tutor', ADMIN: 'Admin',
   CARD: 'Card', EZ_CASH: 'eZ Cash', MCASH: 'mCash', BANK_TRANSFER: 'Bank transfer', BANK_DEPOSIT: 'Bank deposit slip',
-  CASH: 'Cash', ONLINE: 'Online (PayHere)', BANK_FILE: 'Bank file', PAYOUT_API: 'Payout provider', MANUAL: 'Manual record',
+  CASH: 'Cash', ONLINE: 'Online (PayHere)', BANK_FILE: 'Bank file', PAYOUT_API: 'Payout provider', CARD_ACCOUNT: 'Card account transfer', MANUAL: 'Manual record',
   IN_PROGRESS: 'In progress', ADMIN_TUTOR: 'Admin & tutor', ALL: 'Everyone', EZCASH: 'eZ Cash',
   IN_APP: 'In-app', EMAIL: 'Email', SMS: 'SMS', EXTRA: 'Extra class',
   SAME_DAY: 'Marked same day', MARKED_LATER: 'Marked later', CHECKINS_ONLY: 'Check-ins only',

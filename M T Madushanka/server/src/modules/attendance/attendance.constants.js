@@ -8,6 +8,7 @@ const ATTENDANCE_STATUS = Object.freeze({
 // the allowed statuses as a list, for validation
 const VALID_ATTENDANCE_STATUSES = Object.values(ATTENDANCE_STATUS);
 
+// key works for 15 minutes
 const CHECKIN_CODE_VALID_MINUTES = 15;
 
 module.exports = { ATTENDANCE_STATUS, VALID_ATTENDANCE_STATUSES, CHECKIN_CODE_VALID_MINUTES };

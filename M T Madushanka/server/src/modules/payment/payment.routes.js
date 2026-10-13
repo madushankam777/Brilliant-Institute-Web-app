@@ -19,6 +19,7 @@ const {
   failPayoutRules,
   bankDetailsRules,
   paymentSettingsRules,
+  paymentMethodsRules,
   studentSearchRules,
   recordPaymentRules,
 } = require('./payment.validation');
@@ -28,6 +29,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/me/bank-details', authorize(ROLES.TUTOR), controller.getMyBankDetails);
+// tutor saves own bank account
 router.put(
   '/me/bank-details',
   authorize(ROLES.TUTOR),
@@ -37,6 +39,7 @@ router.put(
 );
 
 router.get('/settings', controller.getPaymentSettings);
+// save payment details
 router.put(
   '/admin/settings',
   authorize(ROLES.ADMIN),
@@ -44,11 +47,23 @@ router.put(
   validateRequest,
   controller.updatePaymentSettings
 );
+// payment method switch - turn one on or off straight away
+router.put(
+  '/admin/methods',
+  authorize(ROLES.ADMIN),
+  paymentMethodsRules,
+  validateRequest,
+  controller.updatePaymentMethods
+);
 
+// my fee balances
 router.get('/balance', authorize(ROLES.STUDENT_PARENT), controller.getMyBalances);
+// my payment history
 router.get('/history', authorize(ROLES.STUDENT_PARENT), controller.getMyPaymentHistory);
+// pay now (card / wallet)
 router.post('/', authorize(ROLES.STUDENT_PARENT), makePaymentRules, validateRequest, controller.makePayment);
 
+// start a PayHere payment
 router.post(
   '/checkout/online',
   authorize(ROLES.STUDENT_PARENT),
@@ -56,6 +71,7 @@ router.post(
   validateRequest,
   controller.startOnlineCheckout
 );
+// start a PayPal payment
 router.post(
   '/checkout/paypal',
   authorize(ROLES.STUDENT_PARENT),
@@ -108,6 +124,7 @@ router.get(
   validateRequest,
   controller.searchStudentsForPayment
 );
+// record a payment at the office
 router.post(
   '/admin/record-payment',
   authorize(ROLES.ADMIN),
@@ -126,6 +143,7 @@ router.get(
   authorize(ROLES.ADMIN),
   controller.listRecentPayments
 );
+// approve a bank slip
 router.patch(
   '/admin/:paymentId/approve',
   authorize(ROLES.ADMIN),
@@ -166,6 +184,7 @@ router.put(
   controller.updateTutorBankDetailsAsAdmin
 );
 router.get('/admin/tutor-payouts', authorize(ROLES.ADMIN), controller.listTutorPayouts);
+// pay a tutor
 router.post(
   '/admin/tutor-payouts',
   authorize(ROLES.ADMIN),
@@ -176,6 +195,7 @@ router.post(
 
 router.get('/admin/payouts/options', authorize(ROLES.ADMIN), controller.getPayoutOptions);
 router.get('/admin/payouts/batch', authorize(ROLES.ADMIN), controller.getPayoutBatch);
+// download the bank file
 router.post('/admin/payouts/export', authorize(ROLES.ADMIN), controller.exportPayoutFile);
 router.patch(
   '/admin/payouts/:payoutId/settled',

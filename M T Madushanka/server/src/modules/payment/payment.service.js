@@ -41,10 +41,12 @@ function lastDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
 
+// closed on the last day of the month
 function isBankTransferWindowOpen(date = new Date()) {
   return date.getDate() !== lastDayOfMonth(date);
 }
 
+// open or closed, with a message
 function getBankTransferAvailability() {
   const now = new Date();
   const available = isBankTransferWindowOpen(now);
@@ -58,6 +60,7 @@ function getBankTransferAvailability() {
   };
 }
 
+// balance per class
 async function getMyBalances(studentUser) {
   const rows = await repository.listBalancesForStudent(studentUser.id);
   return rows.map((row) => ({
@@ -71,12 +74,14 @@ async function getMyBalances(studentUser) {
   }));
 }
 
+// receipt number RCPT-year-id
 function buildReceiptNumber(paymentId) {
   const year = new Date().getFullYear();
   const paddedId = String(paymentId).padStart(6, '0');
   return `RCPT-${year}-${paddedId}`;
 }
 
+// keep safe details only
 function buildStoredPaymentDetails(paymentMethod, rawDetails = {}) {
   if (paymentMethod === 'CARD') {
     return {
@@ -102,6 +107,7 @@ function buildStoredPaymentDetails(paymentMethod, rawDetails = {}) {
   return { method: paymentMethod };
 }
 
+// BEGIN, then COMMIT or ROLLBACK
 async function withTransaction(work) {
   const connection = await pool.getConnection();
   let transactionOpen = false;
@@ -122,6 +128,7 @@ async function withTransaction(work) {
   }
 }
 
+// save a PENDING payment
 async function createPendingPaymentRecord(
   studentUser,
   { enrollmentId, amount, paymentMethod, paymentDetails }
@@ -299,32 +306,63 @@ async function finalizePendingPayment(studentUser, paymentId) {
 }
 
 const PAYMENT_METHOD_KEYS = ['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH', 'PAYPAL'];
+const METHOD_NAMES = { BANK_TRANSFER: 'Bank transfer', CARD: 'Card', EZ_CASH: 'eZ Cash', MCASH: 'mCash', PAYPAL: 'PayPal' };
 
+// methods that are switched on
 async function loadEnabledMethods() {
   const saved = await repository.findEnabledMethods();
   if (!saved) return ['BANK_TRANSFER', 'PAYPAL'];
   return PAYMENT_METHOD_KEYS.filter((method) => saved.includes(method));
 }
 
-function checkoutMethodsFor(enabled) {
-  const online = enabled.filter((method) => method !== 'BANK_TRANSFER' && method !== 'PAYPAL');
+// what is still missing before a method can be used (null when it is ready)
+function missingDetailFor(method, row, hasCardColumns) {
+  const settings = row || {};
+  if (method === 'BANK_TRANSFER' && !settings.bank_account_number) {
+    return 'Add the bank account number under Bank transfer first.';
+  }
+  if (method === 'CARD') {
+    // until the card columns exist, card payments settle into the main bank account
+    if (!hasCardColumns) {
+      return settings.bank_account_number ? null : 'Add the bank account number under Bank transfer first.';
+    }
+    if (!settings.card_account_number) return 'Add the card account number under Card first.';
+  }
+  if (method === 'EZ_CASH' && !settings.ez_cash_number) return 'Add the institute eZ Cash number first.';
+  if (method === 'MCASH' && !settings.mcash_number) return 'Add the institute mCash number first.';
+  if (method === 'PAYPAL' && !paypal.isConfigured()) return 'PayPal is not connected on this server.';
+  return null;
+}
+
+// the saved details plus whether the card columns exist
+async function loadMethodDetails() {
+  const [row, hasCardColumns] = await Promise.all([repository.getPaymentSettings(), schema.hasCardAccount()]);
+  return { row, hasCardColumns };
+}
+
+// checkout tabs - methods that are switched on and have their details
+function checkoutMethodsFor(enabled, details) {
+  const ready = enabled.filter((method) => !missingDetailFor(method, details.row, details.hasCardColumns));
+  const online = ready.filter((method) => method !== 'BANK_TRANSFER' && method !== 'PAYPAL');
   const tabs = [];
   if (online.length > 0) {
     if (payhere.isConfigured()) tabs.push('ONLINE');
     else if (!config.isProduction && config.paymentGateway.providerName === 'mock-gateway') tabs.push(...online);
   }
-  if (enabled.includes('PAYPAL') && paypal.isConfigured()) tabs.push('PAYPAL');
-  if (enabled.includes('BANK_TRANSFER')) tabs.push('BANK_TRANSFER');
+  if (ready.includes('PAYPAL')) tabs.push('PAYPAL');
+  if (ready.includes('BANK_TRANSFER')) tabs.push('BANK_TRANSFER');
   return tabs;
 }
 
+// refuse a method that is off
 async function assertMethodAllowed(method) {
-  const tabs = checkoutMethodsFor(await loadEnabledMethods());
+  const tabs = checkoutMethodsFor(await loadEnabledMethods(), await loadMethodDetails());
   if (!tabs.includes(method)) {
     throw ApiError.forbidden('This payment method is not available right now. Please choose another one.');
   }
 }
 
+// pay instantly
 async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, paymentDetails }) {
   await assertMethodAllowed(paymentMethod);
   const paymentId = await createPendingPaymentRecord(studentUser, {
@@ -336,12 +374,14 @@ async function makePayment(studentUser, { enrollmentId, amount, paymentMethod, p
   return finalizePendingPayment(studentUser, paymentId);
 }
 
+// retry a pending payment
 async function retryPendingPayment(studentUser, paymentId) {
   const pending = await repository.findPaymentById(paymentId);
   if (pending) await assertMethodAllowed(pending.payment_method);
   return finalizePendingPayment(studentUser, paymentId);
 }
 
+// save the slip as PENDING
 async function submitBankTransferPayment(
   studentUser,
   { enrollmentId, amount, bankReference, receiptImagePath }
@@ -397,6 +437,7 @@ async function submitBankTransferPayment(
   return { pending: true, payment: toSafePayment(payment) };
 }
 
+// fix a pending slip
 async function editBankTransferPayment(studentUser, paymentId, { bankReference, receiptImagePath }) {
   const payment = await repository.findPaymentById(paymentId);
   if (!payment || payment.payment_method !== 'BANK_TRANSFER') {
@@ -436,6 +477,7 @@ async function editBankTransferPayment(studentUser, paymentId, { bankReference, 
   return toSafePayment(updated);
 }
 
+// slips waiting to be checked
 async function listPendingBankTransfers() {
   const rows = await repository.listPendingBankTransfers();
   return rows.map((row) => {
@@ -467,6 +509,7 @@ async function findPendingBankTransferOrThrow(paymentId) {
   return payment;
 }
 
+// approve the slip in one transaction
 async function approveBankTransferPayment(adminUser, paymentId, { amount } = {}) {
   const outcome = await withTransaction(async (connection) => {
     const payment = await repository.findPaymentByIdForUpdate(paymentId, connection);
@@ -566,6 +609,7 @@ async function searchStudentsForPayment(term) {
 
 const OFFICE_METHODS = { CASH: 'Cash', BANK_DEPOSIT: 'Bank deposit slip' };
 
+// cash or deposit paid at the office
 async function recordOfficePayment(adminUser, { enrollmentId, amount, method, reference, note }) {
   const paid = roundMoney(Number(amount));
   if (!(paid > 0)) {
@@ -636,6 +680,7 @@ async function recordOfficePayment(adminUser, { enrollmentId, amount, method, re
   };
 }
 
+// reject the slip and tell the student
 async function rejectBankTransferPayment(adminUser, paymentId) {
   const pendingPayment = await findPendingBankTransferOrThrow(paymentId);
   await repository.markPaymentFailed(paymentId, { gatewayTransactionId: null });
@@ -660,6 +705,7 @@ async function rejectBankTransferPayment(adminUser, paymentId) {
   return toSafePayment(payment);
 }
 
+// only an admin or the owner
 async function getReceiptImagePath(requestingUser, paymentId) {
   const payment = await repository.findPaymentById(paymentId);
   if (!payment || payment.payment_method !== 'BANK_TRANSFER') {
@@ -693,11 +739,13 @@ async function listRecentPayments() {
   }));
 }
 
+// history with receipts
 async function getMyPaymentHistory(studentUser) {
   const rows = await repository.listPaymentHistoryForStudent(studentUser.id);
   return rows.map(toSafePayment);
 }
 
+// show only the last 4 digits
 function maskAccountNumber(accountNumber) {
   const digits = String(accountNumber || '').trim();
   if (!digits) return null;
@@ -705,10 +753,13 @@ function maskAccountNumber(accountNumber) {
   return `•••• ${digits.slice(-4)}`;
 }
 
-async function getPaymentSettings() {
-  const row = await repository.getPaymentSettings();
+// the settings page and checkout - the card settlement account is only shown to admins
+async function getPaymentSettings({ forAdmin = false } = {}) {
+  const details = await loadMethodDetails();
+  const row = details.row;
   const enabledMethods = await loadEnabledMethods();
-  return {
+  const checkoutMethods = checkoutMethodsFor(enabledMethods, details);
+  const settings = {
     bankName: row ? row.bank_name : null,
     bankAccountName: row ? row.bank_account_name : null,
     bankAccountNumber: row ? row.bank_account_number : null,
@@ -717,28 +768,76 @@ async function getPaymentSettings() {
     ezCashNumber: row ? row.ez_cash_number : null,
     mcashNumber: row ? row.mcash_number : null,
     enabledMethods,
-    checkoutMethods: checkoutMethodsFor(enabledMethods),
+    checkoutMethods,
     onlinePaymentsEnabled: payhere.isConfigured(),
-    paypalEnabled: checkoutMethodsFor(enabledMethods).includes('PAYPAL'),
+    paypalEnabled: checkoutMethods.includes('PAYPAL'),
     paypalCurrency: config.paypal.currency,
     paypalLkrRate: config.paypal.lkrPerUnit,
     paypalConfigured: paypal.isConfigured(),
   };
+  if (!forAdmin) return settings;
+  // what each method still needs before students can see it
+  const missing = {};
+  PAYMENT_METHOD_KEYS.forEach((method) => {
+    missing[method] = missingDetailFor(method, row, details.hasCardColumns);
+  });
+  return {
+    ...settings,
+    cardAccountAvailable: details.hasCardColumns,
+    cardBankName: row ? row.card_bank_name || null : null,
+    cardAccountName: row ? row.card_account_name || null : null,
+    cardAccountNumber: row ? row.card_account_number || null : null,
+    cardBankBranch: row ? row.card_bank_branch || null : null,
+    missingDetails: missing,
+  };
 }
 
+// the methods to save, or null when nothing changed (turning one off needs REMOVE typed, turning one on needs its details)
+async function checkMethodChange(enabledMethods, confirmText, details) {
+  if (!Array.isArray(enabledMethods)) return null;
+  const methods = PAYMENT_METHOD_KEYS.filter((method) => enabledMethods.includes(method));
+  const current = await loadEnabledMethods();
+  const removed = current.filter((method) => !methods.includes(method));
+  if (removed.length > 0 && String(confirmText || '').trim().toUpperCase() !== 'REMOVE') {
+    throw ApiError.badRequest('Type REMOVE to confirm turning off a payment method.');
+  }
+  for (const method of methods.filter((item) => !current.includes(item))) {
+    const missing = missingDetailFor(method, details.row, details.hasCardColumns);
+    if (missing) throw ApiError.badRequest(missing);
+  }
+  return methods.join(',') === current.join(',') ? null : methods;
+}
+
+// the details as they would be saved, in database column names
+function proposedRow(settings, hasCardColumns, saved) {
+  const row = {
+    bank_account_number: settings.bankAccountNumber || null,
+    ez_cash_number: settings.ezCashNumber || null,
+    mcash_number: settings.mcashNumber || null,
+  };
+  row.card_account_number = hasCardColumns
+    ? settings.cardAccountNumber || null
+    : saved && saved.card_account_number;
+  return row;
+}
+
+// save details, keep switched-on methods valid
 async function updatePaymentSettings(adminUser, settings) {
-  let methods = null;
-  if (Array.isArray(settings.enabledMethods)) {
-    methods = PAYMENT_METHOD_KEYS.filter((method) => settings.enabledMethods.includes(method));
-    const current = await loadEnabledMethods();
-    const removed = current.filter((method) => !methods.includes(method));
-    if (removed.length > 0 && String(settings.confirmText || '').trim().toUpperCase() !== 'REMOVE') {
-      throw ApiError.badRequest('Type REMOVE to confirm turning off a payment method.');
+  const details = await loadMethodDetails();
+  const next = { row: proposedRow(settings, details.hasCardColumns, details.row), hasCardColumns: details.hasCardColumns };
+  const methods = await checkMethodChange(settings.enabledMethods, settings.confirmText, next);
+
+  // a method that is on cannot lose the details it needs
+  const stayingOn = methods || (await loadEnabledMethods());
+  for (const method of stayingOn) {
+    const missing = missingDetailFor(method, next.row, next.hasCardColumns);
+    if (missing && !missingDetailFor(method, details.row, details.hasCardColumns)) {
+      throw ApiError.badRequest(`${METHOD_NAMES[method]} is on, so its details cannot be removed. Turn it off first.`);
     }
-    if (methods.join(',') === current.join(',')) methods = null;
   }
 
   await repository.upsertPaymentSettings(settings, adminUser.id);
+  if (details.hasCardColumns) await repository.saveCardAccount(settings);
   if (methods) await repository.saveEnabledMethods(methods, adminUser.id);
   await recordAuditEvent({
     actorId: adminUser.id,
@@ -746,7 +845,23 @@ async function updatePaymentSettings(adminUser, settings) {
     entityType: 'payment_settings',
     entityId: 1,
   });
-  return getPaymentSettings();
+  return getPaymentSettings({ forAdmin: true });
+}
+
+// a payment method switch - saved on its own, the bank details are left alone
+async function updatePaymentMethods(adminUser, { enabledMethods, confirmText }) {
+  const methods = await checkMethodChange(enabledMethods, confirmText, await loadMethodDetails());
+  if (methods) {
+    await repository.saveEnabledMethods(methods, adminUser.id);
+    await recordAuditEvent({
+      actorId: adminUser.id,
+      action: 'PAYMENT_METHODS_CHANGED',
+      entityType: 'payment_settings',
+      entityId: 1,
+      details: { methods },
+    });
+  }
+  return getPaymentSettings({ forAdmin: true });
 }
 
 async function listActiveTutors() {
@@ -774,6 +889,7 @@ async function getMyBankDetails(tutorUser) {
   };
 }
 
+// tutor saves bank account
 async function updateMyBankDetails(tutorUser, { bankName, accountHolder, accountNumber, branch }) {
   await repository.updateBankDetails(tutorUser.id, { bankName, accountHolder, accountNumber, branch });
   await recordAuditEvent({
@@ -785,6 +901,7 @@ async function updateMyBankDetails(tutorUser, { bankName, accountHolder, account
   return getMyBankDetails(tutorUser);
 }
 
+// admin edits - the tutor is told
 async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, accountHolder, accountNumber, branch }) {
   const tutor = await repository.findActiveTutorById(tutorId);
   if (!tutor) {
@@ -817,12 +934,48 @@ async function updateTutorBankDetailsAsAdmin(adminUser, tutorId, { bankName, acc
   };
 }
 
-const PAYOUT_METHODS = ['BANK_TRANSFER', 'BANK_FILE', 'PAYOUT_API'];
+const PAYOUT_METHODS = ['BANK_TRANSFER', 'CARD_ACCOUNT', 'EZ_CASH', 'MCASH', 'BANK_FILE', 'PAYOUT_API'];
+// paid on the spot with a reference - the rest wait in the bank file or go through the provider
+const DIRECT_PAYOUTS = ['BANK_TRANSFER', 'CARD_ACCOUNT', 'EZ_CASH', 'MCASH'];
+const WALLET_PAYOUTS = { EZ_CASH: 'eZ Cash', MCASH: 'mCash' };
+
+// the institute accounts a tutor can be paid from - the main bank account, plus card, eZ Cash and mCash when they are on
+async function listPayoutSources() {
+  const { row, hasCardColumns } = await loadMethodDetails();
+  const enabled = await loadEnabledMethods();
+  const settings = row || {};
+  const sources = [
+    {
+      value: 'BANK_TRANSFER',
+      label: 'Main bank account',
+      kind: 'BANK',
+      account: settings.bank_account_number
+        ? `${settings.bank_name || 'Bank'} ${maskAccountNumber(settings.bank_account_number)}`
+        : null,
+    },
+  ];
+  if (enabled.includes('CARD') && hasCardColumns && settings.card_account_number) {
+    sources.push({
+      value: 'CARD_ACCOUNT',
+      label: 'Card payments account',
+      kind: 'BANK',
+      account: `${settings.card_bank_name || 'Bank'} ${maskAccountNumber(settings.card_account_number)}`,
+    });
+  }
+  if (enabled.includes('EZ_CASH') && settings.ez_cash_number) {
+    sources.push({ value: 'EZ_CASH', label: 'eZ Cash', kind: 'WALLET', account: settings.ez_cash_number });
+  }
+  if (enabled.includes('MCASH') && settings.mcash_number) {
+    sources.push({ value: 'MCASH', label: 'mCash', kind: 'WALLET', account: settings.mcash_number });
+  }
+  return sources;
+}
 
 async function getPayoutOptions() {
   const tracking = await schema.hasPayoutTracking();
   const settings = await repository.getPaymentSettings();
   return {
+    sources: await listPayoutSources(),
     bulkFileAvailable: tracking,
     apiAvailable: tracking && payoutGateway.isApiConfigured(),
     apiName: config.payouts.providerName || 'payout provider',
@@ -857,13 +1010,19 @@ async function getTutorPayoutAccount(adminUser, tutorId) {
     accountHolder: bank ? bank.bank_account_holder : null,
     accountNumber: bank ? bank.bank_account_number : null,
     branch: bank ? bank.bank_branch : null,
+    // their phone, offered as the eZ Cash / mCash number
+    phone: tutor.phone || null,
   };
 }
 
+// the payout message to the tutor
 function payoutNotification({ method, amount, periodLabel, destination, reference }) {
   const what = `${formatLkr(amount)}${periodLabel ? ` (${periodLabel})` : ''}`;
-  if (method === 'BANK_TRANSFER') {
+  if (method === 'BANK_TRANSFER' || method === 'CARD_ACCOUNT') {
     return `You have been paid ${what} to ${destination}. Bank reference: ${reference}.`;
+  }
+  if (method === 'EZ_CASH' || method === 'MCASH') {
+    return `You have been paid ${what} to ${destination}. Transaction ID: ${reference}.`;
   }
   if (method === 'PAYOUT_API') {
     return `${what} has been sent to ${destination}.`;
@@ -872,7 +1031,7 @@ function payoutNotification({ method, amount, periodLabel, destination, referenc
 }
 
 // pay tutor - by bank transfer, bank file or payout API
-async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method, bankReference, transferDate }) {
+async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method, bankReference, transferDate, walletNumber }) {
   if (!(amount > 0)) {
     throw ApiError.badRequest('Payout amount must be greater than zero.');
   }
@@ -881,34 +1040,51 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
     throw ApiError.badRequest('Please select a valid, active Tutor.');
   }
 
-  const bank = await repository.findBankDetails(tutorId);
-  if (!bank || !bank.bank_account_number) {
+  const tracking = await schema.hasPayoutTracking();
+  const payoutMethod = PAYOUT_METHODS.includes(method) ? method : 'BANK_FILE';
+  const walletName = WALLET_PAYOUTS[payoutMethod];
+  const isDirect = DIRECT_PAYOUTS.includes(payoutMethod);
+
+  // card, eZ Cash and mCash can only be used when they are on and set up
+  if (['CARD_ACCOUNT', 'EZ_CASH', 'MCASH'].includes(payoutMethod)) {
+    const sources = await listPayoutSources();
+    if (!sources.some((source) => source.value === payoutMethod)) {
+      throw ApiError.badRequest('That account is not set up for paying tutors. Turn it on in Payment Settings first.');
+    }
+  }
+
+  // a wallet payout goes to the tutor's mobile number; everything else to their bank account
+  const bank = walletName ? null : await repository.findBankDetails(tutorId);
+  if (!walletName && (!bank || !bank.bank_account_number)) {
     throw ApiError.badRequest(
       `${tutor.full_name} has no bank account on file. Add their account details before paying them.`
     );
   }
-
-  const tracking = await schema.hasPayoutTracking();
-  const payoutMethod = PAYOUT_METHODS.includes(method) ? method : 'BANK_FILE';
-
-  if (payoutMethod === 'BANK_TRANSFER' && !bankReference) {
-    throw ApiError.badRequest('Enter the reference number the bank gave for this transfer.');
+  const wallet = String(walletNumber || '').trim();
+  if (walletName && !/^(?:\+94|0)7\d{8}$/.test(wallet)) {
+    throw ApiError.badRequest(`Enter ${tutor.full_name}'s ${walletName} number, e.g. 0771234567.`);
   }
-  if (payoutMethod === 'BANK_TRANSFER' && transferDate && transferDate > todayDateString()) {
+
+  if (isDirect && !bankReference) {
+    throw ApiError.badRequest('Enter the reference or transaction ID for this transfer.');
+  }
+  if (isDirect && transferDate && transferDate > todayDateString()) {
     throw ApiError.badRequest('The transfer date cannot be in the future.');
   }
   if (payoutMethod === 'PAYOUT_API' && !(tracking && payoutGateway.isApiConfigured())) {
     throw ApiError.badRequest('Online payouts are not set up. Pay by bank transfer instead.');
   }
 
-  const destination = `${bank.bank_name || 'bank account'} ${maskAccountNumber(bank.bank_account_number)}`;
-  const settledAt = payoutMethod === 'BANK_TRANSFER' && transferDate && transferDate !== todayDateString()
+  const destination = walletName
+    ? `your ${walletName} ${maskAccountNumber(wallet)}`
+    : `${bank.bank_name || 'bank account'} ${maskAccountNumber(bank.bank_account_number)}`;
+  const settledAt = isDirect && transferDate && transferDate !== todayDateString()
     ? `${transferDate} 00:00:00`
     : null;
 
   const noteParts = [note && note.trim()];
   if (!tracking) {
-    noteParts.push(payoutMethod === 'BANK_TRANSFER' ? `Ref ${bankReference}` : null, `to ${destination}`);
+    noteParts.push(isDirect ? `Ref ${bankReference}` : null, `to ${destination}`);
   }
   const fullNote = noteParts.filter(Boolean).join(' - ').slice(0, 255);
 
@@ -918,17 +1094,17 @@ async function payTutor(adminUser, { tutorId, amount, note, periodLabel, method,
     note: fullNote,
     periodLabel,
     paidBy: adminUser.id,
-    status: payoutMethod === 'BANK_TRANSFER' ? 'SENT' : 'QUEUED',
+    status: isDirect ? 'SENT' : 'QUEUED',
     method: payoutMethod,
-    bankName: bank.bank_name,
-    bankAccountHolder: bank.bank_account_holder,
-    bankAccountLast4: payoutGateway.last4(bank.bank_account_number),
-    bankBranch: bank.bank_branch,
-    providerReference: payoutMethod === 'BANK_TRANSFER' ? bankReference : null,
+    bankName: walletName || bank.bank_name,
+    bankAccountHolder: walletName ? tutor.full_name : bank.bank_account_holder,
+    bankAccountLast4: payoutGateway.last4(walletName ? wallet : bank.bank_account_number),
+    bankBranch: walletName ? null : bank.bank_branch,
+    providerReference: isDirect ? bankReference : null,
     settledAt,
   });
 
-  let status = tracking ? (payoutMethod === 'BANK_TRANSFER' ? 'SENT' : 'QUEUED') : 'RECORDED';
+  let status = tracking ? (isDirect ? 'SENT' : 'QUEUED') : 'RECORDED';
   let failureReason = null;
 
   if (payoutMethod === 'PAYOUT_API') {
@@ -998,6 +1174,7 @@ async function getPayoutBatch() {
   };
 }
 
+// make the bank CSV
 async function exportPayoutFile(adminUser) {
   if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
 
@@ -1027,6 +1204,7 @@ async function exportPayoutFile(adminUser) {
   return { ...file, filename: `tutor-payouts-${todayDateString()}.csv` };
 }
 
+// payout confirmed by the bank
 async function confirmPayoutSettled(adminUser, payoutId, { providerReference, transferDate }) {
   if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
   const payout = await repository.findTutorPayoutById(payoutId);
@@ -1068,6 +1246,7 @@ async function confirmPayoutSettled(adminUser, payoutId, { providerReference, tr
   return { id: payoutId, status: 'SENT' };
 }
 
+// payout failed - tell the tutor
 async function markPayoutFailed(adminUser, payoutId, reason) {
   if (!(await schema.hasPayoutTracking())) throw schema.migrationRequired();
   const payout = await repository.findTutorPayoutById(payoutId);
@@ -1142,6 +1321,7 @@ async function listTutorPayouts() {
   };
 }
 
+// PENDING payment + signed form
 async function startOnlineCheckout(studentUser, { enrollmentId, amount }) {
   if (!payhere.isConfigured()) {
     throw ApiError.badRequest(
@@ -1312,6 +1492,7 @@ function payPalOrderIdOf(payment) {
   return details.provider === 'paypal' && details.orderId ? String(details.orderId) : null;
 }
 
+// PENDING payment + PayPal order
 async function startPayPalCheckout(studentUser, { enrollmentId, amount }, baseUrl) {
   if (!paypal.isConfigured()) {
     throw ApiError.badRequest(
@@ -1475,6 +1656,7 @@ async function completePayPalCheckout(paymentId) {
   return { handled: true, ...outcome };
 }
 
+// cancelled on PayPal
 async function cancelPayPalCheckout(paymentId) {
   const payment = await repository.findPaymentWithDetailsById(paymentId);
   if (!payment || payment.status !== PAYMENT_STATUS.PENDING || !payPalOrderIdOf(payment)) {
@@ -1537,6 +1719,7 @@ module.exports = {
   updateTutorBankDetailsAsAdmin,
   getPaymentSettings,
   updatePaymentSettings,
+  updatePaymentMethods,
   payTutor,
   listTutorPayouts,
   getPayoutOptions,

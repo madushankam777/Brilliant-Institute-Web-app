@@ -41,6 +41,7 @@ router.post(
   controller.getOrCreateTodaySession
 );
 
+// open the attendance sheet
 router.get(
   '/sessions/:sessionId',
   authorize(ROLES.TUTOR, ROLES.ADMIN),
@@ -49,6 +50,7 @@ router.get(
   controller.getAttendanceSheet
 );
 
+// save the attendance sheet
 router.post(
   '/sessions/:sessionId',
   authorize(ROLES.TUTOR, ROLES.ADMIN),
@@ -57,6 +59,7 @@ router.post(
   controller.markAttendance
 );
 
+// tutor views a student's history
 router.get(
   '/students/:studentId',
   authorize(ROLES.TUTOR, ROLES.ADMIN),
@@ -65,6 +68,7 @@ router.get(
   controller.getStudentHistoryForTutor
 );
 
+// generate attendance key
 router.post(
   '/sessions/:sessionId/checkin/start',
   authorize(ROLES.TUTOR, ROLES.ADMIN),
@@ -73,6 +77,7 @@ router.post(
   controller.startSelfCheckIn
 );
 
+// my attendance history
 router.get(
   '/me',
   authorize(ROLES.STUDENT_PARENT),
@@ -81,6 +86,7 @@ router.get(
   controller.getMyHistory
 );
 
+// student enters attendance key
 router.post(
   '/checkin',
   authorize(ROLES.STUDENT_PARENT),

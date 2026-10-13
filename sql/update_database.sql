@@ -238,6 +238,17 @@ CREATE TABLE IF NOT EXISTS report_history_hidden (
   CONSTRAINT fk_report_hidden_by FOREIGN KEY (hidden_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- payment_settings - a separate bank account that card payments settle into
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE payment_settings
+     ADD COLUMN card_bank_name VARCHAR(100) NULL AFTER mcash_number,
+     ADD COLUMN card_account_name VARCHAR(150) NULL AFTER card_bank_name,
+     ADD COLUMN card_account_number VARCHAR(34) NULL AFTER card_account_name,
+     ADD COLUMN card_bank_branch VARCHAR(100) NULL AFTER card_account_number', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payment_settings' AND COLUMN_NAME = 'card_account_number');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- the Messages page was removed - drop its tables
 DROP TABLE IF EXISTS conversation_reads;
 DROP TABLE IF EXISTS conversation_messages;

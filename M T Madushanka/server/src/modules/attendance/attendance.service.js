@@ -9,6 +9,7 @@ const { ROLES } = require('../../../../../shared/server/src/config/roles');
 const { CHECKIN_CODE_VALID_MINUTES } = require('./attendance.constants');
 const repository = require('./attendance.repository');
 
+// tutor may only use own class
 async function assertTutorOwnsClass(tutorUser, classRow) {
   if (!classRow) {
     throw ApiError.notFound('Class not found.');
@@ -34,6 +35,7 @@ async function listClassSessions(tutorUser, classId) {
   return { classSubject: classRow.subject, sessions };
 }
 
+// today as YYYY-MM-DD
 function todayDateString() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -41,6 +43,7 @@ function todayDateString() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+// one session per class per day
 async function getOrCreateTodaySession(tutorUser, classId) {
   const classRow = await repository.findClassById(classId);
   await assertTutorOwnsClass(tutorUser, classRow);
@@ -63,6 +66,7 @@ async function getOrCreateTodaySession(tutorUser, classId) {
   return { sessionId };
 }
 
+// random 6-digit attendance key
 function generateCheckinCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 }
@@ -293,6 +297,7 @@ async function markSessionAttendance(tutorUser, sessionId, records) {
   return getAttendanceSheet(tutorUser, sessionId);
 }
 
+// percentage and low flag
 function withLowAttendanceFlag(summaryRows) {
   const threshold = config.business.lowAttendanceThresholdPercent;
   return summaryRows.map((row) => {
@@ -311,6 +316,7 @@ function withLowAttendanceFlag(summaryRows) {
   });
 }
 
+// history and summary per class
 async function getMyAttendanceHistory(studentUser, classId) {
   const history = await repository.listAttendanceHistoryForStudent(studentUser.id, classId);
   const summary = await repository.getAttendanceSummaryByClass(studentUser.id);
@@ -320,6 +326,7 @@ async function getMyAttendanceHistory(studentUser, classId) {
   };
 }
 
+// own class and enrolled only
 async function getStudentAttendanceHistoryForTutor(tutorUser, studentId, classId) {
   if (!classId) {
     throw ApiError.badRequest('A classId is required to view a specific student record.');

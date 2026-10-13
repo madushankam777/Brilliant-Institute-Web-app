@@ -1,6 +1,6 @@
 // Admin: institute bank / wallet details for checkout
 import { useEffect, useState } from 'react';
-import { fetchPaymentSettings, updatePaymentSettings } from '../../api/paymentApi';
+import { fetchPaymentSettings, updatePaymentSettings, updatePaymentMethods } from '../../api/paymentApi';
 import LoadingSpinner from '../../../../shared/client/src/components/common/LoadingSpinner';
 import Alert from '../../../../shared/client/src/components/common/Alert';
 import FormField from '../../../../shared/client/src/components/common/FormField';
@@ -35,6 +35,18 @@ const EMPTY_FORM = {
   bankSwift: '',
   ezCashNumber: '',
   mcashNumber: '',
+  cardBankName: '',
+  cardAccountName: '',
+  cardAccountNumber: '',
+  cardBankBranch: '',
+};
+
+// the details section each method needs, so the page can jump to it
+const DETAIL_FIELD = {
+  BANK_TRANSFER: 'bankAccountNumber',
+  CARD: 'cardAccountNumber',
+  EZ_CASH: 'ezCashNumber',
+  MCASH: 'mcashNumber',
 };
 
 // payment settings - the bank and wallet details students see at checkout, and which methods are on
@@ -42,14 +54,17 @@ function PaymentSettingsPage() {
   // the settings form and the page state
   const [form, setForm] = useState(EMPTY_FORM);
   const [enabledMethods, setEnabledMethods] = useState(['BANK_TRANSFER']);
+  // what each method still needs, and whether card has its own account
+  const [missing, setMissing] = useState({});
+  const [hasCardAccount, setHasCardAccount] = useState(false);
   // turning a method off - admin must type REMOVE
   const [pendingRemove, setPendingRemove] = useState(null);
   const [removeText, setRemoveText] = useState('');
-  const [removeConfirmed, setRemoveConfirmed] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
+  const { fieldErrors, formError, validate, captureError, clearFieldError, setFieldErrors } = useFormErrors();
   const [saveMessage, setSaveMessage] = useState('');
 
   // load the saved settings when the page opens
@@ -66,8 +81,12 @@ function PaymentSettingsPage() {
           bankSwift: settings.bankSwift || '',
           ezCashNumber: settings.ezCashNumber || '',
           mcashNumber: settings.mcashNumber || '',
+          cardBankName: settings.cardBankName || '',
+          cardAccountName: settings.cardAccountName || '',
+          cardAccountNumber: settings.cardAccountNumber || '',
+          cardBankBranch: settings.cardBankBranch || '',
         });
-        setEnabledMethods(settings.enabledMethods || ['BANK_TRANSFER']);
+        applySettings(settings);
       })
       .catch((error) => {
         if (isMounted) setLoadError(error.message);
@@ -79,6 +98,13 @@ function PaymentSettingsPage() {
       isMounted = false;
     };
   }, []);
+
+  // keep the switches and the "needs details" notes in step with the server
+  function applySettings(settings) {
+    setEnabledMethods(settings.enabledMethods || []);
+    setMissing(settings.missingDetails || {});
+    setHasCardAccount(Boolean(settings.cardAccountAvailable));
+  }
 
   // change one field and clear its error
   function updateField(field, value) {
@@ -109,10 +135,29 @@ function PaymentSettingsPage() {
         form.mcashNumber.trim() &&
         !WALLET_PATTERN.test(form.mcashNumber.trim()) &&
         'Enter a valid mobile number, e.g. 0771234567.',
+      cardAccountNumber:
+        form.cardAccountNumber.trim() &&
+        !ACCOUNT_PATTERN.test(form.cardAccountNumber.trim()) &&
+        'Use 4-34 digits, spaces or dashes only.',
     });
   }
 
-  // switch a method on, or ask to confirm before turning it off
+  // save the methods straight away - the page shows what the server kept
+  async function saveMethods(methods, label, verb, confirmText) {
+    setSaveMessage('');
+    setIsSwitching(true);
+    try {
+      const settings = await updatePaymentMethods({ enabledMethods: methods, confirmText });
+      applySettings(settings);
+      setSaveMessage(`${label} turned ${verb}. Students see the change at checkout now.`);
+    } catch (error) {
+      captureError(error);
+    } finally {
+      setIsSwitching(false);
+    }
+  }
+
+  // switch a method on (saved at once), or ask to confirm before turning it off
   function toggleMethod(value) {
     setSaveMessage('');
     if (enabledMethods.includes(value)) {
@@ -120,14 +165,30 @@ function PaymentSettingsPage() {
       setRemoveText('');
       return;
     }
-    setEnabledMethods((current) => [...current, value]);
+    const option = METHOD_OPTIONS.find((item) => item.value === value);
+    // its details are missing - say so and jump to the box to fill in
+    if (missing[value] && DETAIL_FIELD[value]) {
+      setFieldErrors({ [DETAIL_FIELD[value]]: `Enter this, press Save payment details, then turn ${option.label} on.` });
+      const box = document.getElementById(DETAIL_FIELD[value]);
+      if (box) {
+        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        box.focus({ preventScroll: true });
+      }
+      return;
+    }
+    saveMethods([...enabledMethods, value], option.label, 'on');
   }
 
-  // confirm remove btn
-  function confirmRemove() {
-    setEnabledMethods((current) => current.filter((item) => item !== pendingRemove.value));
-    setRemoveConfirmed(true);
+  // confirm remove btn - turns it off and saves
+  async function confirmRemove() {
+    const option = pendingRemove;
     setPendingRemove(null);
+    await saveMethods(
+      enabledMethods.filter((item) => item !== option.value),
+      option.label,
+      'off',
+      'REMOVE'
+    );
   }
 
   // save payment settings btn - check the fields, then save
@@ -138,9 +199,8 @@ function PaymentSettingsPage() {
 
     setIsSaving(true);
     try {
-      await updatePaymentSettings({ ...form, enabledMethods, confirmText: removeConfirmed ? 'REMOVE' : undefined });
-      setRemoveConfirmed(false);
-      setSaveMessage('Payment settings saved. Students will see the updated details at checkout.');
+      applySettings(await updatePaymentSettings(form));
+      setSaveMessage('Payment details saved. You can now turn on any method whose details are filled in.');
     } catch (error) {
       captureError(error);
     } finally {
@@ -184,12 +244,20 @@ function PaymentSettingsPage() {
                       <span>
                         <strong>{option.label}</strong>
                         <span className="order-line-sub">{option.help}</span>
+                        {/* what is missing before students can see it */}
+                        {missing[option.value] && (
+                          <span className="method-switch-missing">
+                            {isOn ? 'Hidden from students - ' : ''}
+                            {missing[option.value]}
+                          </span>
+                        )}
                       </span>
                       <input
                         type="checkbox"
                         role="switch"
                         className="switch"
                         checked={isOn}
+                        disabled={isSwitching}
                         onChange={() => toggleMethod(option.value)}
                         aria-label={`${option.label} ${isOn ? 'on' : 'off'}`}
                       />
@@ -247,11 +315,56 @@ function PaymentSettingsPage() {
                 />
               </div>
 
+              {/* card - the bank account card payments settle into (never shown to students) */}
+              {hasCardAccount && (
+                <>
+                  <h2 style={{ fontSize: '0.95rem', marginTop: '24px' }}>Card</h2>
+                  <p className="field-help" style={{ marginTop: '-8px' }}>
+                    The bank account card payments are paid into. Only admins see it, and you can pay tutors from it.
+                  </p>
+                  <div className="card-field-row">
+                    <FormField
+                      id="cardBankName"
+                      label="Bank name"
+                      placeholder="e.g. Commercial Bank"
+                      value={form.cardBankName}
+                      onChange={(e) => updateField('cardBankName', e.target.value)}
+                      error={fieldErrors.cardBankName}
+                    />
+                    <FormField
+                      id="cardAccountName"
+                      label="Account name"
+                      placeholder="e.g. Brilliant Institute (Pvt) Ltd"
+                      value={form.cardAccountName}
+                      onChange={(e) => updateField('cardAccountName', e.target.value)}
+                      error={fieldErrors.cardAccountName}
+                    />
+                  </div>
+                  <div className="card-field-row">
+                    <FormField
+                      id="cardAccountNumber"
+                      label="Account number"
+                      placeholder="e.g. 8001234567"
+                      value={form.cardAccountNumber}
+                      onChange={(e) => updateField('cardAccountNumber', e.target.value)}
+                      error={fieldErrors.cardAccountNumber}
+                    />
+                    <FormField
+                      id="cardBankBranch"
+                      label="Branch"
+                      placeholder="e.g. Colombo 03"
+                      value={form.cardBankBranch}
+                      onChange={(e) => updateField('cardBankBranch', e.target.value)}
+                      error={fieldErrors.cardBankBranch}
+                    />
+                  </div>
+                </>
+              )}
+
               {/* mobile wallet numbers - eZ Cash and mCash */}
               <h2 style={{ fontSize: '0.95rem', marginTop: '24px' }}>Mobile wallets</h2>
               <p className="field-help" style={{ marginTop: '-8px' }}>
-                Shown to students so they know which number to send their eZ Cash / mCash payment to.
-                Leave blank to hide that tab&apos;s callout.
+                Students send their eZ Cash / mCash payment to these numbers, and you can pay tutors from them.
               </p>
               <div className="card-field-row">
                 <FormField
@@ -276,7 +389,7 @@ function PaymentSettingsPage() {
 
               {/* save btn */}
               <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save payment settings'}
+                {isSaving ? 'Saving...' : 'Save payment details'}
               </button>
             </form>
           </div>
@@ -317,7 +430,6 @@ function PaymentSettingsPage() {
                 Turn off
               </button>
             </div>
-            <p className="field-help" style={{ marginBottom: 0 }}>Click Save payment settings afterwards to apply it.</p>
           </div>
         </div>
       )}

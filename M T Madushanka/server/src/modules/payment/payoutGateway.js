@@ -53,6 +53,7 @@ const FILE_COLUMNS = [
   'Remarks',
 ];
 
+// no formula injection in CSV
 function csvCell(value) {
   let text = String(value === null || value === undefined ? '' : value);
   if (/^[=+\-@\t\r]/.test(text) && !/^-?\d+(\.\d+)?$/.test(text)) {
@@ -61,6 +62,7 @@ function csvCell(value) {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+// CSV for the bank upload
 function buildBankTransferFile(payouts) {
   const rows = [];
   const skipped = [];

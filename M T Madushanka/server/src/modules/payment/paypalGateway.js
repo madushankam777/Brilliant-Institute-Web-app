@@ -64,6 +64,7 @@ async function callPayPal(path, { method = 'GET', body, requestId } = {}) {
   return data;
 }
 
+// LKR to the PayPal currency
 function toProviderAmount(amountLkr) {
   const converted =
     config.paypal.currency === 'LKR' ? Number(amountLkr) : Number(amountLkr) / config.paypal.lkrPerUnit;
@@ -158,6 +159,7 @@ async function getOrder(orderId) {
   return callPayPal(`/v2/checkout/orders/${encodeURIComponent(orderId)}`);
 }
 
+// take the money
 async function captureOrder(orderId) {
   try {
     const order = await callPayPal(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {

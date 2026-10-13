@@ -11,17 +11,17 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
-  
+  // Check whether a user already has an active session.
   useEffect(() => {
     let isMounted = true;
 
-    
+    // Load the current user when the app starts.
     async function loadSession() {
       try {
         const currentUser = await authApi.fetchCurrentSession();
         if (isMounted) setUser(currentUser);
       } catch (error) {
-        
+        // Keep the user logged out if there is no active session.
         if (isMounted) setUser(null);
       } finally {
         if (isMounted) setIsCheckingSession(false);
@@ -34,19 +34,19 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  
+  // Clear the user when the session expires.
   useEffect(() => {
     setSessionExpiredHandler(() => setUser(null));
   }, []);
 
-  // login 
+  // Sign in with the submitted credentials.
   const login = useCallback(async (credentials) => {
     const loggedInUser = await authApi.login(credentials);
     setUser(loggedInUser);
     return loggedInUser;
   }, []);
 
-  // logout 
+  // Sign out and clear the current user.
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -55,14 +55,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  
+  // Load the latest profile details for the current user.
   const refreshProfile = useCallback(async () => {
     const latestUser = await authApi.fetchMyProfile();
     setUser(latestUser);
     return latestUser;
   }, []);
 
-  
+  // Share the user and authentication functions with app pages.
   const value = useMemo(
     () => ({
       user,

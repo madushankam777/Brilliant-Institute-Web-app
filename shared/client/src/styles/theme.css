@@ -4504,6 +4504,14 @@ input[type='number'] {
   cursor: pointer;
 }
 
+/* what a payment method still needs before students can see it */
+.method-switch-missing {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
 .method-switch.is-on {
   border-color: var(--color-primary);
   background: var(--color-primary-light);

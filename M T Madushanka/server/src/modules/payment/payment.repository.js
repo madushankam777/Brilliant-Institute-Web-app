@@ -15,6 +15,7 @@ async function findEnrollmentById(enrollmentId, executor = pool) {
   return rows[0] || null;
 }
 
+// lock the enrolment row
 async function findEnrollmentByIdForUpdate(enrollmentId, connection) {
   const [rows] = await connection.execute(
     `SELECT e.id, e.student_id, e.class_id, e.balance, e.status, c.subject
@@ -27,6 +28,7 @@ async function findEnrollmentByIdForUpdate(enrollmentId, connection) {
   return rows[0] || null;
 }
 
+// balances of my active classes
 async function listBalancesForStudent(studentId, executor = pool) {
   const dueColumn = (await schema.hasPaymentDeadlines()) ? 'e.payment_due_at' : 'NULL';
   const [rows] = await executor.execute(
@@ -42,6 +44,7 @@ async function listBalancesForStudent(studentId, executor = pool) {
   return rows;
 }
 
+// new balance, PAID at zero
 async function updateEnrollmentBalance(enrollmentId, newBalance, executor = pool) {
   await executor.execute(
     `UPDATE enrollments SET balance = ?, payment_status = IF(? <= 0, 'PAID', 'UNPAID') WHERE id = ?`,
@@ -49,6 +52,7 @@ async function updateEnrollmentBalance(enrollmentId, newBalance, executor = pool
   );
 }
 
+// insert a PENDING payment
 async function createPendingPayment(
   { studentId, enrollmentId, amount, balanceBefore, paymentMethod, paymentDetails },
   executor = pool
@@ -71,6 +75,7 @@ async function createPendingPayment(
   return result.insertId;
 }
 
+// mark payment SUCCESSFUL
 async function markPaymentSuccessful(
   paymentId,
   { gatewayTransactionId, balanceAfter },
@@ -84,6 +89,7 @@ async function markPaymentSuccessful(
   );
 }
 
+// mark the slip paid
 async function approveBankTransfer(
   paymentId,
   { amount, balanceBefore, balanceAfter, gatewayTransactionId, paymentDetails },
@@ -123,6 +129,7 @@ async function updatePaymentMethodAndDetails(
   );
 }
 
+// insert the receipt
 async function createReceipt(paymentId, receiptNumber, executor = pool) {
   await executor.execute(
     `INSERT INTO receipts (payment_id, receipt_number, issued_at) VALUES (?, ?, NOW())`,
@@ -144,6 +151,7 @@ async function findPaymentByIdForUpdate(paymentId, connection) {
   return rows[0] || null;
 }
 
+// pending bank slips
 async function listPendingBankTransfers(executor = pool) {
   const [rows] = await executor.execute(
     `SELECT p.id, p.enrollment_id, p.amount, p.balance_before, p.payment_details, p.created_at,
@@ -177,6 +185,7 @@ async function findPaymentWithDetailsById(paymentId, executor = pool) {
   return rows[0] || null;
 }
 
+// history joined with receipts
 async function listPaymentHistoryForStudent(studentId, executor = pool) {
   const [rows] = await executor.execute(
     `SELECT p.id, p.enrollment_id, c.subject, p.amount, p.balance_before, p.balance_after,
@@ -269,6 +278,7 @@ async function findBankDetails(tutorId) {
   return rows[0] || null;
 }
 
+// save the tutor bank columns
 async function updateBankDetails(tutorId, { bankName, accountHolder, accountNumber, branch }) {
   await pool.execute(
     `UPDATE users
@@ -280,7 +290,7 @@ async function updateBankDetails(tutorId, { bankName, accountHolder, accountNumb
 
 async function findActiveTutorById(tutorId) {
   const [rows] = await pool.execute(
-    `SELECT id, full_name FROM users WHERE id = ? AND role = 'TUTOR' AND status = 'ACTIVE' LIMIT 1`,
+    `SELECT id, full_name, phone FROM users WHERE id = ? AND role = 'TUTOR' AND status = 'ACTIVE' LIMIT 1`,
     [tutorId]
   );
   return rows[0] || null;
@@ -435,6 +445,7 @@ async function sumPayoutsByTutor() {
   return rows;
 }
 
+// read the settings row
 async function getPaymentSettings() {
   const [rows] = await pool.execute(`SELECT * FROM payment_settings WHERE id = 1 LIMIT 1`);
   return rows[0] || null;
@@ -473,6 +484,17 @@ async function upsertPaymentSettings(
   );
 }
 
+// save the bank account card payments settle into
+async function saveCardAccount({ cardBankName, cardAccountName, cardAccountNumber, cardBankBranch }) {
+  await pool.execute(
+    `UPDATE payment_settings
+     SET card_bank_name = ?, card_account_name = ?, card_account_number = ?, card_bank_branch = ?
+     WHERE id = 1`,
+    [cardBankName || null, cardAccountName || null, cardAccountNumber || null, cardBankBranch || null]
+  );
+}
+
+// read the latest switches
 async function findEnabledMethods() {
   const [rows] = await pool.execute(
     `SELECT details FROM audit_log WHERE action = 'PAYMENT_METHODS_SET' ORDER BY id DESC LIMIT 1`
@@ -482,6 +504,7 @@ async function findEnabledMethods() {
   return details && Array.isArray(details.methods) ? details.methods : null;
 }
 
+// save the switches (audit_log)
 async function saveEnabledMethods(methods, adminId) {
   await pool.execute(
     `INSERT INTO audit_log (actor_id, action, entity_type, entity_id, details, created_at)
@@ -491,6 +514,7 @@ async function saveEnabledMethods(methods, adminId) {
 }
 
 module.exports = {
+  saveCardAccount,
   findEnabledMethods,
   saveEnabledMethods,
   searchStudents,

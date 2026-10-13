@@ -64,6 +64,7 @@ const onlineCheckoutRules = [
   amountRule('amount', 'Amount must be a positive number.'),
 ];
 
+// bank slip form rules
 const bankTransferRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Invalid enrollment id.'),
   amountRule('amount', 'Amount must be a positive number.'),
@@ -79,6 +80,7 @@ const paymentIdParamRules = [
   param('paymentId').isInt({ min: 1 }).withMessage('Invalid payment id.'),
 ];
 
+// approve - optional received amount
 const approveBankTransferRules = [
   ...paymentIdParamRules,
   body('amount')
@@ -116,16 +118,21 @@ const payTutorRules = [
     .withMessage('Period label is too long.'),
   body('method')
     .optional({ checkFalsy: true })
-    .isIn(['BANK_TRANSFER', 'BANK_FILE', 'PAYOUT_API'])
+    .isIn(['BANK_TRANSFER', 'CARD_ACCOUNT', 'EZ_CASH', 'MCASH', 'BANK_FILE', 'PAYOUT_API'])
     .withMessage('Choose how this payout is made.'),
   body('bankReference')
-    .if(body('method').equals('BANK_TRANSFER'))
+    .if(body('method').isIn(['BANK_TRANSFER', 'CARD_ACCOUNT', 'EZ_CASH', 'MCASH']))
     .trim()
     .isLength({ min: 3, max: 60 })
-    .withMessage('Enter the reference number the bank gave for this transfer.')
+    .withMessage('Enter the reference or transaction ID for this transfer.')
     .bail()
     .matches(BANK_REFERENCE_REGEX)
     .withMessage('Reference can only contain letters, numbers, spaces, hyphens, and slashes.'),
+  body('walletNumber')
+    .if(body('method').isIn(['EZ_CASH', 'MCASH']))
+    .trim()
+    .matches(WALLET_PHONE_REGEX)
+    .withMessage('Enter the tutor\'s mobile wallet number, e.g. 0771234567.'),
   body('transferDate')
     .optional({ checkFalsy: true })
     .matches(DATE_REGEX)
@@ -137,6 +144,7 @@ const payTutorRules = [
 
 const tutorIdParamRules = [param('tutorId').isInt({ min: 1 }).withMessage('Invalid tutor id.')];
 
+// bank account rules
 const bankDetailsRules = [
   body('bankName').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bank name is too long.'),
   body('accountHolder')
@@ -153,6 +161,16 @@ const bankDetailsRules = [
 ];
 
 // Admin-only: the institute's own receiving details shown to students
+// payment method switch rules - the list of methods that stay on
+const paymentMethodsRules = [
+  body('enabledMethods').isArray({ max: 5 }).withMessage('Invalid payment methods.'),
+  body('enabledMethods.*')
+    .isIn(['BANK_TRANSFER', 'CARD', 'EZ_CASH', 'MCASH', 'PAYPAL'])
+    .withMessage('Invalid payment method.'),
+  body('confirmText').optional().isString().isLength({ max: 20 }),
+];
+
+// payment details rules
 const paymentSettingsRules = [
   body('enabledMethods').optional().isArray({ max: 5 }).withMessage('Invalid payment methods.'),
   body('enabledMethods.*')
@@ -182,6 +200,14 @@ const paymentSettingsRules = [
     .trim()
     .matches(WALLET_PHONE_REGEX)
     .withMessage('Enter a valid mCash mobile number (e.g. 0771234567).'),
+  body('cardBankName').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Bank name is too long.'),
+  body('cardAccountName').optional({ checkFalsy: true }).trim().isLength({ max: 150 }).withMessage('Account name is too long.'),
+  body('cardAccountNumber')
+    .optional({ checkFalsy: true })
+    .trim()
+    .matches(/^[0-9 -]{4,34}$/)
+    .withMessage('Enter a valid account number (digits, spaces, and dashes only).'),
+  body('cardBankBranch').optional({ checkFalsy: true }).trim().isLength({ max: 100 }).withMessage('Branch is too long.'),
 ];
 
 const payoutIdParamRules = [
@@ -221,6 +247,7 @@ const studentSearchRules = [
   query('search').trim().isLength({ min: 1, max: 60 }).withMessage('Type a registration number or name.'),
 ];
 
+// office payment rules
 const recordPaymentRules = [
   body('enrollmentId').isInt({ min: 1 }).withMessage('Choose the class being paid for.'),
   amountRule('amount', 'Enter the amount the student paid.'),
@@ -249,5 +276,6 @@ module.exports = {
   payTutorRules,
   bankDetailsRules,
   paymentSettingsRules,
+  paymentMethodsRules,
   WALLET_PHONE_REGEX,
 };

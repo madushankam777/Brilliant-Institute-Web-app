@@ -63,6 +63,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
   const [note, setNote] = useState('');
   const [bankReference, setBankReference] = useState('');
   const [transferDate, setTransferDate] = useState(todayKey());
+  const [walletNumber, setWalletNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { fieldErrors, formError, validate, captureError, clearFieldError } = useFormErrors();
 
@@ -71,6 +72,8 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
     fetchTutorPayoutAccount(tutor.id)
       .then((data) => {
         setAccount(data);
+        // their phone is the usual eZ Cash / mCash number
+        setWalletNumber((current) => current || (data.phone || '').replace(/\s+/g, ''));
         setBankForm({
           bankName: data.bankName || '',
           accountHolder: data.accountHolder || '',
@@ -119,14 +122,18 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
     event.preventDefault();
     const value = Number(amount);
     const isValid = validate({
-      account: !hasAccount && 'Add the tutor\'s bank account first.',
+      account: !isWallet && !hasAccount && 'Add the tutor\'s bank account first.',
+      walletNumber:
+        isWallet &&
+        !/^(?:\+94|0)7\d{8}$/.test(walletNumber.trim()) &&
+        `Enter the tutor's ${chosen.label} number, e.g. 0771234567.`,
       amount: !(value > 0) && 'Enter an amount greater than zero.',
       bankReference:
-        method === 'BANK_TRANSFER' &&
+        isDirect &&
         bankReference.trim().length < 3 &&
-        'Enter the reference number the bank gave for this transfer.',
+        (isWallet ? 'Enter the transaction ID from the confirmation SMS.' : 'Enter the reference number the bank gave for this transfer.'),
       transferDate:
-        method === 'BANK_TRANSFER' &&
+        isDirect &&
         ((!transferDate && 'Pick the date of the transfer.') ||
           (transferDate > todayKey() && 'The transfer date cannot be in the future.')),
     });
@@ -140,8 +147,9 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
         periodLabel,
         note: note.trim(),
         method,
-        bankReference: method === 'BANK_TRANSFER' ? bankReference.trim() : undefined,
-        transferDate: method === 'BANK_TRANSFER' ? transferDate : undefined,
+        bankReference: isDirect ? bankReference.trim() : undefined,
+        transferDate: isDirect ? transferDate : undefined,
+        walletNumber: isWallet ? walletNumber.trim() : undefined,
       });
       onPaid(result.message);
     } catch (error) {
@@ -151,13 +159,19 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
     }
   }
 
-  // the ways it can be paid - bank transfer, bank file or a payout api when set up
-  const methods = [{ value: 'BANK_TRANSFER', label: 'Paid by bank transfer' }];
-  if (options && options.bulkFileAvailable) methods.push({ value: 'BANK_FILE', label: 'Add to bank file' });
-  if (options && options.apiAvailable) methods.push({ value: 'PAYOUT_API', label: `Send via ${options.apiName}` });
+  // the accounts it can be paid from - main bank, plus card, eZ Cash and mCash when they are on
+  const sources = (options && options.sources) || [{ value: 'BANK_TRANSFER', label: 'Main bank account', kind: 'BANK' }];
+  const methods = sources.map((item) => ({ ...item }));
+  if (options && options.bulkFileAvailable) methods.push({ value: 'BANK_FILE', label: 'Add to bank file', kind: 'BANK' });
+  if (options && options.apiAvailable) methods.push({ value: 'PAYOUT_API', label: `Send via ${options.apiName}`, kind: 'BANK' });
 
-  // the institute's account the money is paid from
-  const source = options ? options.sourceAccount : null;
+  // the chosen way, and what it needs
+  const chosen = methods.find((item) => item.value === method) || methods[0];
+  const isWallet = chosen.kind === 'WALLET';
+  const isDirect = ['BANK_TRANSFER', 'CARD_ACCOUNT', 'EZ_CASH', 'MCASH'].includes(chosen.value);
+
+  // the institute's account the money is paid from (the bank file and payout api use the main account)
+  const source = sources.find((item) => item.value === chosen.value) || sources[0];
 
   // the pop-up - the two accounts, then the payout form
   return (
@@ -179,27 +193,42 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
         </div>
         <p className="muted" style={{ marginTop: 0 }}>{tutor.email}</p>
 
-        {/* from - the institute's bank account */}
+        {/* pay from - main bank account, card account, eZ Cash, mCash, bank file or payout api */}
+        {methods.length > 1 && (
+          <div className="form-field">
+            <label>Pay from</label>
+            <div className="period-tabs" role="radiogroup" aria-label="Pay from">
+              {methods.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen.value === item.value}
+                  className={`period-tab${chosen.value === item.value ? ' active' : ''}`}
+                  onClick={() => {
+                    setMethod(item.value);
+                    clearFieldError('account');
+                    clearFieldError('bankReference');
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* from - the institute account the money leaves */}
         <div className="transfer-box soft">
           <p className="transfer-box-title">
             <span>
-              <Icon name="bank" size={16} /> From: institute account
+              <Icon name="bank" size={16} /> From: {source.label}
             </span>
           </p>
-          {source ? (
-            <dl className="detail-grid">
-              <div>
-                <dt>Bank</dt>
-                <dd>{source.bankName || '-'}</dd>
-              </div>
-              <div>
-                <dt>Account</dt>
-                <dd>
-                  {source.accountNumber}
-                  {source.accountName ? ` · ${source.accountName}` : ''}
-                </dd>
-              </div>
-            </dl>
+          {source.account ? (
+            <p style={{ margin: 0 }}>
+              <strong>{source.account}</strong>
+            </p>
           ) : (
             <p className="muted" style={{ margin: 0, fontSize: '0.86rem' }}>
               The institute&apos;s bank account is not saved yet.{' '}
@@ -208,7 +237,31 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
           )}
         </div>
 
-        {/* to - the tutor's bank account, with a change btn */}
+        {/* to - the tutor's wallet number, or their bank account with a change btn */}
+        {isWallet ? (
+          <div className="transfer-box">
+            <p className="transfer-box-title">
+              <span>
+                <Icon name="user" size={16} /> To: {tutor.fullName}&apos;s {chosen.label}
+              </span>
+            </p>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label htmlFor="wallet-number">{chosen.label} number</label>
+              <input
+                id="wallet-number"
+                type="tel"
+                placeholder="07XXXXXXXX"
+                value={walletNumber}
+                onChange={(e) => {
+                  setWalletNumber(e.target.value);
+                  clearFieldError('walletNumber');
+                }}
+                className={fieldErrors.walletNumber ? 'input-error' : ''}
+              />
+              {fieldErrors.walletNumber && <p className="field-error">{fieldErrors.walletNumber}</p>}
+            </div>
+          </div>
+        ) : (
         <div className="transfer-box">
           <p className="transfer-box-title">
             <span>
@@ -334,6 +387,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
           )}
           {fieldErrors.account && <p className="field-error">{fieldErrors.account}</p>}
         </div>
+        )}
 
         {/* payout form - amount, month, note and how it is paid */}
         <form onSubmit={handleSubmit} noValidate>
@@ -377,41 +431,21 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
             />
           </div>
 
-          {/* how it is paid - shown only when there is more than one way */}
-          {methods.length > 1 && (
-            <div className="form-field">
-              <label>How is it being paid?</label>
-              <div className="period-tabs" role="radiogroup" aria-label="Payment method">
-                {methods.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={method === item.value}
-                    className={`period-tab${method === item.value ? ' active' : ''}`}
-                    onClick={() => setMethod(item.value)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* bank reference and transfer date */}
-          {method === 'BANK_TRANSFER' && (
+          {/* reference (or wallet transaction ID) and transfer date */}
+          {isDirect && (
             <>
               <p className="field-help" style={{ marginTop: 0, marginBottom: '12px' }}>
-                Send the amount to the account above from your online banking or at the bank, then
-                enter the reference number shown on the bank&apos;s confirmation.
+                {isWallet
+                  ? `Send the amount from the institute's ${chosen.label} to the number above, then enter the transaction ID from the confirmation SMS.`
+                  : 'Send the amount to the account above from your online banking or at the bank, then enter the reference number shown on the bank\'s confirmation.'}
               </p>
               <div className="card-field-row">
                 <div className="form-field">
-                  <label htmlFor="bank-reference">Bank reference number</label>
+                  <label htmlFor="bank-reference">{isWallet ? 'Transaction ID' : 'Bank reference number'}</label>
                   <input
                     id="bank-reference"
                     type="text"
-                    placeholder="e.g. CEFT 240926001234"
+                    placeholder={isWallet ? 'e.g. 9F2K7Q1X' : 'e.g. CEFT 240926001234'}
                     maxLength={60}
                     value={bankReference}
                     onChange={(e) => {
@@ -442,7 +476,7 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
           )}
 
           {/* bank file note - download the file, upload it to the bank, then mark it paid */}
-          {method === 'BANK_FILE' && (
+          {chosen.value === 'BANK_FILE' && (
             <p className="field-help" style={{ marginTop: 0 }}>
               The payout waits in the bank file. Download the file from this page, upload it to your
               corporate online banking, then mark it as paid.
@@ -456,12 +490,12 @@ function PayTutorModal({ tutor, options, onClose, onPaid, onBankSaved }) {
             <button type="button" className="btn btn-secondary" disabled={isSubmitting} onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={isSubmitting || isEditingBank}>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting || (isEditingBank && !isWallet)}>
               {isSubmitting
                 ? 'Saving...'
-                : method === 'BANK_TRANSFER'
+                : isDirect
                   ? 'Record payment'
-                  : method === 'BANK_FILE'
+                  : chosen.value === 'BANK_FILE'
                     ? 'Add to bank file'
                     : 'Send payment'}
             </button>

@@ -41,6 +41,7 @@ async function findSessionWithClass(sessionId) {
   return rows[0] || null;
 }
 
+// save key and expiry time
 async function setSessionCheckinCode(sessionId, code, expiresAt) {
   await pool.execute(
     `UPDATE class_sessions SET checkin_code = ?, checkin_code_expires_at = ? WHERE id = ?`,
@@ -48,6 +49,7 @@ async function setSessionCheckinCode(sessionId, code, expiresAt) {
   );
 }
 
+// session using this live key
 async function findSessionByActiveCheckinCode(code) {
   const [rows] = await pool.execute(
     `SELECT cs.id, cs.class_id, cs.session_date, c.subject, c.tutor_id, c.level
@@ -71,6 +73,7 @@ async function listSessionsForClass(classId) {
   return rows;
 }
 
+// enrolled students of a class
 async function listActiveStudentsForClass(classId) {
   const [rows] = await pool.execute(
     `SELECT u.id AS student_id, u.full_name AS student_name, u.student_code,
@@ -84,6 +87,7 @@ async function listActiveStudentsForClass(classId) {
   return rows;
 }
 
+// session for a class and date
 async function findSessionByClassAndDate(classId, sessionDate) {
   const [rows] = await pool.execute(
     `SELECT id, class_id, session_date, start_time, end_time
@@ -93,6 +97,7 @@ async function findSessionByClassAndDate(classId, sessionDate) {
   return rows[0] || null;
 }
 
+// insert a class session
 async function createSession({ classId, sessionDate, startTime, endTime }) {
   const [result] = await pool.execute(
     `INSERT INTO class_sessions (class_id, session_date, start_time, end_time, created_at)
@@ -102,6 +107,7 @@ async function createSession({ classId, sessionDate, startTime, endTime }) {
   return result.insertId;
 }
 
+// marks saved for a session
 async function listAttendanceForSession(sessionId) {
   const [rows] = await pool.execute(
     `SELECT id, session_id, student_id, status, remarks, marked_by, marked_at, updated_at
@@ -112,6 +118,7 @@ async function listAttendanceForSession(sessionId) {
   return rows;
 }
 
+// one student's mark in a session
 async function findAttendanceRecord(sessionId, studentId) {
   const [rows] = await pool.execute(
     `SELECT * FROM attendance_records WHERE session_id = ? AND student_id = ? LIMIT 1`,
@@ -120,6 +127,7 @@ async function findAttendanceRecord(sessionId, studentId) {
   return rows[0] || null;
 }
 
+// insert a mark
 async function createAttendanceRecord({ sessionId, studentId, status, remarks, markedBy }) {
   await pool.execute(
     `INSERT INTO attendance_records
@@ -129,6 +137,7 @@ async function createAttendanceRecord({ sessionId, studentId, status, remarks, m
   );
 }
 
+// correct a mark
 async function updateAttendanceRecord(id, { status, remarks, markedBy }) {
   await pool.execute(
     `UPDATE attendance_records
@@ -160,6 +169,7 @@ async function listAttendanceHistoryForStudent(studentId, classId) {
   return rows;
 }
 
+// is the student in this class
 async function isStudentEnrolledInClass(studentId, classId) {
   const [rows] = await pool.execute(
     `SELECT id FROM enrollments WHERE student_id = ? AND class_id = ? AND status = 'ACTIVE' LIMIT 1`,

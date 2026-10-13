@@ -4,6 +4,7 @@ const config = require('../../../../../shared/server/src/config/env');
 const { saveUpload, deleteUpload, sendUpload } = require('../../../../../shared/server/src/utils/fileStore');
 const service = require('./payment.service');
 
+// balances request
 const getMyBalances = asyncHandler(async (req, res) => {
   const balances = await service.getMyBalances(req.user);
   res.status(200).json({ success: true, data: { balances } });
@@ -55,6 +56,7 @@ const retryPendingPayment = asyncHandler(async (req, res) => {
   });
 });
 
+// history request
 const getMyPaymentHistory = asyncHandler(async (req, res) => {
   const payments = await service.getMyPaymentHistory(req.user);
   res.status(200).json({ success: true, data: { payments } });
@@ -123,6 +125,7 @@ const listRecentPayments = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { payments } });
 });
 
+// approve request
 const approveBankTransferPayment = asyncHandler(async (req, res) => {
   const paymentId = Number(req.params.paymentId);
   const payment = await service.approveBankTransferPayment(req.user, paymentId, { amount: req.body.amount });
@@ -142,13 +145,15 @@ const getReceiptImage = asyncHandler(async (req, res) => {
 });
 
 const getPaymentSettings = asyncHandler(async (req, res) => {
-  const settings = await service.getPaymentSettings();
+  const settings = await service.getPaymentSettings({ forAdmin: req.user.role === 'ADMIN' });
   res.status(200).json({ success: true, data: { settings } });
 });
 
+// save details request
 const updatePaymentSettings = asyncHandler(async (req, res) => {
   const { bankName, bankAccountName, bankAccountNumber, bankBranch, bankSwift, ezCashNumber, mcashNumber, enabledMethods, confirmText } =
     req.body;
+  const { cardBankName, cardAccountName, cardAccountNumber, cardBankBranch } = req.body;
   const settings = await service.updatePaymentSettings(req.user, {
     enabledMethods,
     confirmText,
@@ -159,8 +164,21 @@ const updatePaymentSettings = asyncHandler(async (req, res) => {
     bankSwift,
     ezCashNumber,
     mcashNumber,
+    cardBankName,
+    cardAccountName,
+    cardAccountNumber,
+    cardBankBranch,
   });
   res.status(200).json({ success: true, message: 'Payment settings saved.', data: { settings } });
+});
+
+// payment method switch - turn one on or off straight away
+const updatePaymentMethods = asyncHandler(async (req, res) => {
+  const settings = await service.updatePaymentMethods(req.user, {
+    enabledMethods: req.body.enabledMethods,
+    confirmText: req.body.confirmText,
+  });
+  res.status(200).json({ success: true, message: 'Payment methods saved.', data: { settings } });
 });
 
 const listActiveTutors = asyncHandler(async (req, res) => {
@@ -173,6 +191,7 @@ const getMyBankDetails = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { bankDetails } });
 });
 
+// save my bank details request
 const updateMyBankDetails = asyncHandler(async (req, res) => {
   const { bankName, accountHolder, accountNumber, branch } = req.body;
   const bankDetails = await service.updateMyBankDetails(req.user, {
@@ -190,7 +209,7 @@ const updateMyBankDetails = asyncHandler(async (req, res) => {
 
 // POST /admin/tutor-payouts - pay a tutor and notify them
 const payTutor = asyncHandler(async (req, res) => {
-  const { tutorId, amount, note, periodLabel, method, bankReference, transferDate } = req.body;
+  const { tutorId, amount, note, periodLabel, method, bankReference, transferDate, walletNumber } = req.body;
   const payout = await service.payTutor(req.user, {
     tutorId,
     amount: Number(amount),
@@ -199,6 +218,7 @@ const payTutor = asyncHandler(async (req, res) => {
     method,
     bankReference,
     transferDate,
+    walletNumber,
   });
   const outcome = {
     SENT: `Payment to ${payout.tutorName} recorded. They have been notified.`,
@@ -310,6 +330,7 @@ function siteAddressOf(req) {
   return config.paypal.publicBaseUrl;
 }
 
+// PayPal checkout request
 const startPayPalCheckout = asyncHandler(async (req, res) => {
   const { enrollmentId, amount } = req.body;
   const checkout = await service.startPayPalCheckout(
@@ -355,6 +376,7 @@ const searchStudentsForPayment = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { students } });
 });
 
+// office payment request
 const recordOfficePayment = asyncHandler(async (req, res) => {
   const { enrollmentId, amount, method, reference, note } = req.body;
   const data = await service.recordOfficePayment(req.user, {
@@ -393,6 +415,7 @@ module.exports = {
   updateMyBankDetails,
   getPaymentSettings,
   updatePaymentSettings,
+  updatePaymentMethods,
   payTutor,
   listTutorPayouts,
   getPayoutOptions,
