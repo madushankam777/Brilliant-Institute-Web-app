@@ -25,7 +25,13 @@ async function authenticate(req, res, next) {
     return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
   }
   // this session was logged out
-  if (isTokenRevoked(token)) {
+  let revoked;
+  try {
+    revoked = await isTokenRevoked(token);
+  } catch (error) {
+    return next(error);
+  }
+  if (revoked) {
     return next(ApiError.unauthorized('Your session has expired. Please log in again.'));
   }
 

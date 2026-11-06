@@ -19,6 +19,7 @@ const {
 const { sendMail } = require('../../../../../shared/server/src/utils/mailer');
 const { createNotification } = require('../../../../../shared/server/src/utils/notifications');
 const { hashPassword, comparePassword, hashNow } = require('../../../../../shared/server/src/utils/passwordHasher');
+const schema = require('../../../../../shared/server/src/utils/schemaFeatures');
 const repository = require('./auth.repository');
 const signupEmailCheck = require('./signupEmailCheck');
 
@@ -61,7 +62,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
   }
 
   // the address must be confirmed with the code we emailed to it
-  signupEmailCheck.checkSignupCode(email, emailCode);
+  await signupEmailCheck.checkSignupCode(email, emailCode);
 
   // anyone who is not a tutor is a student - nobody can sign up as admin
   const targetRole = role === ROLES.TUTOR ? ROLES.TUTOR : ROLES.STUDENT_PARENT;
@@ -129,7 +130,7 @@ async function registerUser({ fullName, email, password, phone, role, enrollment
     details: consumedKey ? { enrollmentKeyId: consumedKey.id } : undefined,
   });
 
-  signupEmailCheck.forgetSignupCode(email);
+  await signupEmailCheck.forgetSignupCode(email);
 
   // welcome - in the bell and by email
   await createNotification({
@@ -215,18 +216,39 @@ async function loginWithEmailAndPassword({ email, password }, res) {
   return toSafeUser(user);
 }
 
-// logout btn - also ends the token on the server, so a copied cookie stops working
-function logout(req, res) {
+// logout btn - also ends the token on the server (saved in MySQL), so a copied cookie stops working
+async function logout(req, res) {
   const token = req.cookies && req.cookies[SESSION_COOKIE_NAME];
+  let payload = null;
   if (token) {
     try {
-      const payload = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] });
-      revokeToken(token, payload.exp);
+      payload = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] });
     } catch {
       // expired or invalid - nothing to end
     }
   }
+  if (payload) await revokeToken(token, payload.exp);
   clearSessionCookie(res);
+}
+
+// cookie banner - save the choice in MySQL, with the user when someone is signed in
+async function saveCookieConsent(choice, req) {
+  if (!(await schema.hasCookieConsents())) return;
+  let userId = null;
+  const token = req.cookies && req.cookies[SESSION_COOKIE_NAME];
+  if (token) {
+    try {
+      userId = jwt.verify(token, config.auth.jwtSecret, { algorithms: ['HS256'] }).sub || null;
+    } catch {
+      // not signed in - saved without a user
+    }
+  }
+  try {
+    await repository.saveCookieConsent(choice, userId);
+  } catch {
+    // the account is gone - keep the choice without it
+    await repository.saveCookieConsent(choice, null);
+  }
 }
 
 // Deletes an old upload, but never anything outside the uploads folder.
@@ -339,10 +361,6 @@ const RESET_CODE_TTL_MINUTES = 15;
 const RESET_CODE_MAX_TRIES = 5;
 const RESET_CODE_RESEND_SECONDS = 60;
 
-// wrong-code count and last send time per user (kept in memory)
-const codeTries = new Map();
-const lastCodeSentAt = new Map();
-
 // admin reset link - only the sha256 hash of the token is stored
 function hashResetToken(rawToken) {
   return crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -359,9 +377,9 @@ async function requestPasswordReset(email) {
   const user = await repository.findUserByEmail(email);
   if (!user || user.status !== 'ACTIVE') return;
 
-  // one code a minute at most
-  const last = lastCodeSentAt.get(user.id) || 0;
-  if (Date.now() - last < RESET_CODE_RESEND_SECONDS * 1000) return;
+  // one code a minute at most (the last send time is the newest code row in MySQL)
+  const secondsAgo = await repository.secondsSinceLastResetCode(user.id);
+  if (secondsAgo !== null && secondsAgo < RESET_CODE_RESEND_SECONDS) return;
 
   // make the random 6-digit reset code
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -370,7 +388,6 @@ async function requestPasswordReset(email) {
   await repository.invalidateResetTokensForUser(user.id);
   await repository.deleteOldResetTokensForUser(user.id);
   await repository.createPasswordResetToken(user.id, hashResetCode(user.id, code), expiresAt);
-  codeTries.delete(user.id);
 
   // audit log - reset requested
   await recordAuditEvent({
@@ -402,13 +419,13 @@ async function requestPasswordReset(email) {
     if (!config.isProduction) {
       // eslint-disable-next-line no-console
       console.log(`[dev-only] reset code for ${user.email}: ${code}`);
-      lastCodeSentAt.set(user.id, Date.now());
       return;
     }
+    // not sent - cancel this code so the user can ask again straight away
+    await repository.invalidateResetTokensForUser(user.id);
+    await repository.deleteOldResetTokensForUser(user.id);
     throw new ApiError(503, 'We could not send your reset code. Please try again later.');
   }
-
-  lastCodeSentAt.set(user.id, Date.now());
 }
 
 // makes text safe to put inside the email
@@ -454,12 +471,10 @@ async function checkResetCode(email, code) {
 
   const resetToken = await repository.findValidResetTokenForUser(user.id, hashResetCode(user.id, code));
   if (!resetToken) {
-    // too many wrong codes - the current code stops working
-    const tries = (codeTries.get(user.id) || 0) + 1;
-    codeTries.set(user.id, tries);
+    // too many wrong codes - the current code stops working (the count is kept in MySQL)
+    const tries = (await schema.hasResetTries()) ? await repository.addResetCodeTry(user.id) : 0;
     if (tries >= RESET_CODE_MAX_TRIES) {
       await repository.invalidateResetTokensForUser(user.id);
-      codeTries.delete(user.id);
       throw ApiError.badRequest('Too many wrong codes. Please ask for a new code.');
     }
     throw ApiError.badRequest(invalid);
@@ -482,7 +497,6 @@ async function resetPasswordWithCode({ email, code, newPassword }, res) {
   await repository.markResetTokenUsed(resetToken.id);
   await repository.invalidateResetTokensForUser(user.id);
   await repository.resetFailedLoginCounter(user.id);
-  codeTries.delete(user.id);
 
   // audit log - reset completed
   await recordAuditEvent({
@@ -540,6 +554,7 @@ async function resetPasswordWithToken(rawToken, newPassword) {
 }
 
 module.exports = {
+  saveCookieConsent,
   sendSignupCode,
   verifyResetCode,
   registerUser,

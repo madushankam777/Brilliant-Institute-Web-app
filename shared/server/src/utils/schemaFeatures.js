@@ -110,6 +110,26 @@ function hasCardAccount() {
   return hasColumn('payment_settings', 'card_account_number');
 }
 
+// sign-up email codes are kept in MySQL
+function hasSignupCodes() {
+  return hasTable('signup_codes');
+}
+
+// logged-out sessions are kept in MySQL
+function hasRevokedSessions() {
+  return hasTable('revoked_sessions');
+}
+
+// wrong reset-code tries are counted in MySQL
+function hasResetTries() {
+  return hasColumn('password_reset_tokens', 'failed_tries');
+}
+
+// cookie banner choices are kept in MySQL
+function hasCookieConsents() {
+  return hasTable('cookie_consents');
+}
+
 // notifications remember when their email went out (so each is emailed once)
 async function hasNotificationEmails() {
   return (await hasColumn('notification_log', 'emailed_at')) && (await hasColumn('notification_log', 'email_tries'));
@@ -138,6 +158,10 @@ async function reportPendingUpdates() {
   if (!(await hasFeedbackReads())) missing.push('read / delete for feedback tickets');
   if (!(await hasReportHistoryHidden())) missing.push('deleting recent reports');
   if (!(await hasCardAccount())) missing.push('a separate bank account for card payments');
+  if (!(await hasSignupCodes())) missing.push('sign-up email codes');
+  if (!(await hasRevokedSessions())) missing.push('logging out on the server');
+  if (!(await hasResetTries())) missing.push('counting wrong reset codes');
+  if (!(await hasCookieConsents())) missing.push('saving cookie choices');
 
   if (missing.length > 0) {
     console.warn(
@@ -164,6 +188,10 @@ module.exports = {
   hasFeedbackReads,
   hasReportHistoryHidden,
   hasCardAccount,
+  hasSignupCodes,
+  hasRevokedSessions,
+  hasResetTries,
+  hasCookieConsents,
   migrationRequired,
   reportPendingUpdates,
 };

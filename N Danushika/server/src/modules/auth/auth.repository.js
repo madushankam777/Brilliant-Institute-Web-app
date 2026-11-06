@@ -165,7 +165,74 @@ async function releaseTutorKey(keyId) {
   );
 }
 
+// sign-up code - save (or replace) the hash of the code emailed to this address
+async function saveSignupCode(email, codeHash, validMinutes) {
+  await pool.execute('DELETE FROM signup_codes WHERE expires_at <= NOW()');
+  await pool.execute(
+    `INSERT INTO signup_codes (email, code_hash, tries, sent_at, expires_at)
+     VALUES (?, ?, 0, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE))
+     ON DUPLICATE KEY UPDATE code_hash = VALUES(code_hash), tries = 0, sent_at = NOW(), expires_at = VALUES(expires_at)`,
+    [email, codeHash, validMinutes]
+  );
+}
+
+// sign-up code - the waiting code for an address, with how long ago it was sent
+async function findSignupCode(email) {
+  const [rows] = await pool.execute(
+    `SELECT email, code_hash, tries, expires_at > NOW() AS is_valid, TIMESTAMPDIFF(SECOND, sent_at, NOW()) AS seconds_ago
+     FROM signup_codes WHERE email = ? LIMIT 1`,
+    [email]
+  );
+  return rows[0] || null;
+}
+
+// sign-up code - one more wrong try
+async function addSignupCodeTry(email) {
+  await pool.execute('UPDATE signup_codes SET tries = tries + 1 WHERE email = ?', [email]);
+}
+
+// sign-up code - used up or cancelled
+async function deleteSignupCode(email) {
+  await pool.execute('DELETE FROM signup_codes WHERE email = ?', [email]);
+}
+
+// reset code - seconds since the last code was sent to this user (null when none)
+async function secondsSinceLastResetCode(userId) {
+  const [rows] = await pool.execute(
+    'SELECT TIMESTAMPDIFF(SECOND, MAX(created_at), NOW()) AS seconds_ago FROM password_reset_tokens WHERE user_id = ?',
+    [userId]
+  );
+  return rows[0] && rows[0].seconds_ago !== null ? Number(rows[0].seconds_ago) : null;
+}
+
+// reset code - one more wrong try on the user's waiting code; returns the new count
+async function addResetCodeTry(userId) {
+  await pool.execute(
+    `UPDATE password_reset_tokens SET failed_tries = failed_tries + 1
+     WHERE user_id = ? AND used_at IS NULL AND expires_at > NOW()`,
+    [userId]
+  );
+  const [rows] = await pool.execute(
+    `SELECT MAX(failed_tries) AS tries FROM password_reset_tokens
+     WHERE user_id = ? AND used_at IS NULL AND expires_at > NOW()`,
+    [userId]
+  );
+  return rows[0] && rows[0].tries !== null ? Number(rows[0].tries) : 0;
+}
+
+// cookie banner - save the choice (and the user, when signed in)
+async function saveCookieConsent(choice, userId) {
+  await pool.execute('INSERT INTO cookie_consents (choice, user_id) VALUES (?, ?)', [choice, userId || null]);
+}
+
 module.exports = {
+  saveSignupCode,
+  findSignupCode,
+  addSignupCodeTry,
+  deleteSignupCode,
+  secondsSinceLastResetCode,
+  addResetCodeTry,
+  saveCookieConsent,
   createUser,
   setStudentCode,
   findUserByEmail,

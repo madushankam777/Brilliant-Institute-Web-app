@@ -11,6 +11,12 @@ const sendSignupCode = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: `We emailed a 6-digit code to ${email}.` });
 });
 
+// POST /api/auth/cookie-consent - save the cookie banner choice in MySQL
+const saveCookieConsent = asyncHandler(async (req, res) => {
+  await authService.saveCookieConsent(req.body.choice, req);
+  res.status(201).json({ success: true, message: 'Cookie choice saved.' });
+});
+
 // POST /api/auth/verify-reset-code - is the emailed reset code right?
 const verifyResetCode = asyncHandler(async (req, res) => {
   const { email, code } = req.body;
@@ -51,7 +57,7 @@ const login = asyncHandler(async (req, res) => {
 
 // POST /api/auth/logout - end the current session.
 const logout = asyncHandler(async (req, res) => {
-  authService.logout(req, res);
+  await authService.logout(req, res);
   res.status(200).json({ success: true, message: 'Logged out successfully.' });
 });
 
@@ -139,6 +145,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  saveCookieConsent,
   sendSignupCode,
   verifyResetCode,
   register,

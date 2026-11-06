@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   token_hash  CHAR(64)     NOT NULL,
   expires_at  DATETIME     NOT NULL,
   used_at     DATETIME     NULL,
+  failed_tries TINYINT UNSIGNED NOT NULL DEFAULT 0,
   created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_reset_token_hash (token_hash),
   KEY idx_reset_user (user_id),
@@ -434,4 +435,31 @@ CREATE TABLE IF NOT EXISTS report_history_hidden (
   hidden_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_report_hidden_audit FOREIGN KEY (audit_id) REFERENCES audit_log(id) ON DELETE CASCADE,
   CONSTRAINT fk_report_hidden_by FOREIGN KEY (hidden_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- signup_codes - sign-up email codes waiting to be typed in (only a hash of the code)
+CREATE TABLE IF NOT EXISTS signup_codes (
+  email       VARCHAR(190) NOT NULL PRIMARY KEY,
+  code_hash   CHAR(64)     NOT NULL,
+  tries       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  sent_at     DATETIME     NOT NULL,
+  expires_at  DATETIME     NOT NULL,
+  KEY idx_signup_codes_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- revoked_sessions - sessions ended with Log out (a hash of the token)
+CREATE TABLE IF NOT EXISTS revoked_sessions (
+  token_hash  CHAR(64) NOT NULL PRIMARY KEY,
+  expires_at  DATETIME NOT NULL,
+  KEY idx_revoked_sessions_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- cookie_consents - cookie banner choices
+CREATE TABLE IF NOT EXISTS cookie_consents (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  choice      ENUM('accepted', 'declined') NOT NULL,
+  user_id     INT UNSIGNED NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_cookie_consents_user (user_id),
+  CONSTRAINT fk_cookie_consents_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

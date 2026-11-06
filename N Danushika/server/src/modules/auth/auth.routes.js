@@ -14,6 +14,7 @@ const {
   resetPasswordValidationRules,
   signupCodeValidationRules,
   verifyResetCodeValidationRules,
+  cookieConsentValidationRules,
 } = require('./auth.validation');
 
 const router = express.Router();
@@ -57,6 +58,9 @@ router.post(
 
 // logout btn - end the session
 router.post('/logout', controller.logout);
+
+// cookie banner Accept / Decline - the choice is saved in MySQL
+router.post('/cookie-consent', cookieConsentValidationRules, validateRequest, controller.saveCookieConsent);
 
 // forgot password btn - email a 6-digit reset code
 router.post(

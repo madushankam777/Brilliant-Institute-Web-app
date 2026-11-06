@@ -249,6 +249,40 @@ SET @ddl = (SELECT IF(COUNT(*) = 0,
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payment_settings' AND COLUMN_NAME = 'card_account_number');
 PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- sign-up email codes waiting to be typed in (only a hash of the code is kept)
+CREATE TABLE IF NOT EXISTS signup_codes (
+  email       VARCHAR(190) NOT NULL PRIMARY KEY,
+  code_hash   CHAR(64)     NOT NULL,
+  tries       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  sent_at     DATETIME     NOT NULL,
+  expires_at  DATETIME     NOT NULL,
+  KEY idx_signup_codes_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- sessions ended with Log out (a hash of the token), kept until the token would have expired anyway
+CREATE TABLE IF NOT EXISTS revoked_sessions (
+  token_hash  CHAR(64) NOT NULL PRIMARY KEY,
+  expires_at  DATETIME NOT NULL,
+  KEY idx_revoked_sessions_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- password reset codes count wrong tries in the database
+SET @ddl = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE password_reset_tokens ADD COLUMN failed_tries TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER used_at', 'SELECT 1')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'password_reset_tokens' AND COLUMN_NAME = 'failed_tries');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- cookie banner choices (the signed-in user, when there is one)
+CREATE TABLE IF NOT EXISTS cookie_consents (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  choice      ENUM('accepted', 'declined') NOT NULL,
+  user_id     INT UNSIGNED NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_cookie_consents_user (user_id),
+  CONSTRAINT fk_cookie_consents_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- the Messages page was removed - drop its tables
 DROP TABLE IF EXISTS conversation_reads;
 DROP TABLE IF EXISTS conversation_messages;

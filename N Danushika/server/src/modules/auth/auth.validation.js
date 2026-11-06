@@ -125,7 +125,13 @@ const verifyResetCodeValidationRules = [
   body('code').trim().matches(/^\d{6}$/).withMessage('Enter the 6-digit code from the email.'),
 ];
 
+// cookie banner choice rules
+const cookieConsentValidationRules = [
+  body('choice').isIn(['accepted', 'declined']).withMessage('Choose accept or decline.'),
+];
+
 module.exports = {
+  cookieConsentValidationRules,
   signupCodeValidationRules,
   verifyResetCodeValidationRules,
   registerValidationRules,

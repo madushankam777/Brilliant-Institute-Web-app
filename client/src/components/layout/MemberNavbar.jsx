@@ -20,24 +20,6 @@ import Logo from '../../../../shared/client/src/components/common/Logo';
 import Avatar from '../../../../shared/client/src/components/common/Avatar';
 import ModalClose from '../../../../shared/client/src/components/common/ModalClose';
 
-// read saved dismissed notifications
-function readVersionMap(key) {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-// save dismissed notifications
-function writeVersionMap(key, versionMap) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(versionMap));
-  } catch {
-    // ignore - storage may be unavailable
-  }
-}
 
 // a time as 5m ago, 2h ago, 3d ago
 function timeAgo(isoDate) {
@@ -110,7 +92,6 @@ function MemberNavbar() {
   const [announcements, setAnnouncements] = useState([]);
   const [personalNotifications, setPersonalNotifications] = useState([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [lastSeenAt, setLastSeenAt] = useState(null);
   const [dismissedVersions, setDismissedVersions] = useState({});
   // items marked read in this visit (the server knows too - this shows it straight away)
   const [readHere, setReadHere] = useState({});
@@ -121,8 +102,6 @@ function MemberNavbar() {
   // ids already shown, so only notifications that arrive later pop up as a toast
   const knownIdsRef = useRef(null);
 
-  const lastSeenKey = user ? `brilliant_notif_last_seen_${user.id}` : null;
-  const dismissedKey = user ? `brilliant_notif_dismissed_${user.id}` : null;
   const userId = user ? user.id : null;
 
   // load bell notifications (announcements + personal notifications)
@@ -158,6 +137,7 @@ function MemberNavbar() {
     knownIdsRef.current = null;
     setToasts([]);
     setReadHere({});
+    setDismissedVersions({});
   }, [userId]);
 
   // going to another page closes the bell
@@ -176,21 +156,11 @@ function MemberNavbar() {
     };
   }, [isLoggedIn, loadNotifications]);
 
-  // when the user logs in, restore what they last saw and dismissed, then load the bell
+  // when the user logs in, load the bell (read and cleared items come from MySQL)
   useEffect(() => {
     if (!isLoggedIn) return;
-    if (lastSeenKey) {
-      try {
-        setLastSeenAt(window.localStorage.getItem(lastSeenKey));
-      } catch {
-        setLastSeenAt(null);
-      }
-    }
-    if (dismissedKey) {
-      setDismissedVersions(readVersionMap(dismissedKey));
-    }
     loadNotifications();
-  }, [isLoggedIn, lastSeenKey, dismissedKey, loadNotifications]);
+  }, [isLoggedIn, loadNotifications]);
 
   // close the notification panel when you click outside it
   useEffect(() => {
@@ -237,40 +207,21 @@ function MemberNavbar() {
   // hide dismissed notifications
   const visibleItems = feedItems.filter((item) => (dismissedVersions[item.feedId] ?? 0) < item.version);
 
-  // does the server keep read / unread? (before the database update the bell uses "last opened" instead)
-  const readKnown = feedItems.some((item) => typeof item.isRead === 'boolean');
-
-  // is this item read?
+  // is this item read? (read / unread is kept in MySQL)
   function isItemRead(item) {
     if ((readHere[item.feedId] ?? 0) >= item.version) return true;
-    if (readKnown) return item.isRead === true;
-    return Boolean(lastSeenAt) && new Date(item.effectiveDate) <= new Date(lastSeenAt);
+    return item.isRead === true;
   }
 
   // count unread for the bell badge
   const unreadCount = visibleItems.filter((item) => !isItemRead(item)).length;
   const readCount = visibleItems.length - unreadCount;
 
-  // remember "last opened" (only used before the database update)
-  function rememberSeenNow() {
-    if (!lastSeenKey) return;
-    const now = new Date().toISOString();
-    try {
-      window.localStorage.setItem(lastSeenKey, now);
-    } catch {
-      // ignore - storage may be unavailable
-    }
-    setLastSeenAt(now);
-  }
-
   // bell btn - open or close the panel
   function toggleNotifications() {
     const opening = !isNotifOpen;
     setIsNotifOpen(opening);
-    if (opening) {
-      loadNotifications();
-      if (!readKnown) rememberSeenNow();
-    }
+    if (opening) loadNotifications();
   }
 
   // one item is read - shown at once, saved on the server for every device
@@ -292,57 +243,47 @@ function MemberNavbar() {
       });
       return next;
     });
-    if (!readKnown) rememberSeenNow();
     markAllMyNotificationsRead().catch(() => {
       // offline - shown as read here anyway
     });
   }
 
-  // delete read btn - clear what is read, keep what is new
+  // delete read btn - clear what is read, keep what is new (saved in MySQL)
   function deleteReadNotifications() {
-    if (!dismissedKey) return;
     const readItems = visibleItems.filter((item) => isItemRead(item));
     setDismissedVersions((prev) => {
       const next = { ...prev };
       readItems.forEach((item) => {
         next[item.feedId] = item.version;
       });
-      writeVersionMap(dismissedKey, next);
       return next;
     });
     clearMyReadNotifications().catch(() => {
-      // offline - this browser still remembers it
+      // offline - hidden on this screen until the next load
     });
   }
 
-  // clear btn - hide one notification for good: saved on the server (every device) and in this browser
+  // clear btn - hide one notification for good (saved in MySQL, so every device hides it)
   function dismissNotification(item) {
-    if (!dismissedKey) return;
-    setDismissedVersions((prev) => {
-      const next = { ...prev, [item.feedId]: item.version };
-      writeVersionMap(dismissedKey, next);
-      return next;
-    });
+    setDismissedVersions((prev) => ({ ...prev, [item.feedId]: item.version }));
     const saved =
       item.kind === 'notification' ? dismissMyNotification(item.id) : dismissMyAnnouncement(item.id, item.version);
     saved.catch(() => {
-      // offline - this browser still remembers it, the server will hear next time
+      // offline - hidden on this screen until the next load
     });
   }
 
   // clear all btn - hide every notification, on every device
   function clearAllNotifications() {
-    if (!dismissedKey) return;
     setDismissedVersions((prev) => {
       const next = { ...prev };
       visibleItems.forEach((item) => {
         next[item.feedId] = item.version;
       });
-      writeVersionMap(dismissedKey, next);
       return next;
     });
     clearMyNotifications().catch(() => {
-      // offline - this browser still remembers it
+      // offline - hidden on this screen until the next load
     });
   }
 

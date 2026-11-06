@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import httpClient from '../../api/httpClient';
 
-// where the choice is remembered in the browser
+// the browser only remembers that a choice was made (so the banner stays hidden); the choice is saved in MySQL
 const STORAGE_KEY = 'brilliant_cookie_consent';
 
 // cookie consent popup - shown once until accepted or declined
@@ -17,8 +18,11 @@ function CookieConsentBanner() {
     }
   }, []);
 
-  // accept / decline btn - remember the choice and hide the banner
+  // accept / decline btn - save the choice in MySQL and hide the banner
   function recordChoice(choice) {
+    httpClient.post('/auth/cookie-consent', { choice }, { background: true }).catch(() => {
+      // offline - the banner still hides
+    });
     try {
       window.localStorage.setItem(STORAGE_KEY, choice);
     } catch {
